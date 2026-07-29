@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { MiniCalendar } from "@/components/dashboard/mini-calendar";
 import { RecentSales, type VendaRow } from "@/components/dashboard/recent-sales";
 import { TasksAlerts } from "@/components/dashboard/tasks-alerts";
+import { usePeriod, presetRange, isoToDate } from "@/components/dashboard/period-context";
 
 type Venda = {
   id: string;
@@ -29,9 +30,10 @@ function startOfDay(d: Date) {
   return x;
 }
 
-function somaConcluidas(vendas: Venda[], inicio: Date, fim?: Date) {
+/** Soma o total das vendas concluídas com created_at em [inicio, fimExclusivo). */
+function somaConcluidas(vendas: Venda[], inicio: Date, fimExclusivo: Date) {
   const ini = inicio.getTime();
-  const f = fim ? fim.getTime() : Infinity;
+  const f = fimExclusivo.getTime();
   return vendas
     .filter((v) => v.status === "concluida")
     .filter((v) => {
@@ -47,6 +49,7 @@ function variacao(atual: number, anterior: number) {
 }
 
 export default function DashboardPage() {
+  const { period } = usePeriod();
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
@@ -75,10 +78,7 @@ export default function DashboardPage() {
         clientesRes.error ||
         promissoriasRes.error ||
         condicionaisRes.error;
-
-      if (primeiroErro) {
-        setErro(primeiroErro.message);
-      }
+      if (primeiroErro) setErro(primeiroErro.message);
 
       setVendas(vendasRes.data || []);
       setClientes(clientesRes.data || []);
@@ -86,7 +86,6 @@ export default function DashboardPage() {
       setCondicionais(condicionaisRes.data || []);
       setLoading(false);
     }
-
     carregar();
   }, []);
 
@@ -96,32 +95,49 @@ export default function DashboardPage() {
     return map;
   }, [clientes]);
 
+  // Janela do período selecionado (fim exclusivo = dia seguinte).
+  const janela = useMemo(() => {
+    const inicio = startOfDay(isoToDate(period.inicio));
+    const fim = startOfDay(isoToDate(period.fim));
+    fim.setDate(fim.getDate() + 1);
+    const anteriorFim = inicio;
+    const anteriorInicio = new Date(inicio.getTime() - (fim.getTime() - inicio.getTime()));
+    const ehHoje = period.inicio === presetRange("hoje").inicio && period.fim === presetRange("hoje").fim;
+    return { inicio, fim, anteriorInicio, anteriorFim, ehHoje };
+  }, [period]);
+
   const metricas = useMemo(() => {
     const agora = new Date();
-    const hoje = startOfDay(agora);
-    const ontem = new Date(hoje);
-    ontem.setDate(ontem.getDate() - 1);
     const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const inicioProxMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1);
     const inicioMesAnterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
 
-    const vendasHoje = somaConcluidas(vendas, hoje);
-    const vendasOntem = somaConcluidas(vendas, ontem, hoje);
-    const faturamentoMes = somaConcluidas(vendas, inicioMes);
-    const faturamentoMesAnterior = somaConcluidas(vendas, inicioMesAnterior, inicioMes);
+    const vendasPeriodo = somaConcluidas(vendas, janela.inicio, janela.fim);
+    const vendasPeriodoAnterior = somaConcluidas(
+      vendas,
+      janela.anteriorInicio,
+      janela.anteriorFim
+    );
+    const qtdPeriodo = vendas.filter((v) => {
+      const t = new Date(v.created_at).getTime();
+      return (
+        v.status === "concluida" &&
+        t >= janela.inicio.getTime() &&
+        t < janela.fim.getTime()
+      );
+    }).length;
 
-    const qtdHoje = vendas.filter(
-      (v) => v.status === "concluida" && new Date(v.created_at) >= hoje
-    ).length;
+    const faturamentoMes = somaConcluidas(vendas, inicioMes, inicioProxMes);
+    const faturamentoMesAnterior = somaConcluidas(vendas, inicioMesAnterior, inicioMes);
 
     const contasReceber = promissorias
       .filter((p) => p.status === "em_aberto")
       .reduce((acc, p) => acc + Number(p.valor_total || 0), 0);
 
-    const condicionaisAbertas = condicionais.filter(
-      (c) => c.status === "aberto"
-    ).length;
+    const condicionaisAbertas = condicionais.filter((c) => c.status === "aberto").length;
 
     // sparkline: faturamento diário dos últimos 7 dias
+    const hoje = startOfDay(agora);
     const spark: number[] = [];
     for (let i = 6; i >= 0; i--) {
       const dia = new Date(hoje);
@@ -132,35 +148,41 @@ export default function DashboardPage() {
     }
 
     return {
-      vendasHoje,
-      qtdHoje,
-      deltaVendas: variacao(vendasHoje, vendasOntem),
+      vendasPeriodo,
+      qtdPeriodo,
+      deltaVendas: variacao(vendasPeriodo, vendasPeriodoAnterior),
       faturamentoMes,
       deltaFaturamento: variacao(faturamentoMes, faturamentoMesAnterior),
       contasReceber,
       condicionaisAbertas,
       spark,
     };
-  }, [vendas, promissorias, condicionais]);
+  }, [vendas, promissorias, condicionais, janela]);
 
   const ultimasVendas: VendaRow[] = useMemo(() => {
-    return vendas.slice(0, 8).map((v) => {
-      const d = new Date(v.created_at);
-      const data = `${String(d.getDate()).padStart(2, "0")}/${String(
-        d.getMonth() + 1
-      ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
-        d.getMinutes()
-      ).padStart(2, "0")}`;
-      return {
-        id: v.id,
-        cliente: (v.cliente_id && clienteNome.get(v.cliente_id)) || "Sem cliente",
-        pagamento: v.forma_pagamento,
-        valor: Number(v.total || 0),
-        status: v.status,
-        data,
-      };
-    });
-  }, [vendas, clienteNome]);
+    return vendas
+      .filter((v) => {
+        const t = new Date(v.created_at).getTime();
+        return t >= janela.inicio.getTime() && t < janela.fim.getTime();
+      })
+      .slice(0, 8)
+      .map((v) => {
+        const d = new Date(v.created_at);
+        const data = `${String(d.getDate()).padStart(2, "0")}/${String(
+          d.getMonth() + 1
+        ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
+          d.getMinutes()
+        ).padStart(2, "0")}`;
+        return {
+          id: v.id,
+          cliente: (v.cliente_id && clienteNome.get(v.cliente_id)) || "Sem cliente",
+          pagamento: v.forma_pagamento,
+          valor: Number(v.total || 0),
+          status: v.status,
+          data,
+        };
+      });
+  }, [vendas, clienteNome, janela]);
 
   const vendasLite: VendaLite[] = useMemo(
     () =>
@@ -180,7 +202,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ─── Gráfico principal (dados reais) ────────────────────────────── */}
+      {/* ─── Gráfico principal (dados reais, período global) ─────────────── */}
       <SalesPanel vendas={vendasLite} loading={loading} />
 
       {/* ─── Cards de métrica (reais + clicáveis) ───────────────────────── */}
@@ -188,10 +210,10 @@ export default function DashboardPage() {
         <MetricCard
           icon={ShoppingCart}
           tint="#2563eb"
-          title="Vendas hoje"
-          value={loading ? "…" : formatCurrency(metricas.vendasHoje)}
+          title={janela.ehHoje ? "Vendas hoje" : "Vendas no período"}
+          value={loading ? "…" : formatCurrency(metricas.vendasPeriodo)}
           delta={loading ? undefined : metricas.deltaVendas}
-          deltaLabel="vs ontem"
+          deltaLabel={janela.ehHoje ? "vs ontem" : "vs período anterior"}
           spark={metricas.spark}
           href="/dashboard/vendas"
           ariaLabel="Ver vendas"
@@ -230,8 +252,8 @@ export default function DashboardPage() {
         <MiniCalendar />
         <RecentSales
           vendas={ultimasVendas}
-          totalQtd={metricas.qtdHoje}
-          totalValor={metricas.vendasHoje}
+          totalQtd={metricas.qtdPeriodo}
+          totalValor={metricas.vendasPeriodo}
           loading={loading}
         />
         <TasksAlerts />

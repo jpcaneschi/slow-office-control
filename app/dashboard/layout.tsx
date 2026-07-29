@@ -17,10 +17,11 @@ import {
   Settings,
   Search,
   Bell,
-  Calendar,
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
+import { PeriodProvider } from "@/components/dashboard/period-context";
+import { PeriodFilter } from "@/components/dashboard/period-filter";
 
 type NavItem = {
   href: string;
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     navItems.find((item) => isActive(item.href))?.label ?? "Dashboard";
 
   return (
+    <PeriodProvider>
     <div className="min-h-screen bg-[#f4f6fb] text-[#0f172a]">
       <div className="flex min-h-screen">
         {/* ─── Menu lateral (azul) ─────────────────────────────────────── */}
@@ -137,12 +139,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
 
               <div className="ml-auto flex items-center gap-3">
-                {/* Seletor de data */}
-                <button className="hidden items-center gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb] sm:flex">
-                  <Calendar className="h-4 w-4 text-[#64748b]" />
-                  <span>01/05/2024 - 31/05/2024</span>
-                  <ChevronDown className="h-4 w-4 text-[#94a3b8]" />
-                </button>
+                {/* Seletor de período global */}
+                <div className="hidden sm:block">
+                  <PeriodFilter />
+                </div>
 
                 {/* Notificações */}
                 <button className="relative rounded-xl border border-[#e8ecf4] bg-white p-2.5 text-[#475569] transition hover:bg-[#f4f6fb]">
@@ -203,5 +203,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </div>
+    </PeriodProvider>
   );
 }
