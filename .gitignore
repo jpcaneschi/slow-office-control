@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# ferramentas locais e referências (não versionar)
+.claude/
+/modelo-dashboard.png/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

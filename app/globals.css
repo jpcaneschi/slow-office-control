@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
+/* ─── Sistema de design — Slow Office Control (tema claro / azul) ───────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* superfícies */
+  --background: #f4f6fb;     /* fundo geral da aplicação */
+  --surface: #ffffff;        /* fundo dos cards */
+  --border: #e8ecf4;         /* bordas suaves dos cards */
+  --foreground: #0f172a;     /* texto principal (quase preto azulado) */
+
+  /* azul da marca */
+  --brand: #2563eb;          /* azul principal (botões, ativo, destaques) */
+  --brand-dark: #1e40af;     /* topo do menu lateral */
+  --brand-strong: #1d4ed8;   /* base do menu lateral */
+
+  /* texto */
+  --text-muted: #64748b;     /* texto secundário */
+  --text-faint: #94a3b8;     /* texto terciário / labels */
+
+  /* status */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-strong: var(--brand-strong);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Scrollbar discreta para combinar com o tema claro */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
 }
