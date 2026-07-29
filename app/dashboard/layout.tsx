@@ -16,12 +16,12 @@ import {
   ShieldCheck,
   Settings,
   Search,
-  Bell,
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { PeriodProvider } from "@/components/dashboard/period-context";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
+import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 
 type NavItem = {
   href: string;
@@ -145,12 +145,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
 
                 {/* Notificações */}
-                <button className="relative rounded-xl border border-[#e8ecf4] bg-white p-2.5 text-[#475569] transition hover:bg-[#f4f6fb]">
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2563eb] px-1 text-[11px] font-bold text-white">
-                    8
-                  </span>
-                </button>
+                <NotificationsBell />
 
                 {/* Perfil */}
                 <button className="flex items-center gap-2.5 rounded-xl border border-[#e8ecf4] bg-white py-1.5 pl-1.5 pr-3 transition hover:bg-[#f4f6fb]">
