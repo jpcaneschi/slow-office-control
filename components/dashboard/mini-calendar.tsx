@@ -9,6 +9,7 @@ import {
   X,
   Clock,
   CalendarDays,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { EventoForm } from "./evento-form";
@@ -27,7 +28,22 @@ const MESES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-type ClienteLite = { id: string; nome: string };
+type Cliente = { id: string; nome: string; data_nascimento: string | null };
+type CondicionalLite = { id: string; status: string; data_limite: string | null };
+type PromissoriaLite = { id: string; status: string; data_vencimento: string | null };
+
+// Item unificado do calendário (manual OU automático).
+type CalItem = {
+  id: string;
+  data: string;
+  titulo: string;
+  subtitulo: string;
+  color: string;
+  hora: string | null;
+  automatico: boolean;
+  evento?: Evento; // quando manual
+  href?: string; // quando automático (registro de origem)
+};
 
 export function MiniCalendar() {
   const [view, setView] = useState(() => {
@@ -35,27 +51,45 @@ export function MiniCalendar() {
     return new Date(n.getFullYear(), n.getMonth(), 1);
   });
   const [eventos, setEventos] = useState<Evento[]>([]);
-  const [clientes, setClientes] = useState<ClienteLite[]>([]);
+  const [condicionais, setCondicionais] = useState<CondicionalLite[]>([]);
+  const [promissorias, setPromissorias] = useState<PromissoriaLite[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<Evento | null>(null);
   const [dataPadrao, setDataPadrao] = useState<string | undefined>(undefined);
 
+  const first = toISODate(new Date(view.getFullYear(), view.getMonth(), 1));
+  const last = toISODate(new Date(view.getFullYear(), view.getMonth() + 1, 0));
+
   const carregar = useCallback(async () => {
     setLoading(true);
-    const first = toISODate(new Date(view.getFullYear(), view.getMonth(), 1));
-    const last = toISODate(new Date(view.getFullYear(), view.getMonth() + 1, 0));
-    const { data } = await supabase
-      .from("eventos")
-      .select("*")
-      .gte("data", first)
-      .lte("data", last)
-      .order("data", { ascending: true })
-      .order("hora", { ascending: true });
-    setEventos((data as Evento[]) || []);
+    const [evRes, condRes, promRes] = await Promise.all([
+      supabase
+        .from("eventos")
+        .select("*")
+        .gte("data", first)
+        .lte("data", last)
+        .order("hora", { ascending: true }),
+      supabase
+        .from("condicionais")
+        .select("id, status, data_limite")
+        .eq("status", "aberto")
+        .gte("data_limite", first)
+        .lte("data_limite", last),
+      supabase
+        .from("promissorias")
+        .select("id, status, data_vencimento")
+        .eq("status", "em_aberto")
+        .gte("data_vencimento", first)
+        .lte("data_vencimento", last),
+    ]);
+    setEventos((evRes.data as Evento[]) || []);
+    setCondicionais((condRes.data as CondicionalLite[]) || []);
+    setPromissorias((promRes.data as PromissoriaLite[]) || []);
     setLoading(false);
-  }, [view]);
+  }, [first, last]);
 
   useEffect(() => {
     carregar();
@@ -64,23 +98,90 @@ export function MiniCalendar() {
   useEffect(() => {
     supabase
       .from("clientes")
-      .select("id, nome")
-      .then(({ data }) => setClientes((data as ClienteLite[]) || []));
+      .select("id, nome, data_nascimento")
+      .then(({ data }) => setClientes((data as Cliente[]) || []));
   }, []);
 
-  const porDia = useMemo(() => {
-    const map = new Map<string, Evento[]>();
+  // Monta os itens (manuais + automáticos) do mês visível.
+  const itens = useMemo<CalItem[]>(() => {
+    const out: CalItem[] = [];
+
     for (const e of eventos) {
-      const arr = map.get(e.data) || [];
-      arr.push(e);
-      map.set(e.data, arr);
+      const info = tipoInfo(e.tipo);
+      out.push({
+        id: `ev-${e.id}`,
+        data: e.data,
+        titulo: e.titulo,
+        subtitulo: info.label,
+        color: info.color,
+        hora: e.hora,
+        automatico: false,
+        evento: e,
+      });
+    }
+
+    for (const c of condicionais) {
+      if (!c.data_limite) continue;
+      out.push({
+        id: `cond-${c.id}`,
+        data: c.data_limite,
+        titulo: "Retorno de condicional",
+        subtitulo: "Prazo de devolução",
+        color: "#d97706",
+        hora: null,
+        automatico: true,
+        href: "/dashboard/condicional",
+      });
+    }
+
+    for (const p of promissorias) {
+      if (!p.data_vencimento) continue;
+      out.push({
+        id: `prom-${p.id}`,
+        data: p.data_vencimento,
+        titulo: "Vencimento de promissória",
+        subtitulo: "A receber",
+        color: "#dc2626",
+        hora: null,
+        automatico: true,
+        href: "/dashboard/promissorias",
+      });
+    }
+
+    // Aniversários: recorrentes todo ano → usa mês/dia no ano exibido.
+    const mesView = view.getMonth() + 1;
+    for (const cl of clientes) {
+      if (!cl.data_nascimento) continue;
+      const [, m, d] = cl.data_nascimento.split("-");
+      if (Number(m) !== mesView) continue;
+      out.push({
+        id: `aniv-${cl.id}`,
+        data: `${view.getFullYear()}-${m}-${d}`,
+        titulo: `Aniversário de ${cl.nome}`,
+        subtitulo: "Aniversário",
+        color: "#db2777",
+        hora: null,
+        automatico: true,
+        href: "/dashboard/clientes",
+      });
+    }
+
+    return out;
+  }, [eventos, condicionais, promissorias, clientes, view]);
+
+  const porDia = useMemo(() => {
+    const map = new Map<string, CalItem[]>();
+    for (const it of itens) {
+      const arr = map.get(it.data) || [];
+      arr.push(it);
+      map.set(it.data, arr);
     }
     return map;
-  }, [eventos]);
+  }, [itens]);
 
   const cells = useMemo(() => {
-    const first = new Date(view.getFullYear(), view.getMonth(), 1);
-    const startWeekday = first.getDay();
+    const firstDate = new Date(view.getFullYear(), view.getMonth(), 1);
+    const startWeekday = firstDate.getDay();
     const dias = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
     const out: (Date | null)[] = [];
     for (let i = 0; i < startWeekday; i++) out.push(null);
@@ -89,11 +190,12 @@ export function MiniCalendar() {
     return out;
   }, [view]);
 
-  const hojeISO = toISODate(new Date());
+  const clientesLite = useMemo(
+    () => clientes.map((c) => ({ id: c.id, nome: c.nome })),
+    [clientes]
+  );
 
-  function abrirDia(iso: string) {
-    setDiaSelecionado(iso);
-  }
+  const hojeISO = toISODate(new Date());
 
   function novoEvento(dataISO?: string) {
     setEditando(null);
@@ -101,13 +203,7 @@ export function MiniCalendar() {
     setFormOpen(true);
   }
 
-  function editarEvento(ev: Evento) {
-    setEditando(ev);
-    setDataPadrao(undefined);
-    setFormOpen(true);
-  }
-
-  const eventosDoDia = diaSelecionado ? porDia.get(diaSelecionado) || [] : [];
+  const itensDoDia = diaSelecionado ? porDia.get(diaSelecionado) || [] : [];
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
@@ -152,29 +248,27 @@ export function MiniCalendar() {
         {cells.map((d, i) => {
           if (!d) return <span key={i} />;
           const iso = toISODate(d);
-          const evs = porDia.get(iso) || [];
+          const its = porDia.get(iso) || [];
           const isHoje = iso === hojeISO;
           return (
             <button
               key={i}
-              onClick={() => abrirDia(iso)}
+              onClick={() => setDiaSelecionado(iso)}
               className="flex flex-col items-center justify-start rounded-lg py-1 transition hover:bg-[#f4f6fb]"
             >
               <span
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
-                  isHoje
-                    ? "bg-[#2563eb] font-bold text-white"
-                    : "font-medium text-[#334155]"
+                  isHoje ? "bg-[#2563eb] font-bold text-white" : "font-medium text-[#334155]"
                 }`}
               >
                 {d.getDate()}
               </span>
               <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
-                {evs.slice(0, 3).map((e) => (
+                {its.slice(0, 3).map((it) => (
                   <span
-                    key={e.id}
+                    key={it.id}
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: tipoInfo(e.tipo).color }}
+                    style={{ backgroundColor: it.color }}
                   />
                 ))}
               </span>
@@ -230,44 +324,67 @@ export function MiniCalendar() {
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
-              {eventosDoDia.length === 0 ? (
+              {itensDoDia.length === 0 ? (
                 <p className="py-6 text-center text-sm text-[#94a3b8]">
                   Nenhum evento neste dia.
                 </p>
               ) : (
-                eventosDoDia.map((e) => {
-                  const info = tipoInfo(e.tipo);
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => editarEvento(e)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-[#eef2f7] p-3 text-left transition hover:bg-[#f8fafc]"
-                    >
+                itensDoDia.map((it) => {
+                  const conteudo = (
+                    <>
                       <span
                         className="mt-0.5 h-9 w-1.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: info.color }}
+                        style={{ backgroundColor: it.color }}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-bold text-[#0f172a]">
-                            {e.titulo}
+                            {it.titulo}
                           </span>
-                          {e.status === "concluida" && (
-                            <span className="shrink-0 rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold text-[#16a34a]">
-                              {statusLabel(e.status)}
-                            </span>
+                          {it.automatico && (
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
                           )}
+                          {!it.automatico &&
+                            it.evento?.status === "concluida" && (
+                              <span className="shrink-0 rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold text-[#16a34a]">
+                                {statusLabel(it.evento.status)}
+                              </span>
+                            )}
                         </span>
                         <span className="mt-0.5 flex items-center gap-2 text-xs text-[#64748b]">
-                          <span style={{ color: info.color }}>{info.label}</span>
-                          {e.hora && (
+                          <span style={{ color: it.color }}>{it.subtitulo}</span>
+                          {it.hora && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {formatHora(e.hora)}
+                              {formatHora(it.hora)}
                             </span>
+                          )}
+                          {it.automatico && (
+                            <span className="text-[#94a3b8]">· automático</span>
                           )}
                         </span>
                       </span>
+                    </>
+                  );
+
+                  const cls =
+                    "flex w-full items-center gap-3 rounded-xl border border-[#eef2f7] p-3 text-left transition hover:bg-[#f8fafc]";
+
+                  return it.automatico ? (
+                    <Link key={it.id} href={it.href || "#"} className={cls}>
+                      {conteudo}
+                    </Link>
+                  ) : (
+                    <button
+                      key={it.id}
+                      onClick={() => {
+                        setEditando(it.evento || null);
+                        setDataPadrao(undefined);
+                        setFormOpen(true);
+                      }}
+                      className={cls}
+                    >
+                      {conteudo}
                     </button>
                   );
                 })
@@ -291,7 +408,7 @@ export function MiniCalendar() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSaved={carregar}
-        clientes={clientes}
+        clientes={clientesLite}
         evento={editando}
         dataPadrao={dataPadrao}
       />

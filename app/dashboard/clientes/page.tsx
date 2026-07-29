@@ -10,6 +10,7 @@ type Cliente = {
   telefone: string | null;
   cpf: string | null;
   status: string | null;
+  data_nascimento: string | null;
 };
 
 const statusOptions = ["ativo", "inativo", "vip", "em atraso"];
@@ -25,13 +26,14 @@ export default function ClientesPage() {
   const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
   const [status, setStatus] = useState("ativo");
+  const [dataNascimento, setDataNascimento] = useState("");
 
   async function carregarClientes() {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("clientes")
-      .select("id, nome, telefone, cpf, status")
+      .select("id, nome, telefone, cpf, status, data_nascimento")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -53,6 +55,7 @@ export default function ClientesPage() {
     setTelefone("");
     setCpf("");
     setStatus("ativo");
+    setDataNascimento("");
     setEditandoId(null);
   }
 
@@ -62,6 +65,7 @@ export default function ClientesPage() {
     setTelefone(cliente.telefone || "");
     setCpf(cliente.cpf || "");
     setStatus(cliente.status || "ativo");
+    setDataNascimento(cliente.data_nascimento || "");
     setErro("");
   }
 
@@ -102,6 +106,7 @@ export default function ClientesPage() {
           telefone: telefone.trim() || null,
           cpf: cpf.trim() || null,
           status,
+          data_nascimento: dataNascimento || null,
         })
         .eq("id", editandoId);
 
@@ -116,6 +121,7 @@ export default function ClientesPage() {
         telefone: telefone.trim() || null,
         cpf: cpf.trim() || null,
         status,
+        data_nascimento: dataNascimento || null,
       });
 
       if (error) {
@@ -198,6 +204,18 @@ export default function ClientesPage() {
                   onChange={(e) => setCpf(e.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
                   placeholder="000.000.000-00"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-zinc-300">
+                  Data de nascimento
+                </label>
+                <input
+                  type="date"
+                  value={dataNascimento}
+                  onChange={(e) => setDataNascimento(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
                 />
               </div>
 

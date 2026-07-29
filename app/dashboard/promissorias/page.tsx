@@ -36,6 +36,7 @@ export default function PromissoriasPage() {
   const [valorTotal, setValorTotal] = useState("");
   const [parcelas, setParcelas] = useState("1");
   const [observacao, setObservacao] = useState("");
+  const [dataVencimento, setDataVencimento] = useState("");
 
   async function carregarDados() {
     setLoading(true);
@@ -86,6 +87,7 @@ export default function PromissoriasPage() {
     setValorTotal("");
     setParcelas("1");
     setObservacao("");
+    setDataVencimento("");
   }
 
   async function criarPromissoria() {
@@ -112,6 +114,7 @@ export default function PromissoriasPage() {
         parcelas: parcelasNumero,
         status: "em_aberto",
         observacao: observacao.trim() || null,
+        data_vencimento: dataVencimento || null,
       });
 
       if (error) {
@@ -239,6 +242,18 @@ export default function PromissoriasPage() {
                   onChange={(e) => setParcelas(e.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
                   placeholder="Ex: 1 até 4"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-zinc-300">
+                  Data de vencimento
+                </label>
+                <input
+                  type="date"
+                  value={dataVencimento}
+                  onChange={(e) => setDataVencimento(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
                 />
               </div>
 
