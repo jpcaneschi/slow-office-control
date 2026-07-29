@@ -82,11 +82,12 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
               fontSize: 13,
             }}
             labelStyle={{ color: "#0f172a", fontWeight: 700 }}
-            formatter={(value: number, name) =>
-              name === "faturamento"
-                ? [brl(value), "Faturamento"]
-                : [value, "Pedidos"]
-            }
+            formatter={(value, name) => {
+              const num = typeof value === "number" ? value : Number(value);
+              return name === "faturamento"
+                ? [brl(num), "Faturamento"]
+                : [num, "Pedidos"];
+            }}
           />
 
           <Bar
@@ -106,7 +107,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
               <LabelList
                 dataKey="faturamento"
                 position="top"
-                formatter={(v: number) => `R$ ${(v / 1000).toFixed(2).replace(".", ",")}k`}
+                formatter={(v) => `R$ ${(Number(v) / 1000).toFixed(2).replace(".", ",")}k`}
                 style={{ fill: "#475569", fontSize: 10, fontWeight: 600 }}
               />
             )}
