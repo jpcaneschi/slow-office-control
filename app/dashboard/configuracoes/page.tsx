@@ -75,7 +75,7 @@ export default function ConfiguracoesPage() {
         .select("id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, tema_escuro")
         .order("created_at", { ascending: true })
         .limit(1)
-        .single(),
+        .maybeSingle(),
     ]);
 
     if (profileRes.error) {
@@ -204,11 +204,6 @@ export default function ConfiguracoesPage() {
     setErro("");
     setSucesso("");
 
-    if (!configuracao) {
-      setErro("Configuração do sistema não encontrada.");
-      return;
-    }
-
     const pixNumero = Number(pixDesconto);
     const tatuagemNumero = Number(tatuagemPercentual);
     const parcelasNumero = Number(maxParcelas);
@@ -235,16 +230,18 @@ export default function ConfiguracoesPage() {
 
     setSalvandoSistema(true);
 
-    const { error } = await supabase
-      .from("configuracoes")
-      .update({
-        nome_operacao: nomeOperacao.trim(),
-        pix_desconto: pixNumero,
-        tatuagem_percentual: tatuagemNumero,
-        max_parcelas: parcelasNumero,
-        tema_escuro: temaEscuro,
-      })
-      .eq("id", configuracao.id);
+    const payload = {
+      nome_operacao: nomeOperacao.trim(),
+      pix_desconto: pixNumero,
+      tatuagem_percentual: tatuagemNumero,
+      max_parcelas: parcelasNumero,
+      tema_escuro: temaEscuro,
+    };
+
+    // Atualiza se já existe config; senão cria (nova empresa).
+    const { error } = configuracao
+      ? await supabase.from("configuracoes").update(payload).eq("id", configuracao.id)
+      : await supabase.from("configuracoes").insert(payload);
 
     if (error) {
       setErro(error.message);
