@@ -41,6 +41,8 @@ type CalItem = {
   color: string;
   hora: string | null;
   automatico: boolean;
+  categoria: string; // chave da legenda/filtro
+  catLabel: string; // rótulo da legenda
   evento?: Evento; // quando manual
   href?: string; // quando automático (registro de origem)
 };
@@ -59,6 +61,7 @@ export function MiniCalendar() {
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<Evento | null>(null);
   const [dataPadrao, setDataPadrao] = useState<string | undefined>(undefined);
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
 
   const first = toISODate(new Date(view.getFullYear(), view.getMonth(), 1));
   const last = toISODate(new Date(view.getFullYear(), view.getMonth() + 1, 0));
@@ -116,6 +119,8 @@ export function MiniCalendar() {
         color: info.color,
         hora: e.hora,
         automatico: false,
+        categoria: e.tipo,
+        catLabel: info.label,
         evento: e,
       });
     }
@@ -130,6 +135,8 @@ export function MiniCalendar() {
         color: "#d97706",
         hora: null,
         automatico: true,
+        categoria: "condicional",
+        catLabel: "Condicionais",
         href: "/dashboard/condicional",
       });
     }
@@ -144,6 +151,8 @@ export function MiniCalendar() {
         color: "#dc2626",
         hora: null,
         automatico: true,
+        categoria: "promissoria",
+        catLabel: "Vencimentos",
         href: "/dashboard/promissorias",
       });
     }
@@ -162,6 +171,8 @@ export function MiniCalendar() {
         color: "#db2777",
         hora: null,
         automatico: true,
+        categoria: "aniversario",
+        catLabel: "Aniversários",
         href: "/dashboard/clientes",
       });
     }
@@ -169,15 +180,39 @@ export function MiniCalendar() {
     return out;
   }, [eventos, condicionais, promissorias, clientes, view]);
 
+  const legenda = useMemo(() => {
+    const map = new Map<string, { label: string; color: string; count: number }>();
+    for (const it of itens) {
+      const cur = map.get(it.categoria);
+      if (cur) cur.count += 1;
+      else map.set(it.categoria, { label: it.catLabel, color: it.color, count: 1 });
+    }
+    return Array.from(map.entries()).map(([categoria, v]) => ({ categoria, ...v }));
+  }, [itens]);
+
+  const itensVisiveis = useMemo(
+    () => itens.filter((it) => !ocultas.has(it.categoria)),
+    [itens, ocultas]
+  );
+
   const porDia = useMemo(() => {
     const map = new Map<string, CalItem[]>();
-    for (const it of itens) {
+    for (const it of itensVisiveis) {
       const arr = map.get(it.data) || [];
       arr.push(it);
       map.set(it.data, arr);
     }
     return map;
-  }, [itens]);
+  }, [itensVisiveis]);
+
+  function toggleCategoria(cat: string) {
+    setOcultas((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }
 
   const cells = useMemo(() => {
     const firstDate = new Date(view.getFullYear(), view.getMonth(), 1);
@@ -277,7 +312,33 @@ export function MiniCalendar() {
         })}
       </div>
 
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#eef2f7] pt-4">
+      {legenda.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[#eef2f7] pt-3">
+          {legenda.map((l) => {
+            const oculta = ocultas.has(l.categoria);
+            return (
+              <button
+                key={l.categoria}
+                onClick={() => toggleCategoria(l.categoria)}
+                aria-pressed={!oculta}
+                title={oculta ? "Mostrar no calendário" : "Ocultar do calendário"}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                  oculta ? "bg-white text-[#94a3b8] opacity-60" : "bg-[#f4f6fb] text-[#334155]"
+                }`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: oculta ? "#cbd5e1" : l.color }}
+                />
+                {l.label}
+                <span className="font-bold">{l.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#eef2f7] pt-4">
         <button
           onClick={() => novoEvento(hojeISO)}
           className="flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1d4ed8]"
