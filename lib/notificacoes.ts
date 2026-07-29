@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { tipoInfo } from "@/lib/eventos-utils";
 
 export type Notificacao = {
   id: string;
@@ -96,12 +97,21 @@ export async function sincronizarNotificacoes(): Promise<void> {
   }
 
   for (const e of (evRes.data as { id: string; titulo: string; tipo: string; status: string; data: string }[]) || []) {
-    if (e.tipo !== "tarefa" || e.status !== "pendente") continue;
+    if (e.status !== "pendente") continue;
+    const label = tipoInfo(e.tipo).label;
     if (e.data < hojeISO) {
       novas.push({
-        chave: `tarefa_vencida:${e.id}`,
+        chave: `evento_vencido:${e.id}`,
         tipo: "tarefa",
-        titulo: "Tarefa vencida",
+        titulo: `${label} em atraso`,
+        descricao: e.titulo,
+        href: "/dashboard/agenda",
+      });
+    } else if (e.data === hojeISO) {
+      novas.push({
+        chave: `evento_hoje:${e.id}:${hojeISO}`,
+        tipo: "tarefa",
+        titulo: `${label} de hoje`,
         descricao: e.titulo,
         href: "/dashboard/agenda",
       });
