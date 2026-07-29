@@ -1,134 +1,202 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Boxes,
   ListTodo,
   CalendarClock,
-  HandCoins,
   ClipboardList,
-  PhoneCall,
+  HandCoins,
   ChevronRight,
-  Clock,
-  X,
+  CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { formatCurrency } from "@/lib/vendas-utils";
+import { toISODate } from "@/lib/eventos-utils";
+
+const LIMITE_ESTOQUE = 5;
+
+type Produto = { estoque: number | null; status: string | null };
+type Condicional = { status: string; data_limite: string | null };
+type Promissoria = { valor_total: number | null; status: string };
+type EventoLite = { tipo: string; status: string; data: string };
 
 type Alerta = {
+  key: string;
   icon: LucideIcon;
   tint: string;
   title: string;
   subtitle: string;
   badge: string;
-  badgeColor: string;
+  href: string;
 };
 
-const ALERTAS: Alerta[] = [
-  {
-    icon: Boxes,
-    tint: "#dc2626",
-    title: "Estoque baixo",
-    subtitle: "Produtos com estoque crítico",
-    badge: "8 itens",
-    badgeColor: "#dc2626",
-  },
-  {
-    icon: ListTodo,
-    tint: "#2563eb",
-    title: "Tarefas do dia",
-    subtitle: "Pendências para hoje",
-    badge: "5 tarefas",
-    badgeColor: "#2563eb",
-  },
-  {
-    icon: CalendarClock,
-    tint: "#d97706",
-    title: "Próximos vencimentos",
-    subtitle: "Vencem nos próximos 7 dias",
-    badge: "R$ 12.450,00",
-    badgeColor: "#d97706",
-  },
-  {
-    icon: HandCoins,
-    tint: "#16a34a",
-    title: "Promissórias a receber",
-    subtitle: "Vencem nos próximos 7 dias",
-    badge: "R$ 8.930,00",
-    badgeColor: "#16a34a",
-  },
-  {
-    icon: ClipboardList,
-    tint: "#2563eb",
-    title: "Condicionais em aberto",
-    subtitle: "Aguardando finalização",
-    badge: "12 títulos",
-    badgeColor: "#2563eb",
-  },
-  {
-    icon: PhoneCall,
-    tint: "#0891b2",
-    title: "Clientes para retorno",
-    subtitle: "Último contato há mais de 15 dias",
-    badge: "18 clientes",
-    badgeColor: "#0891b2",
-  },
-];
-
 export function TasksAlerts() {
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [condicionais, setCondicionais] = useState<Condicional[]>([]);
+  const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
+  const [eventos, setEventos] = useState<EventoLite[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function carregar() {
+      setLoading(true);
+      const [prodRes, condRes, promRes, evRes] = await Promise.all([
+        supabase.from("produtos").select("estoque, status"),
+        supabase.from("condicionais").select("status, data_limite"),
+        supabase.from("promissorias").select("valor_total, status"),
+        supabase.from("eventos").select("tipo, status, data"),
+      ]);
+      setProdutos((prodRes.data as Produto[]) || []);
+      setCondicionais((condRes.data as Condicional[]) || []);
+      setPromissorias((promRes.data as Promissoria[]) || []);
+      setEventos((evRes.data as EventoLite[]) || []);
+      setLoading(false);
+    }
+    carregar();
+  }, []);
+
+  const hoje = toISODate(new Date());
+
+  const estoqueBaixo = produtos.filter(
+    (p) => (p.status || "ativo") === "ativo" && p.estoque != null && p.estoque <= LIMITE_ESTOQUE
+  ).length;
+
+  const tarefasHoje = eventos.filter(
+    (e) => e.tipo === "tarefa" && e.status === "pendente" && e.data === hoje
+  ).length;
+
+  const condicionaisAbertas = condicionais.filter((c) => c.status === "aberto").length;
+
+  const retornosAtrasados = condicionais.filter(
+    (c) => c.status === "aberto" && c.data_limite != null && c.data_limite < hoje
+  ).length;
+
+  const promissoriasAbertas = promissorias.filter((p) => p.status === "em_aberto");
+  const promissoriasValor = promissoriasAbertas.reduce(
+    (acc, p) => acc + Number(p.valor_total || 0),
+    0
+  );
+
+  const plural = (n: number, sing: string, plu: string) =>
+    `${n} ${n === 1 ? sing : plu}`;
+
+  const alertas: Alerta[] = [
+    {
+      key: "estoque",
+      icon: Boxes,
+      tint: "#dc2626",
+      title: "Estoque baixo",
+      subtitle: `Produtos com estoque ≤ ${LIMITE_ESTOQUE}`,
+      badge: plural(estoqueBaixo, "item", "itens"),
+      href: "/dashboard/produtos",
+    },
+    {
+      key: "tarefas",
+      icon: ListTodo,
+      tint: "#2563eb",
+      title: "Tarefas do dia",
+      subtitle: "Pendentes para hoje",
+      badge: plural(tarefasHoje, "tarefa", "tarefas"),
+      href: "/dashboard/agenda",
+    },
+    {
+      key: "retornos",
+      icon: CalendarClock,
+      tint: "#d97706",
+      title: "Retornos atrasados",
+      subtitle: "Condicionais fora do prazo",
+      badge: plural(retornosAtrasados, "atrasado", "atrasados"),
+      href: "/dashboard/condicional",
+    },
+    {
+      key: "condicionais",
+      icon: ClipboardList,
+      tint: "#0891b2",
+      title: "Condicionais em aberto",
+      subtitle: "Aguardando finalização",
+      badge: plural(condicionaisAbertas, "título", "títulos"),
+      href: "/dashboard/condicional",
+    },
+    {
+      key: "promissorias",
+      icon: HandCoins,
+      tint: "#16a34a",
+      title: "Promissórias a receber",
+      subtitle: plural(promissoriasAbertas.length, "em aberto", "em aberto"),
+      badge: formatCurrency(promissoriasValor),
+      href: "/dashboard/promissorias",
+    },
+  ];
+
+  const tudoEmDia =
+    !loading &&
+    estoqueBaixo === 0 &&
+    tarefasHoje === 0 &&
+    retornosAtrasados === 0 &&
+    condicionaisAbertas === 0 &&
+    promissoriasAbertas.length === 0;
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-bold text-[#0f172a]">Tarefas e alertas</h3>
-        <button className="text-sm font-semibold text-[#2563eb] transition hover:underline">
-          Ver todas
-        </button>
+        <Link
+          href="/dashboard/agenda"
+          className="text-sm font-semibold text-[#2563eb] transition hover:underline"
+        >
+          Ver agenda
+        </Link>
       </div>
 
-      <div className="flex-1 space-y-1">
-        {ALERTAS.map((a) => {
-          const Icon = a.icon;
-          return (
-            <button
-              key={a.title}
-              className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition hover:bg-[#f4f6fb]"
-            >
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${a.tint}1a`, color: a.tint }}
-              >
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-[#0f172a]">
-                  {a.title}
-                </span>
-                <span className="block truncate text-xs text-[#64748b]">
-                  {a.subtitle}
-                </span>
-              </span>
-              <span
-                className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
-                style={{ backgroundColor: `${a.badgeColor}1a`, color: a.badgeColor }}
-              >
-                {a.badge}
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-[#cbd5e1]" />
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 flex items-start gap-3 rounded-xl bg-[#eff6ff] p-3.5">
-        <Clock className="mt-0.5 h-5 w-5 shrink-0 text-[#2563eb]" />
-        <div className="flex-1">
-          <p className="text-sm font-bold text-[#1e40af]">
-            Mantenha seus cadastros e tarefas em dia
-          </p>
-          <p className="text-xs text-[#3b82f6]">
-            Organização é o que impulsiona os resultados.
-          </p>
+      {loading ? (
+        <div className="flex-1 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-14 w-full animate-pulse rounded-xl bg-[#f1f5f9]" />
+          ))}
         </div>
-        <button className="text-[#93c5fd] transition hover:text-[#2563eb]">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+      ) : tudoEmDia ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#dcfce7] text-[#16a34a]">
+            <CheckCircle2 className="h-6 w-6" />
+          </span>
+          <p className="text-sm font-semibold text-[#475569]">Tudo em dia ✓</p>
+          <p className="text-xs text-[#94a3b8]">Nenhum alerta pendente no momento.</p>
+        </div>
+      ) : (
+        <div className="flex-1 space-y-1">
+          {alertas.map((a) => {
+            const Icon = a.icon;
+            return (
+              <Link
+                key={a.key}
+                href={a.href}
+                className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition hover:bg-[#f4f6fb]"
+              >
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `${a.tint}1a`, color: a.tint }}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-[#0f172a]">{a.title}</span>
+                  <span className="block truncate text-xs text-[#64748b]">{a.subtitle}</span>
+                </span>
+                <span
+                  className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{ backgroundColor: `${a.tint}1a`, color: a.tint }}
+                >
+                  {a.badge}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#cbd5e1]" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
