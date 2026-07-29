@@ -16,12 +16,13 @@ import {
   ShieldCheck,
   Settings,
   Search,
-  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { PeriodProvider } from "@/components/dashboard/period-context";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { NotificationsBell } from "@/components/dashboard/notifications-bell";
+import { UserMenu } from "@/components/dashboard/user-menu";
+import { AuthGuard } from "@/components/dashboard/auth-guard";
 
 type NavItem = {
   href: string;
@@ -61,6 +62,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     navItems.find((item) => isActive(item.href))?.label ?? "Dashboard";
 
   return (
+    <AuthGuard>
     <PeriodProvider>
     <div className="min-h-screen bg-[#f4f6fb] text-[#0f172a]">
       <div className="flex min-h-screen">
@@ -148,20 +150,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <NotificationsBell />
 
                 {/* Perfil */}
-                <button className="flex items-center gap-2.5 rounded-xl border border-[#e8ecf4] bg-white py-1.5 pl-1.5 pr-3 transition hover:bg-[#f4f6fb]">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1e40af] to-[#2563eb] text-sm font-bold text-white">
-                    RO
-                  </span>
-                  <span className="hidden text-left leading-tight sm:block">
-                    <span className="block text-sm font-bold text-[#0f172a]">
-                      Rafael Oliveira
-                    </span>
-                    <span className="block text-xs text-[#64748b]">
-                      Gerente Geral
-                    </span>
-                  </span>
-                  <ChevronDown className="hidden h-4 w-4 text-[#94a3b8] sm:block" />
-                </button>
+                <UserMenu />
               </div>
             </div>
           </header>
@@ -199,5 +188,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
     </div>
     </PeriodProvider>
+    </AuthGuard>
   );
 }
