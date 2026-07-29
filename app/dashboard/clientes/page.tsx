@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { PageHeader } from "@/components/dashboard/page-header";
 
 type Cliente = {
   id: string;
@@ -14,6 +15,12 @@ type Cliente = {
 };
 
 const statusOptions = ["ativo", "inativo", "vip", "em atraso"];
+
+const inputClass =
+  "w-full rounded-xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/15";
+const labelClass = "mb-1.5 block text-sm font-semibold text-[#475569]";
+const cardClass =
+  "rounded-2xl border border-[#e8ecf4] bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -137,176 +144,169 @@ export default function ClientesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0b] px-4 py-8 text-white">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-          <div>
-            <p className="mb-2 text-sm uppercase tracking-[0.25em] text-yellow-300">
-              Slow Office Control
-            </p>
-            <h1 className="text-3xl font-semibold">Clientes</h1>
-            <p className="mt-2 text-zinc-400">
-              Cadastro, edição e exclusão de clientes.
-            </p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeader
+          eyebrow="Cadastro"
+          title="Clientes"
+          description="Cadastro, edição e exclusão de clientes."
+        />
+        <Link
+          href="/dashboard"
+          className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2.5 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+        >
+          Voltar
+        </Link>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+        <div className={cardClass}>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-[#0f172a]">
+              {editandoId ? "Editar cliente" : "Novo cliente"}
+            </h2>
+
+            {editandoId && (
+              <button
+                type="button"
+                onClick={limparFormulario}
+                className="rounded-lg border border-[#e8ecf4] bg-white px-3 py-1.5 text-xs font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+              >
+                Cancelar
+              </button>
+            )}
           </div>
 
-          <Link
-            href="/dashboard"
-            className="rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white hover:bg-zinc-800"
-          >
-            Voltar
-          </Link>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">
-                {editandoId ? "Editar cliente" : "Novo cliente"}
-              </h2>
-
-              {editandoId && (
-                <button
-                  type="button"
-                  onClick={limparFormulario}
-                  className="rounded-2xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white hover:bg-zinc-800"
-                >
-                  Cancelar
-                </button>
-              )}
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <div>
+              <label className={labelClass}>Nome</label>
+              <input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className={inputClass}
+                placeholder="Nome completo"
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">Nome</label>
-                <input
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
-                  placeholder="Nome completo"
-                />
-              </div>
+            <div>
+              <label className={labelClass}>Telefone</label>
+              <input
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                className={inputClass}
+                placeholder="(31) 99999-0000"
+              />
+            </div>
 
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">Telefone</label>
-                <input
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
-                  placeholder="(31) 99999-0000"
-                />
-              </div>
+            <div>
+              <label className={labelClass}>CPF</label>
+              <input
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
+                className={inputClass}
+                placeholder="000.000.000-00"
+              />
+            </div>
 
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">CPF</label>
-                <input
-                  value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
-                  placeholder="000.000.000-00"
-                />
-              </div>
+            <div>
+              <label className={labelClass}>Data de nascimento</label>
+              <input
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => setDataNascimento(e.target.value)}
+                className={inputClass}
+              />
+            </div>
 
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">
-                  Data de nascimento
-                </label>
-                <input
-                  type="date"
-                  value={dataNascimento}
-                  onChange={(e) => setDataNascimento(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none"
-                >
-                  {statusOptions.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full rounded-2xl bg-yellow-400 px-4 py-3 font-medium text-black transition hover:bg-yellow-300 disabled:opacity-60"
+            <div>
+              <label className={labelClass}>Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className={inputClass}
               >
-                {saving
-                  ? "Salvando..."
-                  : editandoId
-                  ? "Salvar alterações"
-                  : "Cadastrar cliente"}
-              </button>
-            </form>
-          </div>
+                {statusOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            {erro && (
-              <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-300">
-                {erro}
-              </div>
-            )}
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+            >
+              {saving
+                ? "Salvando..."
+                : editandoId
+                ? "Salvar alterações"
+                : "Cadastrar cliente"}
+            </button>
+          </form>
+        </div>
 
-            {loading && <p className="text-zinc-400">Carregando clientes...</p>}
+        <div className={cardClass}>
+          {erro && (
+            <div className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
+              {erro}
+            </div>
+          )}
 
-            {!loading && !erro && clientes.length === 0 && (
-              <p className="text-zinc-400">Nenhum cliente encontrado.</p>
-            )}
+          {loading && <p className="text-[#64748b]">Carregando clientes...</p>}
 
-            {!loading && clientes.length > 0 && (
-              <div className="space-y-4">
-                {clientes.map((cliente) => (
-                  <div
-                    key={cliente.id}
-                    className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <h2 className="text-lg font-semibold">{cliente.nome}</h2>
-                        <p className="mt-1 text-sm text-zinc-400">
-                          Telefone: {cliente.telefone || "Não informado"}
-                        </p>
-                        <p className="text-sm text-zinc-400">
-                          CPF: {cliente.cpf || "Não informado"}
-                        </p>
-                        <p className="mt-2 inline-flex rounded-full bg-yellow-500/10 px-3 py-1 text-xs font-medium text-yellow-300">
-                          Status: {cliente.status || "ativo"}
-                        </p>
-                      </div>
+          {!loading && !erro && clientes.length === 0 && (
+            <p className="text-[#64748b]">Nenhum cliente encontrado.</p>
+          )}
 
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => editarCliente(cliente)}
-                          className="rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800"
-                        >
-                          Editar
-                        </button>
+          {!loading && clientes.length > 0 && (
+            <div className="space-y-3">
+              {clientes.map((cliente) => (
+                <div
+                  key={cliente.id}
+                  className="rounded-xl border border-[#eef2f7] bg-[#f8fafc] p-4"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-[#0f172a]">
+                        {cliente.nome}
+                      </h2>
+                      <p className="mt-1 text-sm text-[#64748b]">
+                        Telefone: {cliente.telefone || "Não informado"}
+                      </p>
+                      <p className="text-sm text-[#64748b]">
+                        CPF: {cliente.cpf || "Não informado"}
+                      </p>
+                      <p className="mt-2 inline-flex rounded-full bg-[#eff6ff] px-3 py-1 text-xs font-semibold text-[#2563eb]">
+                        {cliente.status || "ativo"}
+                      </p>
+                    </div>
 
-                        <button
-                          type="button"
-                          onClick={() => excluirCliente(cliente.id)}
-                          className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-300 hover:bg-red-500/20"
-                        >
-                          Excluir
-                        </button>
-                      </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editarCliente(cliente)}
+                        className="rounded-lg border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => excluirCliente(cliente.id)}
+                        className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-semibold text-[#dc2626] transition hover:bg-[#fee2e2]"
+                      >
+                        Excluir
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
