@@ -153,64 +153,64 @@ export default function FinanceiroPage() {
       />
 
       {erro && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
           {erro}
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-white/10 bg-[#0f141b] p-5">
-          <p className="text-sm font-bold text-zinc-300">Receita</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#e8ecf4] bg-[#f8fafc] p-5">
+          <p className="text-sm font-bold text-[#475569]">Receita</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(receita)}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-red-500/20 bg-red-500/[0.06] p-5">
-          <p className="text-sm font-bold text-red-300">Despesas</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#fecaca] bg-[#fef2f2] p-5">
+          <p className="text-sm font-bold text-[#b91c1c]">Despesas</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(despesasTotal)}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
-          <p className="text-sm font-bold text-emerald-300">Resultado</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
+          <p className="text-sm font-bold text-[#15803d]">Resultado</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(resultado)}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-[#d4a93a]/20 bg-[#d4a93a]/[0.06] p-5">
-          <p className="text-sm font-bold text-[#f3d37a]">Vendas Pix</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-5">
+          <p className="text-sm font-bold text-[#2563eb]">Vendas Pix</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {vendasPix}
           </p>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="text-xl font-black tracking-tight text-white">
+        <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+          <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
             Nova despesa
           </h2>
 
           <div className="mt-5 space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Descrição</label>
+              <label className="mb-2 block text-sm text-[#475569]">Descrição</label>
               <input
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 placeholder="Ex: pagamento de fornecedor"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Categoria</label>
+              <label className="mb-2 block text-sm text-[#475569]">Categoria</label>
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
               >
                 {categoriasDespesa.map((item) => (
                   <option key={item} value={item}>
@@ -221,32 +221,32 @@ export default function FinanceiroPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Valor</label>
+              <label className="mb-2 block text-sm text-[#475569]">Valor</label>
               <input
                 type="number"
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 placeholder="0,00"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Data</label>
+              <label className="mb-2 block text-sm text-[#475569]">Data</label>
               <input
                 type="date"
                 value={dataDespesa}
                 onChange={(e) => setDataDespesa(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Responsável</label>
+              <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
               <select
                 value={responsavel}
                 onChange={(e) => setResponsavel(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
               >
                 <option value="João Pedro">João Pedro</option>
                 <option value="Maria Eduarda">Maria Eduarda</option>
@@ -256,11 +256,11 @@ export default function FinanceiroPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Observação</label>
+              <label className="mb-2 block text-sm text-[#475569]">Observação</label>
               <textarea
                 value={observacao}
                 onChange={(e) => setObservacao(e.target.value)}
-                className="min-h-[100px] w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                className="min-h-[100px] w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 placeholder="Detalhes extras"
               />
             </div>
@@ -269,7 +269,7 @@ export default function FinanceiroPage() {
               type="button"
               onClick={registrarDespesa}
               disabled={salvando}
-              className="w-full rounded-2xl bg-[#d4a93a] px-4 py-3 font-bold text-black transition hover:bg-[#e2bb56] disabled:opacity-60"
+              className="w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {salvando ? "Salvando..." : "Registrar despesa"}
             </button>
@@ -277,15 +277,15 @@ export default function FinanceiroPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Despesas registradas
             </h2>
 
             {loading ? (
-              <p className="mt-4 text-zinc-400">Carregando dados...</p>
+              <p className="mt-4 text-[#64748b]">Carregando dados...</p>
             ) : despesas.length === 0 ? (
-              <p className="mt-4 text-zinc-400">
+              <p className="mt-4 text-[#64748b]">
                 Nenhuma despesa cadastrada ainda.
               </p>
             ) : (
@@ -293,23 +293,23 @@ export default function FinanceiroPage() {
                 {despesas.map((despesa) => (
                   <div
                     key={despesa.id}
-                    className="rounded-[22px] border border-white/10 bg-[#0b0f14]/80 p-4"
+                    className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-sm font-bold text-white">{despesa.descricao}</p>
-                        <p className="mt-1 text-sm text-zinc-400">
+                        <p className="text-sm font-bold text-[#0f172a]">{despesa.descricao}</p>
+                        <p className="mt-1 text-sm text-[#64748b]">
                           {despesa.categoria} · {new Date(despesa.data).toLocaleDateString("pt-BR")}
                         </p>
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-sm text-[#64748b]">
                           Responsável: {despesa.responsavel || "-"}
                         </p>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-[#94a3b8]">
                           {despesa.observacao || "Sem observação"}
                         </p>
                       </div>
 
-                      <span className="text-lg font-black tracking-tight text-white">
+                      <span className="text-lg font-black tracking-tight text-[#0f172a]">
                         {formatCurrency(Number(despesa.valor || 0))}
                       </span>
                     </div>
@@ -319,12 +319,12 @@ export default function FinanceiroPage() {
             )}
           </div>
 
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Leitura rápida
             </h2>
 
-            <div className="mt-4 space-y-3 text-sm text-zinc-300">
+            <div className="mt-4 space-y-3 text-sm text-[#475569]">
               <p>• Receita total: {formatCurrency(receita)}</p>
               <p>• Total de despesas: {formatCurrency(despesasTotal)}</p>
               <p>• Resultado simples: {formatCurrency(resultado)}</p>

@@ -263,32 +263,32 @@ export default function ConfiguracoesPage() {
       />
 
       {erro && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
           {erro}
         </div>
       )}
 
       {sucesso && (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+        <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm text-[#15803d]">
           {sucesso}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-          <p className="text-zinc-400">Carregando configurações...</p>
+        <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+          <p className="text-[#64748b]">Carregando configurações...</p>
         </div>
       ) : (
         <div className="grid gap-6">
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-xl font-black tracking-tight text-white">
+            <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                 Perfil
               </h2>
 
               <div className="mt-5 space-y-4">
-                <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#0b0f14] p-4">
-                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800">
+                <div className="flex items-center gap-4 rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-4">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[#e8ecf4] bg-[#f1f5f9]">
                     {avatarUrl ? (
                       <img
                         src={avatarUrl}
@@ -296,42 +296,42 @@ export default function ConfiguracoesPage() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="text-xl font-black text-zinc-400">
+                      <span className="text-xl font-black text-[#64748b]">
                         {nome?.trim()?.charAt(0)?.toUpperCase() || "S"}
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-sm font-bold text-white">
+                    <p className="text-sm font-bold text-[#0f172a]">
                       {nome || "Slow Office"}
                     </p>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-[#64748b]">
                       {emailAtual || "Sem email"}
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Nome de exibição
                   </label>
                   <input
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                     placeholder="Ex: João Pedro"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     URL da foto de perfil
                   </label>
                   <input
                     value={avatarUrl}
                     onChange={(e) => setAvatarUrl(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                     placeholder="https://..."
                   />
                 </div>
@@ -340,46 +340,46 @@ export default function ConfiguracoesPage() {
                   type="button"
                   onClick={salvarPerfil}
                   disabled={salvandoPerfil}
-                  className="w-full rounded-2xl bg-[#d4a93a] px-4 py-3 font-bold text-black transition hover:bg-[#e2bb56] disabled:opacity-60"
+                  className="w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
                 >
                   {salvandoPerfil ? "Salvando..." : "Salvar perfil"}
                 </button>
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-xl font-black tracking-tight text-white">
+            <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                 Conta e acesso
               </h2>
 
               <div className="mt-5 space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Email da conta
                   </label>
                   <input
                     type="email"
                     value={novoEmail}
                     onChange={(e) => setNovoEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                     placeholder="email@exemplo.com"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Nova senha
                   </label>
                   <input
                     type="password"
                     value={novaSenha}
                     onChange={(e) => setNovaSenha(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                     placeholder="Digite uma nova senha"
                   />
                 </div>
 
-                <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-200">
+                <div className="rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] p-4 text-sm text-[#1d4ed8]">
                   Alteração de email pode exigir confirmação no próprio email,
                   conforme a configuração do Supabase Auth.
                 </div>
@@ -388,7 +388,7 @@ export default function ConfiguracoesPage() {
                   type="button"
                   onClick={salvarConta}
                   disabled={salvandoConta}
-                  className="w-full rounded-2xl border border-white/10 bg-[#11161d] px-4 py-3 font-bold text-white transition hover:bg-[#171d26] disabled:opacity-60"
+                  className="w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
                 >
                   {salvandoConta ? "Atualizando..." : "Atualizar conta"}
                 </button>
@@ -397,26 +397,26 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-xl font-black tracking-tight text-white">
+            <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                 Sistema e operação
               </h2>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Nome da operação
                   </label>
                   <input
                     value={nomeOperacao}
                     onChange={(e) => setNomeOperacao(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                     placeholder="Slow Office Control"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Desconto Pix (%)
                   </label>
                   <input
@@ -424,12 +424,12 @@ export default function ConfiguracoesPage() {
                     step="0.01"
                     value={pixDesconto}
                     onChange={(e) => setPixDesconto(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Percentual tatuagem (%)
                   </label>
                   <input
@@ -437,27 +437,27 @@ export default function ConfiguracoesPage() {
                     step="0.01"
                     value={tatuagemPercentual}
                     onChange={(e) => setTatuagemPercentual(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm text-zinc-300">
+                  <label className="mb-2 block text-sm text-[#475569]">
                     Máximo de parcelas
                   </label>
                   <input
                     type="number"
                     value={maxParcelas}
                     onChange={(e) => setMaxParcelas(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   />
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-[#0b0f14] p-4">
+                <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-4">
                   <label className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm font-bold text-white">Tema escuro ativo</p>
-                      <p className="mt-1 text-sm text-zinc-400">
+                      <p className="text-sm font-bold text-[#0f172a]">Tema escuro ativo</p>
+                      <p className="mt-1 text-sm text-[#64748b]">
                         Mantém o visual dark premium do sistema.
                       </p>
                     </div>
@@ -466,7 +466,7 @@ export default function ConfiguracoesPage() {
                       type="checkbox"
                       checked={temaEscuro}
                       onChange={(e) => setTemaEscuro(e.target.checked)}
-                      className="h-5 w-5 accent-[#d4a93a]"
+                      className="h-5 w-5 accent-[#2563eb]"
                     />
                   </label>
                 </div>
@@ -476,19 +476,19 @@ export default function ConfiguracoesPage() {
                 type="button"
                 onClick={salvarSistema}
                 disabled={salvandoSistema}
-                className="mt-5 w-full rounded-2xl bg-[#d4a93a] px-4 py-3 font-bold text-black transition hover:bg-[#e2bb56] disabled:opacity-60"
+                className="mt-5 w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
               >
                 {salvandoSistema ? "Salvando..." : "Salvar sistema"}
               </button>
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-[30px] border border-[#d4a93a]/20 bg-[#d4a93a]/[0.06] p-6">
-                <h2 className="text-xl font-black tracking-tight text-white">
+              <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-6">
+                <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                   Resumo das configurações
                 </h2>
 
-                <div className="mt-4 space-y-3 text-sm text-zinc-300">
+                <div className="mt-4 space-y-3 text-sm text-[#475569]">
                   <p>• Perfil com nome e foto.</p>
                   <p>• Conta com email e senha.</p>
                   <p>• Identidade básica da operação.</p>
@@ -496,12 +496,12 @@ export default function ConfiguracoesPage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-                <h2 className="text-xl font-black tracking-tight text-white">
+              <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+                <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                   Leitura rápida
                 </h2>
 
-                <div className="mt-4 space-y-3 text-sm text-zinc-300">
+                <div className="mt-4 space-y-3 text-sm text-[#475569]">
                   <p>Nome: {nome || "-"}</p>
                   <p>Email: {emailAtual || "-"}</p>
                   <p>Operação: {nomeOperacao || "-"}</p>

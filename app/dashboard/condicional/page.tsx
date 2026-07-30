@@ -381,36 +381,36 @@ export default function CondicionalPage() {
       />
 
       {erro && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
           {erro}
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-white/10 bg-[#0f141b] p-5">
-          <p className="text-sm font-bold text-zinc-300">Condicionais abertos</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#e8ecf4] bg-[#f8fafc] p-5">
+          <p className="text-sm font-bold text-[#475569]">Condicionais abertos</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {condicionaisAbertos.length}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-red-500/20 bg-red-500/[0.06] p-5">
-          <p className="text-sm font-bold text-red-300">Atrasados</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#fecaca] bg-[#fef2f2] p-5">
+          <p className="text-sm font-bold text-[#b91c1c]">Atrasados</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {condicionaisAtrasados.length}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-[#d4a93a]/20 bg-[#d4a93a]/[0.06] p-5">
-          <p className="text-sm font-bold text-[#f3d37a]">Finalizados</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-5">
+          <p className="text-sm font-bold text-[#2563eb]">Finalizados</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {condicionaisFinalizados.length}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-[#7da2ff]/20 bg-[#7da2ff]/[0.06] p-5">
-          <p className="text-sm font-bold text-[#9bb7ff]">Peças em rascunho</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-white">
+        <div className="rounded-[28px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-5">
+          <p className="text-sm font-bold text-[#2563eb]">Peças em rascunho</p>
+          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {itensRascunho.length}
           </p>
         </div>
@@ -418,18 +418,18 @@ export default function CondicionalPage() {
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Novo condicional
             </h2>
 
             <div className="mt-5 space-y-4">
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Cliente</label>
+                <label className="mb-2 block text-sm text-[#475569]">Cliente</label>
                 <select
                   value={clienteId}
                   onChange={(e) => setClienteId(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
                   <option value="">Selecione o cliente</option>
                   {clientes.map((cliente) => (
@@ -441,11 +441,11 @@ export default function CondicionalPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Responsável</label>
+                <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
                 <select
                   value={responsavel}
                   onChange={(e) => setResponsavel(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
                   <option value="João Pedro">João Pedro</option>
                   <option value="Maria Eduarda">Maria Eduarda</option>
@@ -453,7 +453,7 @@ export default function CondicionalPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Data de saída</label>
+                <label className="mb-2 block text-sm text-[#475569]">Data de saída</label>
                 <input
                   type="date"
                   value={dataSaida}
@@ -461,44 +461,44 @@ export default function CondicionalPage() {
                     setDataSaida(e.target.value);
                     setDataLimite(somarDias(e.target.value, 2));
                   }}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Data limite</label>
+                <label className="mb-2 block text-sm text-[#475569]">Data limite</label>
                 <input
                   type="date"
                   value={dataLimite}
                   onChange={(e) => setDataLimite(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Observação</label>
+                <label className="mb-2 block text-sm text-[#475569]">Observação</label>
                 <textarea
                   value={observacao}
                   onChange={(e) => setObservacao(e.target.value)}
-                  className="min-h-[100px] w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="min-h-[100px] w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   placeholder="Ex: envio para prova em casa, retorno em até 2 dias"
                 />
               </div>
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Adicionar peças
             </h2>
 
             <div className="mt-5 space-y-4">
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Produto</label>
+                <label className="mb-2 block text-sm text-[#475569]">Produto</label>
                 <select
                   value={produtoId}
                   onChange={(e) => setProdutoId(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
                   <option value="">Selecione um produto</option>
                   {produtos.map((produto) => (
@@ -510,12 +510,12 @@ export default function CondicionalPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">Quantidade</label>
+                <label className="mb-2 block text-sm text-[#475569]">Quantidade</label>
                 <input
                   type="number"
                   value={quantidade}
                   onChange={(e) => setQuantidade(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none"
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   placeholder="1"
                 />
               </div>
@@ -523,7 +523,7 @@ export default function CondicionalPage() {
               <button
                 type="button"
                 onClick={adicionarItem}
-                className="w-full rounded-2xl border border-[#d4a93a]/20 bg-[#d4a93a]/10 px-4 py-3 font-bold text-[#f3d37a] transition hover:bg-[#d4a93a]/20"
+                className="w-full rounded-2xl border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-3 font-bold text-[#2563eb] transition hover:bg-[#2563eb]/20"
               >
                 Adicionar ao condicional
               </button>
@@ -531,19 +531,19 @@ export default function CondicionalPage() {
 
             <div className="mt-5 space-y-3">
               {itensRascunho.length === 0 ? (
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-[#64748b]">
                   Nenhuma peça adicionada ainda.
                 </p>
               ) : (
                 itensRascunho.map((item) => (
                   <div
                     key={item.produto_id}
-                    className="rounded-[22px] border border-white/10 bg-[#0b0f14]/80 p-4"
+                    className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold text-white">{item.nome}</p>
-                        <p className="mt-1 text-sm text-zinc-400">
+                        <p className="text-sm font-bold text-[#0f172a]">{item.nome}</p>
+                        <p className="mt-1 text-sm text-[#64748b]">
                           Quantidade: {item.quantidade} · Valor unitário: {formatCurrency(item.preco_unitario)}
                         </p>
                       </div>
@@ -551,7 +551,7 @@ export default function CondicionalPage() {
                       <button
                         type="button"
                         onClick={() => removerItem(item.produto_id)}
-                        className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-300 transition hover:bg-red-500/20"
+                        className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
                       >
                         Remover
                       </button>
@@ -565,7 +565,7 @@ export default function CondicionalPage() {
               type="button"
               onClick={criarCondicional}
               disabled={salvando}
-              className="mt-5 w-full rounded-2xl bg-[#d4a93a] px-4 py-3 font-bold text-black transition hover:bg-[#e2bb56] disabled:opacity-60"
+              className="mt-5 w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {salvando ? "Salvando..." : "Criar condicional"}
             </button>
@@ -573,12 +573,12 @@ export default function CondicionalPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-yellow-500/20 bg-yellow-500/[0.06] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#bfdbfe] bg-[#eff6ff] p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Regras do condicional
             </h2>
 
-            <div className="mt-4 space-y-3 text-sm text-zinc-300">
+            <div className="mt-4 space-y-3 text-sm text-[#475569]">
               <p>• O condicional não é venda.</p>
               <p>• O prazo padrão é de 2 dias.</p>
               <p>• As peças saem temporariamente do estoque.</p>
@@ -588,15 +588,15 @@ export default function CondicionalPage() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-xl font-black tracking-tight text-white">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Condicionais registrados
             </h2>
 
             {loading ? (
-              <p className="mt-4 text-zinc-400">Carregando condicionais...</p>
+              <p className="mt-4 text-[#64748b]">Carregando condicionais...</p>
             ) : condicionais.length === 0 ? (
-              <p className="mt-4 text-zinc-400">
+              <p className="mt-4 text-[#64748b]">
                 Nenhum condicional cadastrado ainda.
               </p>
             ) : (
@@ -610,49 +610,49 @@ export default function CondicionalPage() {
                   return (
                     <div
                       key={condicional.id}
-                      className="rounded-[24px] border border-white/10 bg-[#0b0f14]/80 p-4"
+                      className="rounded-[24px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-black text-white">
+                            <p className="text-sm font-black text-[#0f172a]">
                               {getClienteNome(condicional.cliente_id)}
                             </p>
 
                             <span
                               className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
                                 condicional.status === "aberto"
-                                  ? "bg-blue-500/10 text-blue-300"
+                                  ? "bg-[#eff6ff] text-[#1d4ed8]"
                                   : condicional.status === "recolhido"
-                                  ? "bg-zinc-700 text-zinc-200"
-                                  : "bg-emerald-500/10 text-emerald-300"
+                                  ? "bg-[#f1f5f9] text-[#475569]"
+                                  : "bg-[#f0fdf4] text-[#15803d]"
                               }`}
                             >
                               {condicional.status}
                             </span>
 
                             {atrasado && (
-                              <span className="inline-flex rounded-full bg-red-500/10 px-3 py-1 text-xs font-bold text-red-300">
+                              <span className="inline-flex rounded-full bg-[#fef2f2] px-3 py-1 text-xs font-bold text-[#b91c1c]">
                                 atrasado
                               </span>
                             )}
                           </div>
 
-                          <p className="text-sm text-zinc-400">
+                          <p className="text-sm text-[#64748b]">
                             Saída: {new Date(condicional.data_saida).toLocaleDateString("pt-BR")} ·{" "}
                             Limite: {new Date(condicional.data_limite).toLocaleDateString("pt-BR")}
                           </p>
 
-                          <p className="text-sm text-zinc-400">
+                          <p className="text-sm text-[#64748b]">
                             Responsável: {condicional.responsavel || "-"}
                           </p>
 
-                          <p className="text-sm text-zinc-500">
+                          <p className="text-sm text-[#94a3b8]">
                             {condicional.observacao || "Sem observação"}
                           </p>
 
                           <div className="pt-2">
-                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">
+                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#94a3b8]">
                               Itens
                             </p>
 
@@ -660,7 +660,7 @@ export default function CondicionalPage() {
                               {itens.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-zinc-300"
+                                  className="rounded-2xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm text-[#475569]"
                                 >
                                   {getProdutoNome(item.produto_id)} · Quantidade: {item.quantidade} ·{" "}
                                   {formatCurrency(Number(item.preco_unitario || 0))}
@@ -692,7 +692,7 @@ export default function CondicionalPage() {
                             fileName={`condicional-${getClienteNome(condicional.cliente_id)
                               .toLowerCase()
                               .replaceAll(" ", "-")}.pdf`}
-                            className="rounded-2xl border border-[#d4a93a]/20 bg-[#d4a93a]/10 px-4 py-2 text-center text-sm font-bold text-[#f3d37a] transition hover:bg-[#d4a93a]/20"
+                            className="rounded-2xl border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-2 text-center text-sm font-bold text-[#2563eb] transition hover:bg-[#2563eb]/20"
                           >
                             {({ loading: pdfLoading }) =>
                               pdfLoading ? "Gerando PDF..." : "Baixar PDF"
@@ -704,7 +704,7 @@ export default function CondicionalPage() {
                               <button
                                 type="button"
                                 onClick={() => marcarComoRecolhido(condicional.id)}
-                                className="rounded-2xl border border-white/10 bg-[#11161d] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#171d26]"
+                                className="rounded-2xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
                               >
                                 Marcar recolhido
                               </button>
@@ -712,7 +712,7 @@ export default function CondicionalPage() {
                               <button
                                 type="button"
                                 onClick={() => marcarComoFinalizado(condicional.id)}
-                                className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                                className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-sm font-bold text-[#15803d] transition hover:bg-emerald-500/20"
                               >
                                 Finalizar
                               </button>

@@ -26,10 +26,10 @@ export default function SegurancaPage() {
     <section className="space-y-6">
       <div>
         <p className="text-sm font-medium text-blue-400">Produção e segurança</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-zinc-100">
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
           Segurança / LGPD
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748b]">
           Esta área reúne as regras que protegem o sistema antes do deploy final.
         </p>
       </div>
@@ -38,26 +38,26 @@ export default function SegurancaPage() {
         {items.map((item) => (
           <article
             key={item.title}
-            className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5"
+            className="rounded-[28px] border border-[#e8ecf4] bg-white p-5"
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-black tracking-tight text-white">
+              <h2 className="text-lg font-black tracking-tight text-[#0f172a]">
                 {item.title}
               </h2>
-              <span className="rounded-full border border-[#d4a93a]/20 bg-[#d4a93a]/10 px-3 py-1 text-xs font-bold text-[#f3d37a]">
+              <span className="rounded-full border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 py-1 text-xs font-bold text-[#2563eb]">
                 {item.status}
               </span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">{item.text}</p>
+            <p className="mt-3 text-sm leading-6 text-[#64748b]">{item.text}</p>
           </article>
         ))}
       </div>
 
-      <div className="rounded-[30px] border border-[#d4a93a]/20 bg-[#d4a93a]/[0.06] p-6">
-        <h2 className="text-xl font-black tracking-tight text-white">
+      <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-6">
+        <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
           Checklist rápido antes do deploy
         </h2>
-        <ul className="mt-4 space-y-3 text-sm leading-6 text-zinc-300">
+        <ul className="mt-4 space-y-3 text-sm leading-6 text-[#475569]">
           <li>• Confirmar RLS em todas as tabelas expostas.</li>
           <li>• Confirmar que o frontend usa apenas chave pública.</li>
           <li>• Confirmar que nenhuma key secreta está no client.</li>
