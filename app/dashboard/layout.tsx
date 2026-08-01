@@ -15,7 +15,6 @@ import {
   BarChart3,
   ShieldCheck,
   Settings,
-  Search,
   type LucideIcon,
 } from "lucide-react";
 import { PeriodProvider } from "@/components/dashboard/period-context";
@@ -23,6 +22,7 @@ import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { AuthGuard } from "@/components/dashboard/auth-guard";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 
 type NavItem = {
   href: string;
@@ -130,15 +130,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 {currentLabel}
               </h1>
 
-              {/* Barra de busca */}
-              <div className="order-last flex w-full items-center gap-2 rounded-xl border border-[#e8ecf4] bg-[#f4f6fb] px-4 py-2.5 md:order-none md:w-auto md:min-w-[320px] md:flex-1 md:max-w-md">
-                <Search className="h-4 w-4 shrink-0 text-[#94a3b8]" />
-                <input
-                  type="text"
-                  placeholder="Buscar clientes, produtos, pedidos, notas..."
-                  className="w-full bg-transparent text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none"
-                />
-              </div>
+              {/* Busca global */}
+              <GlobalSearch />
 
               <div className="ml-auto flex items-center gap-3">
                 {/* Seletor de período global */}
