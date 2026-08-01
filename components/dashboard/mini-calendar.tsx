@@ -21,6 +21,7 @@ import {
   formatHora,
   statusLabel,
 } from "@/lib/eventos-utils";
+import { feriadosDoAno } from "@/lib/feriados";
 
 const WEEKDAYS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 const MESES = [
@@ -41,6 +42,7 @@ type CalItem = {
   color: string;
   hora: string | null;
   automatico: boolean;
+  readonly?: boolean; // feriados: só leitura, sem clique
   categoria: string; // chave da legenda/filtro
   catLabel: string; // rótulo da legenda
   evento?: Evento; // quando manual
@@ -174,6 +176,25 @@ export function MiniCalendar() {
         categoria: "aniversario",
         catLabel: "Aniversários",
         href: "/dashboard/clientes",
+      });
+    }
+
+    // Feriados nacionais (somente leitura) do mês visível.
+    const feriados = feriadosDoAno(view.getFullYear());
+    const prefixoMes = `${view.getFullYear()}-${String(view.getMonth() + 1).padStart(2, "0")}`;
+    for (const [dataISO, nome] of feriados) {
+      if (!dataISO.startsWith(prefixoMes)) continue;
+      out.push({
+        id: `feriado-${dataISO}`,
+        data: dataISO,
+        titulo: nome,
+        subtitulo: "Feriado nacional",
+        color: "#0ea5e9",
+        hora: null,
+        automatico: true,
+        readonly: true,
+        categoria: "feriado",
+        catLabel: "Feriados",
       });
     }
 
@@ -402,7 +423,7 @@ export function MiniCalendar() {
                           <span className="truncate text-sm font-bold text-[#0f172a]">
                             {it.titulo}
                           </span>
-                          {it.automatico && (
+                          {it.automatico && it.href && (
                             <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
                           )}
                           {!it.automatico &&
@@ -420,7 +441,7 @@ export function MiniCalendar() {
                               {formatHora(it.hora)}
                             </span>
                           )}
-                          {it.automatico && (
+                          {it.automatico && it.href && (
                             <span className="text-[#94a3b8]">· automático</span>
                           )}
                         </span>
@@ -431,8 +452,15 @@ export function MiniCalendar() {
                   const cls =
                     "flex w-full items-center gap-3 rounded-xl border border-[#eef2f7] p-3 text-left transition hover:bg-[#f8fafc]";
 
-                  return it.automatico ? (
-                    <Link key={it.id} href={it.href || "#"} className={cls}>
+                  if (it.readonly) {
+                    return (
+                      <div key={it.id} className={`${cls} cursor-default`}>
+                        {conteudo}
+                      </div>
+                    );
+                  }
+                  return it.automatico && it.href ? (
+                    <Link key={it.id} href={it.href} className={cls}>
                       {conteudo}
                     </Link>
                   ) : (

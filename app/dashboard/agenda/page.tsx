@@ -23,6 +23,7 @@ import {
   formatHora,
   toISODate,
 } from "@/lib/eventos-utils";
+import { feriadosDoAno } from "@/lib/feriados";
 
 type ClienteLite = { id: string; nome: string };
 
@@ -109,6 +110,11 @@ export default function AgendaPage() {
       out.push(new Date(mesView.getFullYear(), mesView.getMonth(), d));
     return out;
   }, [mesView]);
+
+  const feriadosMap = useMemo(
+    () => feriadosDoAno(mesView.getFullYear()),
+    [mesView]
+  );
 
   const hojeISO = toISODate(new Date());
 
@@ -253,6 +259,17 @@ export default function AgendaPage() {
                     </button>
                   </div>
                   <div className="mt-0.5 space-y-0.5">
+                    {feriadosMap.get(iso) && (
+                      <div className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px]">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#0ea5e9]" />
+                        <span
+                          className="truncate font-medium text-[#0369a1]"
+                          title={feriadosMap.get(iso)}
+                        >
+                          {feriadosMap.get(iso)}
+                        </span>
+                      </div>
+                    )}
                     {evs.slice(0, 3).map((e) => {
                       const info = tipoInfo(e.tipo);
                       return (
