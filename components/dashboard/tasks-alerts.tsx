@@ -144,10 +144,10 @@ export function TasksAlerts() {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-bold text-[#0f172a]">Tarefas e alertas</h3>
         <Link
-          href="/dashboard/agenda"
+          href="/dashboard/tarefas-alertas"
           className="text-sm font-semibold text-[#2563eb] transition hover:underline"
         >
-          Ver agenda
+          Ver todas
         </Link>
       </div>
 
