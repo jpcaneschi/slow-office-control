@@ -125,7 +125,7 @@ export function RecentSales({
                     key={v.id}
                     className="cursor-pointer border-t border-[#f1f5f9] text-sm transition hover:bg-[#f8fafc]"
                     onClick={() => {
-                      window.location.href = "/dashboard/vendas";
+                      window.location.href = `/dashboard/vendas/${v.id}`;
                     }}
                   >
                     <td className="px-2 py-2.5">
