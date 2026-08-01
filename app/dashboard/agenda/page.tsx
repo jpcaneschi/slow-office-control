@@ -7,6 +7,8 @@ import {
   CalendarDays,
   List,
   LayoutGrid,
+  CalendarRange,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -43,11 +45,12 @@ export default function AgendaPage() {
   const [erro, setErro] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [view, setView] = useState<"lista" | "mes">("lista");
+  const [view, setView] = useState<"lista" | "mes" | "semana" | "dia">("lista");
   const [mesView, setMesView] = useState(() => {
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), 1);
   });
+  const [refDate, setRefDate] = useState(() => new Date());
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<Evento | null>(null);
   const [dataPadrao, setDataPadrao] = useState<string | undefined>(undefined);
@@ -118,6 +121,26 @@ export default function AgendaPage() {
 
   const hojeISO = toISODate(new Date());
 
+  const diasDaSemana = useMemo(() => {
+    const start = new Date(
+      refDate.getFullYear(),
+      refDate.getMonth(),
+      refDate.getDate() - refDate.getDay()
+    );
+    return Array.from({ length: 7 }, (_, i) => {
+      const x = new Date(start);
+      x.setDate(start.getDate() + i);
+      return x;
+    });
+  }, [refDate]);
+
+  function feriadoDoDia(d: Date) {
+    return feriadosDoAno(d.getFullYear()).get(toISODate(d));
+  }
+
+  const ddmm = (d: Date) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
   function abrirNovo(dataISO?: string) {
     setEditando(null);
     setDataPadrao(dataISO);
@@ -141,25 +164,26 @@ export default function AgendaPage() {
         </div>
         <div className="flex items-center gap-2">
           {/* Alternador de visão */}
-          <div className="flex items-center rounded-lg border border-[#e8ecf4] bg-white p-0.5">
-            <button
-              onClick={() => setView("lista")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
-                view === "lista" ? "bg-[#2563eb] text-white" : "text-[#334155]"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-              Lista
-            </button>
-            <button
-              onClick={() => setView("mes")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
-                view === "mes" ? "bg-[#2563eb] text-white" : "text-[#334155]"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Mês
-            </button>
+          <div className="flex flex-wrap items-center rounded-lg border border-[#e8ecf4] bg-white p-0.5">
+            {(
+              [
+                { v: "lista", l: "Lista", Icon: List },
+                { v: "mes", l: "Mês", Icon: LayoutGrid },
+                { v: "semana", l: "Semana", Icon: CalendarRange },
+                { v: "dia", l: "Dia", Icon: CalendarClock },
+              ] as const
+            ).map(({ v, l, Icon }) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
+                  view === v ? "bg-[#2563eb] text-white" : "text-[#334155]"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {l}
+              </button>
+            ))}
           </div>
           <button
             onClick={() => abrirNovo()}
@@ -296,6 +320,165 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Visão de semana ─────────────────────────────────────────── */}
+      {view === "semana" && (
+        <div className="rounded-2xl border border-[#e8ecf4] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-bold text-[#0f172a]">
+              {ddmm(diasDaSemana[0])} – {ddmm(diasDaSemana[6])}
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setRefDate(new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - 7))}
+                aria-label="Semana anterior"
+                className="rounded-lg p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setRefDate(new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() + 7))}
+                aria-label="Próxima semana"
+                className="rounded-lg p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setRefDate(new Date())}
+                className="ml-1 rounded-lg border border-[#e8ecf4] px-2.5 py-1 text-xs font-semibold text-[#2563eb] transition hover:bg-[#f4f6fb]"
+              >
+                Hoje
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
+            {diasDaSemana.map((d) => {
+              const iso = toISODate(d);
+              const evs = porDia.get(iso) || [];
+              const fer = feriadoDoDia(d);
+              const isHoje = iso === hojeISO;
+              return (
+                <div key={iso} className="min-h-[130px] rounded-lg border border-[#eef2f7] p-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#94a3b8]">{WEEKDAYS[d.getDay()]}</span>
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
+                        isHoje ? "bg-[#2563eb] font-bold text-white" : "font-medium text-[#334155]"
+                      }`}
+                    >
+                      {d.getDate()}
+                    </span>
+                  </div>
+                  {fer && (
+                    <div className="mb-0.5 flex items-center gap-1 text-[11px]">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#0ea5e9]" />
+                      <span className="truncate font-medium text-[#0369a1]" title={fer}>{fer}</span>
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {evs.map((e) => {
+                      const info = tipoInfo(e.tipo);
+                      return (
+                        <button
+                          key={e.id}
+                          onClick={() => abrirEdicao(e)}
+                          title={e.titulo}
+                          className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] hover:bg-[#f4f6fb]"
+                        >
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: info.color }} />
+                          <span className="truncate text-[#334155]">
+                            {e.hora ? formatHora(e.hora) + " " : ""}
+                            {e.titulo}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => abrirNovo(iso)}
+                    className="mt-1 flex w-full items-center justify-center gap-1 rounded py-0.5 text-[11px] text-[#94a3b8] transition hover:bg-[#f4f6fb] hover:text-[#2563eb]"
+                  >
+                    <Plus className="h-3 w-3" /> novo
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Visão de dia ────────────────────────────────────────────── */}
+      {view === "dia" &&
+        (() => {
+          const iso = toISODate(refDate);
+          const evs = porDia.get(iso) || [];
+          const fer = feriadoDoDia(refDate);
+          return (
+            <div className="rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-bold text-[#0f172a]">{formatDataBR(iso)}</h3>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setRefDate(new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - 1))}
+                    aria-label="Dia anterior"
+                    className="rounded-lg p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb]"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setRefDate(new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() + 1))}
+                    aria-label="Próximo dia"
+                    className="rounded-lg p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb]"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setRefDate(new Date())}
+                    className="ml-1 rounded-lg border border-[#e8ecf4] px-2.5 py-1 text-xs font-semibold text-[#2563eb] transition hover:bg-[#f4f6fb]"
+                  >
+                    Hoje
+                  </button>
+                </div>
+              </div>
+              {fer && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl bg-[#e0f2fe] px-3 py-2 text-sm font-semibold text-[#0369a1]">
+                  <CalendarDays className="h-4 w-4" /> {fer} (feriado nacional)
+                </div>
+              )}
+              <button
+                onClick={() => abrirNovo(iso)}
+                className="mb-3 flex items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+              >
+                <Plus className="h-4 w-4" /> Novo evento neste dia
+              </button>
+              {evs.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#94a3b8]">Nenhum evento neste dia.</p>
+              ) : (
+                <div className="divide-y divide-[#f1f5f9]">
+                  {evs.map((e) => {
+                    const info = tipoInfo(e.tipo);
+                    return (
+                      <button
+                        key={e.id}
+                        onClick={() => abrirEdicao(e)}
+                        className="flex w-full items-center gap-3 py-2.5 text-left transition hover:bg-[#f8fafc]"
+                      >
+                        <span className="w-12 shrink-0 text-xs font-semibold text-[#64748b]">
+                          {e.hora ? formatHora(e.hora) : "—"}
+                        </span>
+                        <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: info.color }} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-[#0f172a]">{e.titulo}</span>
+                          <span className="block text-xs" style={{ color: info.color }}>{info.label}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {/* ─── Visão de lista ───────────────────────────────────────────── */}
       {view === "lista" && (
