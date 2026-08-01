@@ -123,9 +123,18 @@ export function RecentSales({
                 return (
                   <tr
                     key={v.id}
-                    className="cursor-pointer border-t border-[#f1f5f9] text-sm transition hover:bg-[#f8fafc]"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Ver detalhes da venda de ${v.cliente}`}
+                    className="cursor-pointer border-t border-[#f1f5f9] text-sm transition hover:bg-[#f8fafc] focus:outline-none focus-visible:bg-[#eff6ff]"
                     onClick={() => {
                       window.location.href = `/dashboard/vendas/${v.id}`;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        window.location.href = `/dashboard/vendas/${v.id}`;
+                      }
                     }}
                   >
                     <td className="px-2 py-2.5">
