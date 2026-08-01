@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, MoreVertical, BarChart3 } from "lucide-react";
+import Link from "next/link";
+import {
+  ChevronDown,
+  MoreVertical,
+  BarChart3,
+  RefreshCw,
+  Download,
+  FileBarChart2,
+} from "lucide-react";
 import { SalesChart, type SalesPoint } from "./sales-chart";
 import {
   usePeriod,
   presetRange,
   labelForPeriod,
   isoToDate,
+  formatBR,
   type PresetKey,
 } from "./period-context";
 
@@ -42,19 +51,18 @@ function label(date: Date) {
   ).padStart(2, "0")}`;
 }
 
-/** Agrega vendas concluídas em barras (faturamento) e linha (pedidos). */
 function buildSeries(vendas: VendaLite[], start: Date, end: Date): SalesPoint[] {
   const concluidas = vendas.filter((v) => v.status === "concluida");
   const startMs = startOfDay(start).getTime();
   const endMs = startOfDay(end).getTime();
   const totalDays = Math.round((endMs - startMs) / DAY) + 1;
-  const weekly = totalDays > 31; // acima de ~1 mês, agrupa por semana
+  const weekly = totalDays > 31;
   const stepDays = weekly ? 7 : 1;
 
   const points: SalesPoint[] = [];
   for (let t = startMs; t <= endMs; t += stepDays * DAY) {
     const bucketStart = t;
-    const bucketEnd = t + stepDays * DAY; // exclusivo
+    const bucketEnd = t + stepDays * DAY;
     let faturamento = 0;
     let pedidos = 0;
     for (const v of concluidas) {
@@ -72,25 +80,32 @@ function buildSeries(vendas: VendaLite[], start: Date, end: Date): SalesPoint[] 
 export function SalesPanel({
   vendas,
   loading,
+  onRefresh,
 }: {
   vendas: VendaLite[];
   loading: boolean;
+  onRefresh?: () => void;
 }) {
   const { period, setPeriod } = usePeriod();
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const n = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(n)) setOpen(false);
+      if (moreRef.current && !moreRef.current.contains(n)) setMoreOpen(false);
     }
     function onEsc(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        setMoreOpen(false);
+      }
     }
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onEsc);
@@ -106,6 +121,22 @@ export function SalesPanel({
 
   const temDados = data.some((d) => d.pedidos > 0);
   const currentLabel = mounted ? labelForPeriod(period) : "Período";
+
+  function exportarCSV() {
+    const linhas = [
+      ["Periodo", "Faturamento (R$)", "Pedidos"],
+      ...data.map((d) => [d.dia, String(d.faturamento).replace(".", ","), String(d.pedidos)]),
+    ];
+    const csv = linhas.map((l) => l.join(";")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vendas_${period.inicio}_a_${period.fim}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMoreOpen(false);
+  }
 
   return (
     <section className="rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
@@ -125,9 +156,13 @@ export function SalesPanel({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Seletor de período */}
           <div ref={menuRef} className="relative">
             <button
-              onClick={() => setOpen((o) => !o)}
+              onClick={() => {
+                setOpen((o) => !o);
+                setMoreOpen(false);
+              }}
               aria-haspopup="listbox"
               aria-expanded={open}
               className="flex items-center gap-1.5 rounded-lg border border-[#e8ecf4] bg-white px-3 py-1.5 text-xs font-semibold text-[#334155] transition hover:bg-[#f4f6fb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
@@ -171,13 +206,59 @@ export function SalesPanel({
             )}
           </div>
 
-          <button
-            className="rounded-lg border border-[#e8ecf4] bg-white p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb]"
-            aria-label="Mais opções do gráfico"
-            title="Mais opções (em breve)"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
+          {/* Menu de 3 pontos */}
+          <div ref={moreRef} className="relative">
+            <button
+              onClick={() => {
+                setMoreOpen((o) => !o);
+                setOpen(false);
+              }}
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              aria-label="Mais opções do gráfico"
+              className="rounded-lg border border-[#e8ecf4] bg-white p-1.5 text-[#64748b] transition hover:bg-[#f4f6fb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+
+            {moreOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-[#e8ecf4] bg-white py-1 shadow-[0_12px_30px_rgba(15,23,42,0.12)]"
+              >
+                {onRefresh && (
+                  <button
+                    onClick={() => {
+                      onRefresh();
+                      setMoreOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[#334155] transition hover:bg-[#f4f6fb]"
+                  >
+                    <RefreshCw className="h-4 w-4 text-[#64748b]" />
+                    Atualizar dados
+                  </button>
+                )}
+                <button
+                  onClick={exportarCSV}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[#334155] transition hover:bg-[#f4f6fb]"
+                >
+                  <Download className="h-4 w-4 text-[#64748b]" />
+                  Exportar CSV
+                </button>
+                <Link
+                  href="/dashboard/relatorios"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[#334155] transition hover:bg-[#f4f6fb]"
+                >
+                  <FileBarChart2 className="h-4 w-4 text-[#64748b]" />
+                  Ver relatório completo
+                </Link>
+                <div className="border-t border-[#eef2f7] px-3.5 py-1.5 text-[11px] text-[#94a3b8]">
+                  Período: {formatBR(period.inicio)} – {formatBR(period.fim)}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

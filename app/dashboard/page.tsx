@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShoppingCart, CircleDollarSign, Wallet, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
@@ -57,37 +57,38 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
-  useEffect(() => {
-    async function carregar() {
-      setLoading(true);
-      setErro("");
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro("");
 
-      const [vendasRes, clientesRes, promissoriasRes, condicionaisRes] =
-        await Promise.all([
-          supabase
-            .from("vendas")
-            .select("id, cliente_id, forma_pagamento, total, status, created_at")
-            .order("created_at", { ascending: false }),
-          supabase.from("clientes").select("id, nome"),
-          supabase.from("promissorias").select("valor_total, status"),
-          supabase.from("condicionais").select("id, status"),
-        ]);
+    const [vendasRes, clientesRes, promissoriasRes, condicionaisRes] =
+      await Promise.all([
+        supabase
+          .from("vendas")
+          .select("id, cliente_id, forma_pagamento, total, status, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from("clientes").select("id, nome"),
+        supabase.from("promissorias").select("valor_total, status"),
+        supabase.from("condicionais").select("id, status"),
+      ]);
 
-      const primeiroErro =
-        vendasRes.error ||
-        clientesRes.error ||
-        promissoriasRes.error ||
-        condicionaisRes.error;
-      if (primeiroErro) setErro(primeiroErro.message);
+    const primeiroErro =
+      vendasRes.error ||
+      clientesRes.error ||
+      promissoriasRes.error ||
+      condicionaisRes.error;
+    if (primeiroErro) setErro(primeiroErro.message);
 
-      setVendas(vendasRes.data || []);
-      setClientes(clientesRes.data || []);
-      setPromissorias(promissoriasRes.data || []);
-      setCondicionais(condicionaisRes.data || []);
-      setLoading(false);
-    }
-    carregar();
+    setVendas(vendasRes.data || []);
+    setClientes(clientesRes.data || []);
+    setPromissorias(promissoriasRes.data || []);
+    setCondicionais(condicionaisRes.data || []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   const clienteNome = useMemo(() => {
     const map = new Map<string, string>();
@@ -203,7 +204,7 @@ export default function DashboardPage() {
       )}
 
       {/* ─── Gráfico principal (dados reais, período global) ─────────────── */}
-      <SalesPanel vendas={vendasLite} loading={loading} />
+      <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} />
 
       {/* ─── Cards de métrica (reais + clicáveis) ───────────────────────── */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
