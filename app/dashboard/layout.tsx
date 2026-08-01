@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +15,8 @@ import {
   BarChart3,
   ShieldCheck,
   Settings,
+  Menu,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { PeriodProvider } from "@/components/dashboard/period-context";
@@ -60,6 +62,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const currentLabel =
     navItems.find((item) => isActive(item.href))?.label ?? "Dashboard";
+
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    }
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, []);
 
   return (
     <AuthGuard>
@@ -121,11 +133,70 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </svg>
         </aside>
 
+        {/* ─── Menu lateral mobile (gaveta) ────────────────────────────── */}
+        {mobileNavOpen && (
+          <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileNavOpen(false)}
+            />
+            <aside className="absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
+              <div className="flex items-start justify-between px-6 pt-6 pb-5">
+                <div>
+                  <p className="text-[22px] font-black leading-[1.05] tracking-tight text-white">
+                    SLOW
+                    <br />
+                    OFFICE
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
+                    Control
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMobileNavOpen(false)}
+                  aria-label="Fechar menu"
+                  className="rounded-lg p-1.5 text-white/80 transition hover:bg-white/10"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <nav className="space-y-1.5 px-4 pb-8">
+                {navItems.map((item) => {
+                  const active = isActive(item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                        active
+                          ? "bg-white text-[#2563eb] shadow-sm"
+                          : "text-white/80 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </aside>
+          </div>
+        )}
+
         {/* ─── Coluna principal ────────────────────────────────────────── */}
         <div className="flex min-h-screen flex-1 flex-col">
           {/* Cabeçalho */}
           <header className="sticky top-0 z-30 border-b border-[#e8ecf4] bg-white/85 backdrop-blur-xl">
             <div className="flex flex-wrap items-center gap-4 px-4 py-4 md:px-8">
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Abrir menu"
+                className="-ml-1 rounded-lg p-1.5 text-[#334155] transition hover:bg-[#f4f6fb] xl:hidden"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
               <h1 className="text-2xl font-black tracking-tight text-[#0f172a]">
                 {currentLabel}
               </h1>
