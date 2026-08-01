@@ -91,7 +91,7 @@ export function TasksAlerts() {
       title: "Estoque baixo",
       subtitle: `Produtos com estoque ≤ ${LIMITE_ESTOQUE}`,
       badge: plural(estoqueBaixo, "item", "itens"),
-      href: "/dashboard/produtos",
+      href: "/dashboard/produtos?estoque=critico",
     },
     {
       key: "tarefas",
@@ -109,7 +109,7 @@ export function TasksAlerts() {
       title: "Retornos atrasados",
       subtitle: "Condicionais fora do prazo",
       badge: plural(retornosAtrasados, "atrasado", "atrasados"),
-      href: "/dashboard/condicional",
+      href: "/dashboard/condicional?status=atrasado",
     },
     {
       key: "condicionais",
@@ -118,7 +118,7 @@ export function TasksAlerts() {
       title: "Condicionais em aberto",
       subtitle: "Aguardando finalização",
       badge: plural(condicionaisAbertas, "título", "títulos"),
-      href: "/dashboard/condicional",
+      href: "/dashboard/condicional?status=aberto",
     },
     {
       key: "promissorias",
@@ -127,7 +127,7 @@ export function TasksAlerts() {
       title: "Promissórias a receber",
       subtitle: plural(promissoriasAbertas.length, "em aberto", "em aberto"),
       badge: formatCurrency(promissoriasValor),
-      href: "/dashboard/promissorias",
+      href: "/dashboard/promissorias?status=em_aberto",
     },
   ];
 

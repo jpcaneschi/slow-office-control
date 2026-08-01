@@ -48,6 +48,12 @@ export default function ProdutosPage() {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroEstoque, setFiltroEstoque] = useState("todos");
 
+  useEffect(() => {
+    const e = new URLSearchParams(window.location.search).get("estoque");
+    if (e === "critico" || e === "baixo") setFiltroEstoque("baixo");
+    else if (e === "zerado") setFiltroEstoque("zerado");
+  }, []);
+
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("Camiseta");
   const [preco, setPreco] = useState("");

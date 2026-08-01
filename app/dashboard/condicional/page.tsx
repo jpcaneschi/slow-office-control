@@ -135,6 +135,22 @@ export default function CondicionalPage() {
     carregarDados();
   }, []);
 
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("status");
+    if (s) setFiltroStatus(s);
+  }, []);
+
+  const condicionaisFiltrados = useMemo(() => {
+    if (filtroStatus === "todos") return condicionais;
+    if (filtroStatus === "atrasado")
+      return condicionais.filter(
+        (i) => i.status === "aberto" && new Date(i.data_limite) < new Date(hoje)
+      );
+    return condicionais.filter((i) => i.status === filtroStatus);
+  }, [condicionais, filtroStatus, hoje]);
+
   const condicionaisAbertos = useMemo(() => {
     return condicionais.filter((item) => item.status === "aberto");
   }, [condicionais]);
@@ -589,19 +605,43 @@ export default function CondicionalPage() {
           </div>
 
           <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Condicionais registrados
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+                Condicionais registrados
+              </h2>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { v: "todos", l: "Todos" },
+                  { v: "aberto", l: "Abertos" },
+                  { v: "atrasado", l: "Atrasados" },
+                  { v: "finalizado", l: "Finalizados" },
+                ].map((f) => (
+                  <button
+                    key={f.v}
+                    onClick={() => setFiltroStatus(f.v)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      filtroStatus === f.v
+                        ? "bg-[#2563eb] text-white"
+                        : "border border-[#e8ecf4] bg-white text-[#334155] hover:bg-[#f4f6fb]"
+                    }`}
+                  >
+                    {f.l}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {loading ? (
               <p className="mt-4 text-[#64748b]">Carregando condicionais...</p>
-            ) : condicionais.length === 0 ? (
+            ) : condicionaisFiltrados.length === 0 ? (
               <p className="mt-4 text-[#64748b]">
-                Nenhum condicional cadastrado ainda.
+                {condicionais.length === 0
+                  ? "Nenhum condicional cadastrado ainda."
+                  : "Nenhum condicional com esse filtro."}
               </p>
             ) : (
               <div className="mt-5 space-y-4">
-                {condicionais.map((condicional) => {
+                {condicionaisFiltrados.map((condicional) => {
                   const itens = getItensDoCondicional(condicional.id);
                   const atrasado =
                     condicional.status === "aberto" &&

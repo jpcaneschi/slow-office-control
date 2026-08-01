@@ -65,6 +65,18 @@ export default function PromissoriasPage() {
     carregarDados();
   }, []);
 
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("status");
+    if (s) setFiltroStatus(s);
+  }, []);
+
+  const promissoriasFiltradas = useMemo(() => {
+    if (filtroStatus === "todos") return promissorias;
+    return promissorias.filter((p) => p.status === filtroStatus);
+  }, [promissorias, filtroStatus]);
+
   const totalAberto = useMemo(() => {
     return promissorias
       .filter((item) => item.status === "em_aberto")
@@ -301,19 +313,43 @@ export default function PromissoriasPage() {
         </div>
 
         <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-          <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-            Promissórias registradas
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+              Promissórias registradas
+            </h2>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { v: "todos", l: "Todas" },
+                { v: "em_aberto", l: "Em aberto" },
+                { v: "pago", l: "Pagas" },
+                { v: "atrasado", l: "Atrasadas" },
+              ].map((f) => (
+                <button
+                  key={f.v}
+                  onClick={() => setFiltroStatus(f.v)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    filtroStatus === f.v
+                      ? "bg-[#2563eb] text-white"
+                      : "border border-[#e8ecf4] bg-white text-[#334155] hover:bg-[#f4f6fb]"
+                  }`}
+                >
+                  {f.l}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {loading ? (
             <p className="mt-4 text-[#64748b]">Carregando promissórias...</p>
-          ) : promissorias.length === 0 ? (
+          ) : promissoriasFiltradas.length === 0 ? (
             <p className="mt-4 text-[#64748b]">
-              Nenhuma promissória cadastrada ainda.
+              {promissorias.length === 0
+                ? "Nenhuma promissória cadastrada ainda."
+                : "Nenhuma promissória com esse filtro."}
             </p>
           ) : (
             <div className="mt-5 space-y-4">
-              {promissorias.map((item) => {
+              {promissoriasFiltradas.map((item) => {
                 const cliente = clientes.find((c) => c.id === item.cliente_id);
                 const parcelaMensal = calcularParcelaSugerida(
                   Number(item.valor_total || 0),
@@ -358,7 +394,7 @@ export default function PromissoriasPage() {
                         <button
                           type="button"
                           onClick={() => marcarComoPago(item.id)}
-                          className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-sm font-bold text-[#15803d] transition hover:bg-emerald-500/20"
+                          className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-sm font-bold text-[#15803d] transition hover:bg-[#dcfce7]"
                         >
                           Marcar como paga
                         </button>

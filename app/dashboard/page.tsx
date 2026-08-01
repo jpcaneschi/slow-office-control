@@ -235,7 +235,7 @@ export default function DashboardPage() {
           tint="#0891b2"
           title="Contas a receber"
           value={loading ? "…" : formatCurrency(metricas.contasReceber)}
-          href="/dashboard/promissorias"
+          href="/dashboard/promissorias?status=em_aberto"
           ariaLabel="Ver promissórias a receber"
         />
         <MetricCard
@@ -243,7 +243,7 @@ export default function DashboardPage() {
           tint="#ea580c"
           title="Condicionais em aberto"
           value={loading ? "…" : String(metricas.condicionaisAbertas)}
-          href="/dashboard/condicional"
+          href="/dashboard/condicional?status=aberto"
           ariaLabel="Ver condicionais em aberto"
         />
       </section>
