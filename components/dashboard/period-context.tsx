@@ -36,7 +36,8 @@ export type PresetKey =
   | "60"
   | "90"
   | "este_mes"
-  | "mes_anterior";
+  | "mes_anterior"
+  | "este_ano";
 
 export function presetRange(key: PresetKey): Period {
   const hoje = new Date();
@@ -66,6 +67,9 @@ export function presetRange(key: PresetKey): Period {
       fim.setDate(0); // último dia do mês anterior
       break;
     }
+    case "este_ano":
+      inicio.setMonth(0, 1); // 1º de janeiro do ano atual
+      break;
   }
 
   return { inicio: toISO(inicio), fim: toISO(fim) };
@@ -80,6 +84,7 @@ export function labelForPeriod(p: Period): string {
     ["30", "Últimos 30 dias"],
     ["este_mes", "Este mês"],
     ["mes_anterior", "Mês anterior"],
+    ["este_ano", "Este ano"],
   ];
   for (const [key, label] of presets) {
     const r = presetRange(key);

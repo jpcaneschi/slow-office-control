@@ -22,6 +22,36 @@ export type SalesPoint = {
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { payload: SalesPoint }[];
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const d = payload[0].payload;
+  const ticket = d.pedidos > 0 ? d.faturamento / d.pedidos : 0;
+  return (
+    <div className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
+      <p className="text-xs font-bold text-[#0f172a]">{label}</p>
+      <p className="mt-1 text-xs text-[#64748b]">
+        Faturamento:{" "}
+        <span className="font-semibold text-[#0f172a]">{brl(d.faturamento)}</span>
+      </p>
+      <p className="text-xs text-[#64748b]">
+        Pedidos: <span className="font-semibold text-[#0f172a]">{d.pedidos}</span>
+      </p>
+      <p className="text-xs text-[#64748b]">
+        Ticket médio:{" "}
+        <span className="font-semibold text-[#0f172a]">{brl(ticket)}</span>
+      </p>
+    </div>
+  );
+}
+
 export function SalesChart({ data }: { data: SalesPoint[] }) {
   const maxFat = Math.max(...data.map((d) => d.faturamento));
   // Com muitos dias as barras ficam finas e escondemos os rótulos pra não poluir.
@@ -74,20 +104,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
 
           <Tooltip
             cursor={{ fill: "rgba(37,99,235,0.05)" }}
-            contentStyle={{
-              background: "#ffffff",
-              border: "1px solid #e8ecf4",
-              borderRadius: 14,
-              boxShadow: "0 12px 30px rgba(15,23,42,0.10)",
-              fontSize: 13,
-            }}
-            labelStyle={{ color: "#0f172a", fontWeight: 700 }}
-            formatter={(value, name) => {
-              const num = typeof value === "number" ? value : Number(value);
-              return name === "faturamento"
-                ? [brl(num), "Faturamento"]
-                : [num, "Pedidos"];
-            }}
+            content={<CustomTooltip />}
           />
 
           <Bar

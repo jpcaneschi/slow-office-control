@@ -35,6 +35,12 @@ const PERIODS: { key: PresetKey; label: string }[] = [
   { key: "90", label: "Últimos 90 dias" },
   { key: "este_mes", label: "Este mês" },
   { key: "mes_anterior", label: "Mês anterior" },
+  { key: "este_ano", label: "Este ano" },
+];
+
+const MESES_ABREV = [
+  "jan", "fev", "mar", "abr", "mai", "jun",
+  "jul", "ago", "set", "out", "nov", "dez",
 ];
 
 const DAY = 86400000;
@@ -56,23 +62,42 @@ function buildSeries(vendas: VendaLite[], start: Date, end: Date): SalesPoint[] 
   const startMs = startOfDay(start).getTime();
   const endMs = startOfDay(end).getTime();
   const totalDays = Math.round((endMs - startMs) / DAY) + 1;
-  const weekly = totalDays > 31;
-  const stepDays = weekly ? 7 : 1;
 
-  const points: SalesPoint[] = [];
-  for (let t = startMs; t <= endMs; t += stepDays * DAY) {
-    const bucketStart = t;
-    const bucketEnd = t + stepDays * DAY;
+  const somaEntre = (a: number, b: number) => {
     let faturamento = 0;
     let pedidos = 0;
     for (const v of concluidas) {
       const vt = new Date(v.created_at).getTime();
-      if (vt >= bucketStart && vt < bucketEnd) {
+      if (vt >= a && vt < b) {
         faturamento += Number(v.total || 0);
         pedidos += 1;
       }
     }
-    points.push({ dia: label(new Date(bucketStart)), faturamento, pedidos });
+    return { faturamento, pedidos };
+  };
+
+  const points: SalesPoint[] = [];
+
+  if (totalDays > 92) {
+    // Períodos longos (ex.: "Este ano") agrupam por mês.
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cur <= last) {
+      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      const { faturamento, pedidos } = somaEntre(cur.getTime(), next.getTime());
+      points.push({
+        dia: `${MESES_ABREV[cur.getMonth()]}/${String(cur.getFullYear()).slice(2)}`,
+        faturamento,
+        pedidos,
+      });
+      cur = next;
+    }
+  } else {
+    const stepDays = totalDays > 31 ? 7 : 1;
+    for (let t = startMs; t <= endMs; t += stepDays * DAY) {
+      const { faturamento, pedidos } = somaEntre(t, t + stepDays * DAY);
+      points.push({ dia: label(new Date(t)), faturamento, pedidos });
+    }
   }
   return points;
 }
