@@ -72,6 +72,19 @@ export default function PromissoriasPage() {
     if (s) setFiltroStatus(s);
   }, []);
 
+  function aplicarFiltro(v: string) {
+    setFiltroStatus(v);
+    const params = new URLSearchParams(window.location.search);
+    if (v === "todos") params.delete("status");
+    else params.set("status", v);
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+    );
+  }
+
   const promissoriasFiltradas = useMemo(() => {
     if (filtroStatus === "todos") return promissorias;
     return promissorias.filter((p) => p.status === filtroStatus);
@@ -326,7 +339,7 @@ export default function PromissoriasPage() {
               ].map((f) => (
                 <button
                   key={f.v}
-                  onClick={() => setFiltroStatus(f.v)}
+                  onClick={() => aplicarFiltro(f.v)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     filtroStatus === f.v
                       ? "bg-[#2563eb] text-white"
