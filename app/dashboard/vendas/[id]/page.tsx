@@ -38,7 +38,7 @@ const PAGAMENTO: Record<string, string> = {
 };
 
 const cardClass =
-  "rounded-2xl border border-[#e8ecf4] bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]";
+  "rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)]";
 
 export default function VendaDetalhePage() {
   const params = useParams();

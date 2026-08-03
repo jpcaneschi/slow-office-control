@@ -75,7 +75,7 @@ export function RecentSales({
   loading: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <div className="flex h-full flex-col rounded-3xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-base font-bold text-[#0f172a]">Últimas vendas</h3>
         <Link

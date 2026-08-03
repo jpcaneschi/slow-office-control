@@ -13,7 +13,7 @@ import {
 type ClienteLite = { id: string; nome: string };
 
 const inputClass =
-  "w-full rounded-lg border border-[#e8ecf4] bg-[#f8fafc] px-2.5 py-2 text-sm text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/15";
+  "w-full rounded-xl border border-[#e8ecf4] bg-[#f8fafc] px-2.5 py-2 text-sm text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/15";
 
 export function EventoForm({
   open,
@@ -147,7 +147,7 @@ export function EventoForm({
       <div
         role="dialog"
         aria-label={evento ? "Editar evento" : "Novo evento"}
-        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#eef2f7] px-5 py-4">

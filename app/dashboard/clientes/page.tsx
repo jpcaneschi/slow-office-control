@@ -17,10 +17,10 @@ type Cliente = {
 const statusOptions = ["ativo", "inativo", "vip", "em atraso"];
 
 const inputClass =
-  "w-full rounded-xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/15";
+  "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:bg-white focus:ring-2 focus:ring-[#2563eb]/15";
 const labelClass = "mb-1.5 block text-sm font-semibold text-[#475569]";
 const cardClass =
-  "rounded-2xl border border-[#e8ecf4] bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]";
+  "rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)]";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
