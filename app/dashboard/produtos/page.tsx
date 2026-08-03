@@ -26,12 +26,13 @@ type Movimentacao = {
 const statusOptions = ["ativo", "inativo"];
 const categoriaOptions = [
   "Camiseta",
-  "Calça",
-  "Bermuda",
-  "Moletom",
-  "Boné",
-  "Acessório",
-  "Tênis",
+  "Calças",
+  "Calçados",
+  "Moletons & Jaquetas",
+  "Bonés & Gorros",
+  "Shorts",
+  "Acessórios",
+  "Bags & Mochilas",
   "Outro",
 ];
 
