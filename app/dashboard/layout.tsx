@@ -13,7 +13,6 @@ import {
   CircleDollarSign,
   PenTool,
   BarChart3,
-  ShieldCheck,
   Settings,
   Menu,
   X,
@@ -42,7 +41,6 @@ const navItems: NavItem[] = [
   { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
   { href: "/dashboard/tatuagem", label: "Tatuagem", icon: PenTool },
   { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/dashboard/seguranca", label: "Segurança", icon: ShieldCheck },
   { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -82,13 +80,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <aside className="relative hidden w-[260px] shrink-0 overflow-hidden bg-gradient-to-b from-[#1e40af] to-[#2563eb] xl:flex xl:flex-col">
           {/* Logo */}
           <div className="px-6 pt-7 pb-6">
-            <p className="text-[22px] font-black leading-[1.05] tracking-tight text-white">
-              SLOW
-              <br />
-              OFFICE
+            <p className="text-[30px] font-black leading-none tracking-tight text-white">
+              Nexo
             </p>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
-              Control
+            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
+              Gestão
             </p>
           </div>
 
@@ -143,13 +139,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <aside className="absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
               <div className="flex items-start justify-between px-6 pt-6 pb-5">
                 <div>
-                  <p className="text-[22px] font-black leading-[1.05] tracking-tight text-white">
-                    SLOW
-                    <br />
-                    OFFICE
+                  <p className="text-[30px] font-black leading-none tracking-tight text-white">
+                    Nexo
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
-                    Control
+                  <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
+                    Gestão
                   </p>
                 </div>
                 <button

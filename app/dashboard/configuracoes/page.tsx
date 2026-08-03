@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 
@@ -10,7 +10,6 @@ type Configuracao = {
   pix_desconto: number;
   tatuagem_percentual: number;
   max_parcelas: number;
-  tema_escuro: boolean;
 };
 
 type Profile = {
@@ -38,7 +37,7 @@ export default function ConfiguracoesPage() {
   const [pixDesconto, setPixDesconto] = useState("");
   const [tatuagemPercentual, setTatuagemPercentual] = useState("");
   const [maxParcelas, setMaxParcelas] = useState("");
-  const [temaEscuro, setTemaEscuro] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
   const [salvandoConta, setSalvandoConta] = useState(false);
@@ -72,7 +71,7 @@ export default function ConfiguracoesPage() {
         .maybeSingle(),
       supabase
         .from("configuracoes")
-        .select("id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, tema_escuro")
+        .select("id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas")
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle(),
@@ -105,7 +104,6 @@ export default function ConfiguracoesPage() {
       setPixDesconto(String(configuracaoData.pix_desconto ?? 5));
       setTatuagemPercentual(String(configuracaoData.tatuagem_percentual ?? 10));
       setMaxParcelas(String(configuracaoData.max_parcelas ?? 6));
-      setTemaEscuro(Boolean(configuracaoData.tema_escuro));
     }
 
     setLoading(false);
@@ -114,6 +112,39 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  function onEscolherFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErro("Selecione um arquivo de imagem.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        // Redimensiona/recorta para um quadrado de 256px (centralizado).
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const menor = Math.min(img.width, img.height);
+        const sx = (img.width - menor) / 2;
+        const sy = (img.height - menor) / 2;
+        ctx.drawImage(img, sx, sy, menor, menor, 0, 0, size, size);
+        setAvatarUrl(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+
+    // Permite reenviar o mesmo arquivo depois.
+    e.target.value = "";
+  }
 
   async function salvarPerfil() {
     setErro("");
@@ -235,7 +266,6 @@ export default function ConfiguracoesPage() {
       pix_desconto: pixNumero,
       tatuagem_percentual: tatuagemNumero,
       max_parcelas: parcelasNumero,
-      tema_escuro: temaEscuro,
     };
 
     // Atualiza se já existe config; senão cria (nova empresa).
@@ -304,7 +334,7 @@ export default function ConfiguracoesPage() {
 
                   <div>
                     <p className="text-sm font-bold text-[#0f172a]">
-                      {nome || "Slow Office"}
+                      {nome || nomeOperacao || "Meu perfil"}
                     </p>
                     <p className="text-sm text-[#64748b]">
                       {emailAtual || "Sem email"}
@@ -326,14 +356,38 @@ export default function ConfiguracoesPage() {
 
                 <div>
                   <label className="mb-2 block text-sm text-[#475569]">
-                    URL da foto de perfil
+                    Foto de perfil
                   </label>
                   <input
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                    placeholder="https://..."
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={onEscolherFoto}
+                    className="hidden"
                   />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-2.5 text-sm font-semibold text-[#334155] transition hover:bg-[#eef2f7]"
+                    >
+                      {avatarUrl ? "Trocar foto" : "Adicionar foto"}
+                    </button>
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl("")}
+                        className="rounded-2xl px-3 py-2.5 text-sm font-semibold text-[#dc2626] transition hover:bg-[#fef2f2]"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-[#94a3b8]">
+                    Escolha uma imagem do seu dispositivo — ela é reduzida
+                    automaticamente. Clique em &quot;Salvar perfil&quot; para
+                    confirmar.
+                  </p>
                 </div>
 
                 <button
@@ -396,122 +450,77 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-                Sistema e operação
-              </h2>
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+              Negócio
+            </h2>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Dados e regras da sua loja usados no sistema e nos documentos.
+            </p>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm text-[#475569]">
-                    Nome da operação
-                  </label>
-                  <input
-                    value={nomeOperacao}
-                    onChange={(e) => setNomeOperacao(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                    placeholder="Slow Office Control"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm text-[#475569]">
-                    Desconto Pix (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={pixDesconto}
-                    onChange={(e) => setPixDesconto(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm text-[#475569]">
-                    Percentual tatuagem (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={tatuagemPercentual}
-                    onChange={(e) => setTatuagemPercentual(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm text-[#475569]">
-                    Máximo de parcelas
-                  </label>
-                  <input
-                    type="number"
-                    value={maxParcelas}
-                    onChange={(e) => setMaxParcelas(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-4">
-                  <label className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-bold text-[#0f172a]">Tema escuro ativo</p>
-                      <p className="mt-1 text-sm text-[#64748b]">
-                        Mantém o visual dark premium do sistema.
-                      </p>
-                    </div>
-
-                    <input
-                      type="checkbox"
-                      checked={temaEscuro}
-                      onChange={(e) => setTemaEscuro(e.target.checked)}
-                      className="h-5 w-5 accent-[#2563eb]"
-                    />
-                  </label>
-                </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Nome da loja
+                </label>
+                <input
+                  value={nomeOperacao}
+                  onChange={(e) => setNomeOperacao(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                  placeholder="Ex: Slow Office"
+                />
+                <p className="mt-1.5 text-xs text-[#94a3b8]">
+                  Aparece nos documentos e relatórios (ex.: promissórias, vales).
+                </p>
               </div>
 
-              <button
-                type="button"
-                onClick={salvarSistema}
-                disabled={salvandoSistema}
-                className="mt-5 w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-              >
-                {salvandoSistema ? "Salvando..." : "Salvar sistema"}
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-6">
-                <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-                  Resumo das configurações
-                </h2>
-
-                <div className="mt-4 space-y-3 text-sm text-[#475569]">
-                  <p>• Perfil com nome e foto.</p>
-                  <p>• Conta com email e senha.</p>
-                  <p>• Identidade básica da operação.</p>
-                  <p>• Regras comerciais centrais do sistema.</p>
-                </div>
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Desconto Pix (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={pixDesconto}
+                  onChange={(e) => setPixDesconto(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
               </div>
 
-              <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-                <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-                  Leitura rápida
-                </h2>
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Percentual da loja na tatuagem (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={tatuagemPercentual}
+                  onChange={(e) => setTatuagemPercentual(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
+              </div>
 
-                <div className="mt-4 space-y-3 text-sm text-[#475569]">
-                  <p>Nome: {nome || "-"}</p>
-                  <p>Email: {emailAtual || "-"}</p>
-                  <p>Operação: {nomeOperacao || "-"}</p>
-                  <p>Pix: {pixDesconto || "0"}%</p>
-                  <p>Tatuagem: {tatuagemPercentual || "0"}%</p>
-                  <p>Parcelas: {maxParcelas || "0"}</p>
-                  <p>Tema: {temaEscuro ? "Escuro" : "Claro"}</p>
-                </div>
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Máximo de parcelas
+                </label>
+                <input
+                  type="number"
+                  value={maxParcelas}
+                  onChange={(e) => setMaxParcelas(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={salvarSistema}
+              disabled={salvandoSistema}
+              className="mt-5 w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60 sm:w-auto sm:px-8"
+            >
+              {salvandoSistema ? "Salvando..." : "Salvar negócio"}
+            </button>
           </div>
         </div>
       )}

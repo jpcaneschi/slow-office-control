@@ -7,7 +7,6 @@ import {
   ChevronDown,
   User,
   Settings,
-  ShieldCheck,
   LogOut,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -27,16 +26,25 @@ export function UserMenu() {
   const router = useRouter();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [open, setOpen] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const u = data.user;
       if (!u) return;
       setEmail(u.email || "");
       setNome((u.user_metadata?.nome as string) || u.email || "Usuário");
+
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nome, avatar_url")
+        .eq("id", u.id)
+        .maybeSingle();
+      if (prof?.nome) setNome(prof.nome);
+      if (prof?.avatar_url) setAvatarUrl(prof.avatar_url);
     });
   }, []);
 
@@ -64,7 +72,6 @@ export function UserMenu() {
   const itens = [
     { label: "Meu perfil", icon: User, href: "/dashboard/configuracoes" },
     { label: "Configurações", icon: Settings, href: "/dashboard/configuracoes" },
-    { label: "Segurança", icon: ShieldCheck, href: "/dashboard/seguranca" },
   ];
 
   return (
@@ -75,9 +82,18 @@ export function UserMenu() {
         aria-expanded={open}
         className="flex items-center gap-2.5 rounded-xl border border-[#e8ecf4] bg-white py-1.5 pl-1.5 pr-3 transition hover:bg-[#f4f6fb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
       >
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1e40af] to-[#2563eb] text-sm font-bold text-white">
-          {iniciais(nome || "?")}
-        </span>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt="Foto de perfil"
+            className="h-9 w-9 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1e40af] to-[#2563eb] text-sm font-bold text-white">
+            {iniciais(nome || "?")}
+          </span>
+        )}
         <span className="hidden text-left leading-tight sm:block">
           <span className="block max-w-[140px] truncate text-sm font-bold text-[#0f172a]">
             {nome || "…"}
