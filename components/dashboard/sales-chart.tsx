@@ -22,6 +22,30 @@ export type SalesPoint = {
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// Gera uma escala "redonda" (0, passo, 2·passo…) que se ajusta ao maior valor,
+// em vez de um teto fixo. Ex.: max ~600 → passo 200; max ~80k → passo 20k.
+function escalaBonita(max: number, permitir25 = true) {
+  if (!Number.isFinite(max) || max <= 0) {
+    return { max: 100, ticks: [0, 25, 50, 75, 100] };
+  }
+  const bruto = max / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const norm = bruto / mag;
+  let passo: number;
+  if (norm <= 1) passo = 1;
+  else if (norm <= 2) passo = 2;
+  else if (permitir25 && norm <= 2.5) passo = 2.5;
+  else if (norm <= 5) passo = 5;
+  else passo = 10;
+  passo *= mag;
+  const topo = Math.ceil(max / passo) * passo;
+  const ticks: number[] = [];
+  for (let v = 0; v <= topo + passo / 1000; v += passo) {
+    ticks.push(Math.round(v * 100) / 100);
+  }
+  return { max: topo, ticks };
+}
+
 function CustomTooltip({
   active,
   payload,
@@ -53,7 +77,10 @@ function CustomTooltip({
 }
 
 export function SalesChart({ data }: { data: SalesPoint[] }) {
-  const maxFat = Math.max(...data.map((d) => d.faturamento));
+  const maxFat = data.length ? Math.max(...data.map((d) => d.faturamento)) : 0;
+  const maxPed = data.length ? Math.max(...data.map((d) => d.pedidos)) : 0;
+  const escalaFat = escalaBonita(maxFat);
+  const escalaPed = escalaBonita(maxPed, false);
   // Com muitos dias as barras ficam finas e escondemos os rótulos pra não poluir.
   const many = data.length > 8;
   const barSize = data.length > 16 ? 10 : many ? 18 : 38;
@@ -86,9 +113,15 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             tickLine={false}
             axisLine={false}
             tick={{ fill: "#94a3b8", fontSize: 11 }}
-            tickFormatter={(v: number) => (v === 0 ? "R$ 0" : `R$ ${v / 1000}k`)}
-            domain={[0, 80000]}
-            ticks={[0, 20000, 40000, 60000, 80000]}
+            tickFormatter={(v: number) =>
+              v === 0
+                ? "R$ 0"
+                : v >= 1000
+                ? `R$ ${(v / 1000).toLocaleString("pt-BR")}k`
+                : `R$ ${v.toLocaleString("pt-BR")}`
+            }
+            domain={[0, escalaFat.max]}
+            ticks={escalaFat.ticks}
           />
 
           {/* Eixo direito — pedidos */}
@@ -98,8 +131,9 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             tickLine={false}
             axisLine={false}
             tick={{ fill: "#94a3b8", fontSize: 11 }}
-            domain={[0, 100]}
-            ticks={[0, 25, 50, 75, 100]}
+            domain={[0, escalaPed.max]}
+            ticks={escalaPed.ticks}
+            allowDecimals={false}
           />
 
           <Tooltip

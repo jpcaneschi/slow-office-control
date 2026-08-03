@@ -13,8 +13,6 @@ type Venda = {
   observacao: string | null;
   responsavel: string | null;
   cliente_id: string | null;
-  tipo_venda?: string | null;
-  parcelas_total?: number | null;
 };
 
 type Despesa = {
@@ -67,7 +65,7 @@ export default function FinanceiroPage() {
     const [vendasRes, despesasRes] = await Promise.all([
       supabase
         .from("vendas")
-        .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id, tipo_venda, parcelas_total")
+        .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id")
         .order("created_at", { ascending: false }),
       supabase
         .from("despesas")
