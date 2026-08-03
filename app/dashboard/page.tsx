@@ -23,6 +23,11 @@ type Venda = {
 type Cliente = { id: string; nome: string };
 type Promissoria = { valor_total: number | null; status: string };
 type Condicional = { id: string; status: string };
+type AtendimentoTat = {
+  data: string;
+  valor: number | null;
+  percentual: number | null;
+};
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -43,6 +48,22 @@ function somaConcluidas(vendas: Venda[], inicio: Date, fimExclusivo: Date) {
     .reduce((acc, v) => acc + Number(v.total || 0), 0);
 }
 
+/** Soma o repasse da loja (valor × %/100) dos atendimentos de tatuagem em [inicio, fimExclusivo). */
+function somaRepasse(atends: AtendimentoTat[], inicio: Date, fimExclusivo: Date) {
+  const ini = inicio.getTime();
+  const f = fimExclusivo.getTime();
+  return atends
+    .filter((a) => {
+      const t = isoToDate(a.data).getTime();
+      return t >= ini && t < f;
+    })
+    .reduce(
+      (acc, a) =>
+        acc + ((Number(a.valor) || 0) * (Number(a.percentual) || 0)) / 100,
+      0
+    );
+}
+
 function variacao(atual: number, anterior: number) {
   if (anterior <= 0) return atual > 0 ? 100 : 0;
   return ((atual - anterior) / anterior) * 100;
@@ -54,6 +75,7 @@ export default function DashboardPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
+  const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -61,7 +83,7 @@ export default function DashboardPage() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, clientesRes, promissoriasRes, condicionaisRes] =
+    const [vendasRes, clientesRes, promissoriasRes, condicionaisRes, atendRes] =
       await Promise.all([
         supabase
           .from("vendas")
@@ -70,19 +92,24 @@ export default function DashboardPage() {
         supabase.from("clientes").select("id, nome"),
         supabase.from("promissorias").select("valor_total, status"),
         supabase.from("condicionais").select("id, status"),
+        supabase
+          .from("tatuagem_atendimentos")
+          .select("data, valor, percentual"),
       ]);
 
     const primeiroErro =
       vendasRes.error ||
       clientesRes.error ||
       promissoriasRes.error ||
-      condicionaisRes.error;
+      condicionaisRes.error ||
+      atendRes.error;
     if (primeiroErro) setErro(primeiroErro.message);
 
     setVendas(vendasRes.data || []);
     setClientes(clientesRes.data || []);
     setPromissorias(promissoriasRes.data || []);
     setCondicionais(condicionaisRes.data || []);
+    setAtendimentos(atendRes.data || []);
     setLoading(false);
   }, []);
 
@@ -128,8 +155,12 @@ export default function DashboardPage() {
       );
     }).length;
 
-    const faturamentoMes = somaConcluidas(vendas, inicioMes, inicioProxMes);
-    const faturamentoMesAnterior = somaConcluidas(vendas, inicioMesAnterior, inicioMes);
+    const faturamentoMes =
+      somaConcluidas(vendas, inicioMes, inicioProxMes) +
+      somaRepasse(atendimentos, inicioMes, inicioProxMes);
+    const faturamentoMesAnterior =
+      somaConcluidas(vendas, inicioMesAnterior, inicioMes) +
+      somaRepasse(atendimentos, inicioMesAnterior, inicioMes);
 
     const contasReceber = promissorias
       .filter((p) => p.status === "em_aberto")
@@ -158,7 +189,7 @@ export default function DashboardPage() {
       condicionaisAbertas,
       spark,
     };
-  }, [vendas, promissorias, condicionais, janela]);
+  }, [vendas, promissorias, condicionais, atendimentos, janela]);
 
   const ultimasVendas: VendaRow[] = useMemo(() => {
     return vendas

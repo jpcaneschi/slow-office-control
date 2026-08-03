@@ -26,6 +26,8 @@ type Despesa = {
   created_at: string;
 };
 
+type AtendimentoTat = { valor: number | null; percentual: number | null };
+
 const categoriasDespesa = [
   "Aluguel",
   "Fornecedor",
@@ -47,6 +49,7 @@ function formatCurrency(value: number) {
 export default function FinanceiroPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -62,7 +65,7 @@ export default function FinanceiroPage() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, despesasRes] = await Promise.all([
+    const [vendasRes, despesasRes, atendRes] = await Promise.all([
       supabase
         .from("vendas")
         .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id")
@@ -71,13 +74,16 @@ export default function FinanceiroPage() {
         .from("despesas")
         .select("id, descricao, categoria, valor, data, responsavel, observacao, created_at")
         .order("created_at", { ascending: false }),
+      supabase.from("tatuagem_atendimentos").select("valor, percentual"),
     ]);
 
     if (vendasRes.error) setErro(vendasRes.error.message);
     if (despesasRes.error) setErro(despesasRes.error.message);
+    if (atendRes.error) setErro(atendRes.error.message);
 
     setVendas(vendasRes.data || []);
     setDespesas(despesasRes.data || []);
+    setAtendimentos(atendRes.data || []);
     setLoading(false);
   }
 
@@ -85,9 +91,19 @@ export default function FinanceiroPage() {
     carregarDados();
   }, []);
 
-  const receita = useMemo(() => {
+  const receitaVendas = useMemo(() => {
     return vendas.reduce((acc, venda) => acc + Number(venda.total || 0), 0);
   }, [vendas]);
+
+  const receitaTatuagem = useMemo(() => {
+    return atendimentos.reduce(
+      (acc, a) =>
+        acc + ((Number(a.valor) || 0) * (Number(a.percentual) || 0)) / 100,
+      0
+    );
+  }, [atendimentos]);
+
+  const receita = receitaVendas + receitaTatuagem;
 
   const despesasTotal = useMemo(() => {
     return despesas.reduce((acc, despesa) => acc + Number(despesa.valor || 0), 0);
@@ -161,6 +177,10 @@ export default function FinanceiroPage() {
           <p className="text-sm font-bold text-[#475569]">Receita</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(receita)}
+          </p>
+          <p className="mt-2 text-xs text-[#94a3b8]">
+            Vendas {formatCurrency(receitaVendas)} · Tatuagem{" "}
+            {formatCurrency(receitaTatuagem)}
           </p>
         </div>
 
@@ -324,6 +344,7 @@ export default function FinanceiroPage() {
 
             <div className="mt-4 space-y-3 text-sm text-[#475569]">
               <p>• Receita total: {formatCurrency(receita)}</p>
+              <p>• Repasse de tatuagem: {formatCurrency(receitaTatuagem)}</p>
               <p>• Total de despesas: {formatCurrency(despesasTotal)}</p>
               <p>• Resultado simples: {formatCurrency(resultado)}</p>
               <p>• Vendas no Pix: {vendasPix}</p>
