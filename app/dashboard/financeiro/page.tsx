@@ -28,6 +28,15 @@ type Despesa = {
 
 type AtendimentoTat = { valor: number | null; percentual: number | null };
 
+type Recorrente = {
+  id: string;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  dia_vencimento: number;
+  ativo: boolean;
+};
+
 const categoriasDespesa = [
   "Aluguel",
   "Fornecedor",
@@ -46,10 +55,14 @@ function formatCurrency(value: number) {
   });
 }
 
+const inputRec =
+  "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] focus:bg-white";
+
 export default function FinanceiroPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
+  const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -61,11 +74,17 @@ export default function FinanceiroPage() {
   const [responsavel, setResponsavel] = useState("João Pedro");
   const [observacao, setObservacao] = useState("");
 
+  const [rDescricao, setRDescricao] = useState("");
+  const [rCategoria, setRCategoria] = useState("Aluguel");
+  const [rValor, setRValor] = useState("");
+  const [rDia, setRDia] = useState("5");
+  const [salvandoRec, setSalvandoRec] = useState(false);
+
   async function carregarDados() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, despesasRes, atendRes] = await Promise.all([
+    const [vendasRes, despesasRes, atendRes, recRes] = await Promise.all([
       supabase
         .from("vendas")
         .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id")
@@ -75,15 +94,21 @@ export default function FinanceiroPage() {
         .select("id, descricao, categoria, valor, data, responsavel, observacao, created_at")
         .order("created_at", { ascending: false }),
       supabase.from("tatuagem_atendimentos").select("valor, percentual"),
+      supabase
+        .from("despesas_recorrentes")
+        .select("id, descricao, categoria, valor, dia_vencimento, ativo")
+        .order("created_at", { ascending: true }),
     ]);
 
     if (vendasRes.error) setErro(vendasRes.error.message);
     if (despesasRes.error) setErro(despesasRes.error.message);
     if (atendRes.error) setErro(atendRes.error.message);
+    if (recRes.error) setErro(recRes.error.message);
 
     setVendas(vendasRes.data || []);
     setDespesas(despesasRes.data || []);
     setAtendimentos(atendRes.data || []);
+    setRecorrentes(recRes.data || []);
     setLoading(false);
   }
 
@@ -114,6 +139,96 @@ export default function FinanceiroPage() {
   const vendasPix = useMemo(() => {
     return vendas.filter((venda) => venda.forma_pagamento === "pix").length;
   }, [vendas]);
+
+  const mesPrefix = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+
+  const totalFixoMensal = useMemo(
+    () =>
+      recorrentes
+        .filter((r) => r.ativo)
+        .reduce((acc, r) => acc + Number(r.valor || 0), 0),
+    [recorrentes]
+  );
+
+  function lancadaEsteMes(rec: Recorrente) {
+    return despesas.some(
+      (d) =>
+        d.descricao === rec.descricao && (d.data || "").startsWith(mesPrefix)
+    );
+  }
+
+  async function adicionarRecorrente() {
+    setErro("");
+    const v = Number(rValor);
+    const dia = Number(rDia);
+    if (!rDescricao.trim()) {
+      setErro("Informe a descrição da conta recorrente.");
+      return;
+    }
+    if (!Number.isFinite(v) || v <= 0) {
+      setErro("Informe um valor válido para a conta recorrente.");
+      return;
+    }
+    setSalvandoRec(true);
+    const { error } = await supabase.from("despesas_recorrentes").insert({
+      descricao: rDescricao.trim(),
+      categoria: rCategoria,
+      valor: v,
+      dia_vencimento:
+        Number.isFinite(dia) && dia >= 1 && dia <= 31 ? dia : 5,
+      ativo: true,
+    });
+    if (error) {
+      setErro(error.message);
+      setSalvandoRec(false);
+      return;
+    }
+    setRDescricao("");
+    setRValor("");
+    setRDia("5");
+    setRCategoria("Aluguel");
+    await carregarDados();
+    setSalvandoRec(false);
+  }
+
+  async function excluirRecorrente(id: string) {
+    if (!window.confirm("Excluir esta conta recorrente?")) return;
+    const { error } = await supabase
+      .from("despesas_recorrentes")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    await carregarDados();
+  }
+
+  async function lancarRecorrente(rec: Recorrente) {
+    setErro("");
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = agora.getMonth();
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    const dia = Math.min(Math.max(rec.dia_vencimento || 1, 1), ultimoDia);
+    const dataISO = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
+      dia
+    ).padStart(2, "0")}`;
+
+    const { error } = await supabase.from("despesas").insert({
+      descricao: rec.descricao,
+      categoria: rec.categoria,
+      valor: rec.valor,
+      data: dataISO,
+      responsavel: null,
+      observacao: "Conta recorrente",
+    });
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    await carregarDados();
+  }
 
   async function registrarDespesa() {
     setErro("");
@@ -204,6 +319,123 @@ export default function FinanceiroPage() {
             {vendasPix}
           </p>
         </div>
+      </div>
+
+      {/* ─── Contas recorrentes ─────────────────────────────────────────── */}
+      <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+              Contas recorrentes
+            </h2>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Despesas fixas que se repetem todo mês (aluguel, internet…).
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-2 text-sm">
+            <span className="text-[#64748b]">Total fixo mensal: </span>
+            <span className="font-black text-[#0f172a]">
+              {formatCurrency(totalFixoMensal)}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_0.8fr_0.6fr_auto]">
+          <input
+            value={rDescricao}
+            onChange={(e) => setRDescricao(e.target.value)}
+            className={inputRec}
+            placeholder="Descrição (ex: Aluguel)"
+          />
+          <select
+            value={rCategoria}
+            onChange={(e) => setRCategoria(e.target.value)}
+            className={inputRec}
+          >
+            {categoriasDespesa.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={rValor}
+            onChange={(e) => setRValor(e.target.value)}
+            className={inputRec}
+            placeholder="Valor"
+          />
+          <input
+            type="number"
+            min="1"
+            max="31"
+            value={rDia}
+            onChange={(e) => setRDia(e.target.value)}
+            className={inputRec}
+            placeholder="Dia"
+            title="Dia do vencimento"
+          />
+          <button
+            type="button"
+            onClick={adicionarRecorrente}
+            disabled={salvandoRec}
+            className="rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+          >
+            {salvandoRec ? "..." : "Adicionar"}
+          </button>
+        </div>
+
+        {recorrentes.length === 0 ? (
+          <p className="mt-5 text-sm text-[#64748b]">
+            Nenhuma conta recorrente cadastrada ainda.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-2.5">
+            {recorrentes.map((rec) => {
+              const lancada = lancadaEsteMes(rec);
+              return (
+                <div
+                  key={rec.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-[#eef2f7] bg-[#f8fafc] p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#0f172a]">
+                      {rec.descricao}
+                    </p>
+                    <p className="mt-0.5 text-sm text-[#64748b]">
+                      {rec.categoria} · vence dia {rec.dia_vencimento} ·{" "}
+                      {formatCurrency(Number(rec.valor || 0))}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {lancada ? (
+                      <span className="rounded-full bg-[#f0fdf4] px-3 py-1.5 text-xs font-bold text-[#15803d]">
+                        Lançada este mês
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => lancarRecorrente(rec)}
+                        className="rounded-lg border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-[#2563eb]/20"
+                      >
+                        Lançar este mês
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => excluirRecorrente(rec.id)}
+                      className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm font-semibold text-[#dc2626] transition hover:bg-[#fee2e2]"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
