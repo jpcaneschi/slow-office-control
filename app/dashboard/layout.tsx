@@ -31,18 +31,42 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/clientes", label: "Clientes", icon: Users },
-  { href: "/dashboard/produtos", label: "Produtos", icon: Package },
-  { href: "/dashboard/vendas", label: "Vendas", icon: ShoppingCart },
-  { href: "/dashboard/condicional", label: "Condicional", icon: ClipboardList },
-  { href: "/dashboard/promissorias", label: "Promissórias", icon: FileText },
-  { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
-  { href: "/dashboard/tatuagem", label: "Tatuagem", icon: PenTool },
-  { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+const navGroups: { titulo?: string; itens: NavItem[] }[] = [
+  {
+    itens: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    titulo: "Operação",
+    itens: [
+      { href: "/dashboard/vendas", label: "Vendas", icon: ShoppingCart },
+      { href: "/dashboard/condicional", label: "Condicional", icon: ClipboardList },
+      { href: "/dashboard/promissorias", label: "Promissórias", icon: FileText },
+    ],
+  },
+  {
+    titulo: "Cadastros",
+    itens: [
+      { href: "/dashboard/clientes", label: "Clientes", icon: Users },
+      { href: "/dashboard/produtos", label: "Produtos", icon: Package },
+    ],
+  },
+  {
+    titulo: "Gestão",
+    itens: [
+      { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
+      { href: "/dashboard/tatuagem", label: "Tatuagem", icon: PenTool },
+      { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
+    ],
+  },
+  {
+    titulo: "Sistema",
+    itens: [
+      { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+    ],
+  },
 ];
+
+const navItems: NavItem[] = navGroups.flatMap((g) => g.itens);
 
 const mobileNavItems: NavItem[] = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
@@ -51,6 +75,47 @@ const mobileNavItems: NavItem[] = [
   { href: "/dashboard/vendas", label: "Vendas", icon: ShoppingCart },
   { href: "/dashboard/configuracoes", label: "Ajustes", icon: Settings },
 ];
+
+function NavSections({
+  isActive,
+  onNavigate,
+}: {
+  isActive: (href: string) => boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-8">
+      {navGroups.map((grupo, i) => (
+        <div key={i} className="space-y-1">
+          {grupo.titulo && (
+            <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+              {grupo.titulo}
+            </p>
+          )}
+          {grupo.itens.map((item) => {
+            const active = isActive(item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                  active
+                    ? "bg-white text-[#2563eb] shadow-[0_8px_18px_rgba(0,0,0,0.18)]"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -89,27 +154,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           {/* Navegação */}
-          <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 pb-8">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                    active
-                      ? "bg-white text-[#2563eb] shadow-sm"
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <NavSections isActive={isActive} />
 
           {/* Ondinha decorativa no rodapé */}
           <svg
@@ -154,27 +199,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <nav className="space-y-1.5 px-4 pb-8">
-                {navItems.map((item) => {
-                  const active = isActive(item.href);
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileNavOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                        active
-                          ? "bg-white text-[#2563eb] shadow-sm"
-                          : "text-white/80 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
+              <NavSections
+                isActive={isActive}
+                onNavigate={() => setMobileNavOpen(false)}
+              />
             </aside>
           </div>
         )}

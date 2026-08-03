@@ -64,7 +64,7 @@ export function MetricCard({
     <>
       <div className="flex items-start gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
           style={{ backgroundColor: `${tint}1a`, color: tint }}
         >
           <Icon className="h-5 w-5" />
@@ -107,7 +107,7 @@ export function MetricCard({
   );
 
   const baseClass =
-    "block rounded-2xl border border-[#e8ecf4] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]";
+    "block rounded-3xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]";
 
   if (href) {
     return (
