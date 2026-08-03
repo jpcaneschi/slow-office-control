@@ -30,27 +30,27 @@ function safeText(value: string | null | undefined) {
   return value?.trim() || "Não informado";
 }
 
+// Preto & branco, para impressão em folha branca.
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: "#0b0b0d",
-    color: "#f5f5f5",
-    paddingTop: 34,
-    paddingBottom: 34,
-    paddingHorizontal: 28,
+    backgroundColor: "#ffffff",
+    color: "#111111",
+    paddingTop: 40,
+    paddingBottom: 60,
+    paddingHorizontal: 44,
     fontFamily: "Helvetica",
     fontSize: 10,
   },
   shell: {
-    border: "1 solid #2b2b31",
-    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#000000",
     padding: 22,
-    backgroundColor: "#111114",
+    backgroundColor: "#ffffff",
   },
   topBar: {
-    height: 6,
+    height: 4,
     width: 92,
-    borderRadius: 999,
-    backgroundColor: "#d4a93a",
+    backgroundColor: "#000000",
     marginBottom: 18,
   },
   header: {
@@ -59,184 +59,143 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 18,
   },
-  brandBlock: {
-    flex: 1,
-  },
+  brandBlock: { flex: 1 },
   eyebrow: {
     fontSize: 8.5,
     textTransform: "uppercase",
     letterSpacing: 1.4,
-    color: "#d4a93a",
+    color: "#555555",
     marginBottom: 8,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 700,
-    color: "#ffffff",
+    fontSize: 22,
+    fontFamily: "Helvetica-Bold",
+    color: "#000000",
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 9.5,
     lineHeight: 1.5,
-    color: "#a1a1aa",
+    color: "#444444",
     maxWidth: 330,
   },
   codeCard: {
     minWidth: 110,
-    border: "1 solid #3a3a44",
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#000000",
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#17171c",
+    backgroundColor: "#ffffff",
     alignSelf: "flex-start",
   },
   codeLabel: {
     fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 1,
-    color: "#a1a1aa",
+    color: "#666666",
     marginBottom: 4,
   },
-  codeValue: {
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#f3d37a",
-  },
+  codeValue: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#000000" },
   infoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginHorizontal: -5,
     marginBottom: 16,
   },
-  infoCard: {
-    width: "50%",
-    paddingHorizontal: 5,
-    marginBottom: 10,
-  },
+  infoCard: { width: "50%", paddingHorizontal: 5, marginBottom: 10 },
   infoInner: {
-    border: "1 solid #2b2b31",
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#111111",
     padding: 12,
-    backgroundColor: "#0f0f12",
-    minHeight: 84,
+    backgroundColor: "#ffffff",
+    minHeight: 74,
   },
   infoLabel: {
     fontSize: 8,
     textTransform: "uppercase",
     letterSpacing: 0.9,
-    color: "#8b8b97",
+    color: "#666666",
     marginBottom: 6,
   },
   infoValue: {
     fontSize: 12,
-    color: "#ffffff",
-    fontWeight: 700,
+    color: "#000000",
+    fontFamily: "Helvetica-Bold",
     marginBottom: 3,
   },
-  infoHint: {
-    fontSize: 9,
-    color: "#a1a1aa",
-    lineHeight: 1.4,
-  },
+  infoHint: { fontSize: 9, color: "#555555", lineHeight: 1.4 },
   sectionTitle: {
-    fontSize: 10.5,
+    fontSize: 10,
     textTransform: "uppercase",
     letterSpacing: 1,
-    fontWeight: 700,
-    color: "#f5f5f5",
+    fontFamily: "Helvetica-Bold",
+    color: "#000000",
     marginBottom: 10,
   },
   itemBox: {
-    border: "1 solid #2b2b31",
-    borderRadius: 16,
-    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#000000",
     marginBottom: 14,
   },
   itemHead: {
     flexDirection: "row",
-    backgroundColor: "#17171c",
-    paddingVertical: 10,
+    backgroundColor: "#000000",
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderBottom: "1 solid #2b2b31",
   },
   itemRow: {
     flexDirection: "row",
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    borderBottom: "1 solid #202026",
+    borderTopWidth: 1,
+    borderTopColor: "#dddddd",
   },
-  colProduto: {
-    width: "76%",
-    paddingRight: 8,
-  },
-  colQtd: {
-    width: "24%",
-    textAlign: "right",
-  },
+  colProduto: { width: "76%", paddingRight: 8 },
+  colQtd: { width: "24%", textAlign: "right" },
   th: {
     fontSize: 8.5,
-    color: "#a1a1aa",
+    color: "#ffffff",
+    fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.7,
   },
-  td: {
-    fontSize: 10,
-    color: "#f5f5f5",
-    lineHeight: 1.45,
-  },
+  td: { fontSize: 10, color: "#111111", lineHeight: 1.45 },
   notesBox: {
-    border: "1 solid #3b2f07",
-    borderRadius: 16,
-    backgroundColor: "#191308",
+    borderWidth: 1,
+    borderColor: "#cccccc",
     padding: 14,
     marginBottom: 14,
   },
   notesTitle: {
     fontSize: 9.5,
-    color: "#f3d37a",
-    fontWeight: 700,
+    color: "#000000",
+    fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 8,
   },
-  notesText: {
-    fontSize: 9.5,
-    color: "#f5f5f5",
-    lineHeight: 1.6,
-  },
+  notesText: { fontSize: 9.5, color: "#111111", lineHeight: 1.6 },
+  accentNote: { marginTop: 10, fontSize: 8.5, color: "#555555" },
   rulesBox: {
-    border: "1 solid #2b2b31",
-    borderRadius: 16,
-    backgroundColor: "#0f0f12",
+    borderWidth: 1,
+    borderColor: "#cccccc",
     padding: 14,
     marginBottom: 16,
   },
   rulesText: {
     fontSize: 9.3,
-    color: "#d4d4d8",
+    color: "#333333",
     lineHeight: 1.55,
     marginBottom: 4,
   },
-  footer: {
-    flexDirection: "row",
-    gap: 14,
-    marginTop: 20,
-  },
+  footer: { flexDirection: "row", gap: 14, marginTop: 20 },
   signature: {
     flex: 1,
-    borderTop: "1 solid #585866",
+    borderTopWidth: 1,
+    borderTopColor: "#000000",
     paddingTop: 10,
   },
-  signatureText: {
-    fontSize: 9,
-    color: "#a1a1aa",
-    textAlign: "center",
-  },
-  accentNote: {
-    marginTop: 10,
-    fontSize: 8.5,
-    color: "#7da2ff",
-  },
+  signatureText: { fontSize: 9, color: "#444444", textAlign: "center" },
 });
 
 export function CondicionalPdfDocument({
@@ -319,7 +278,7 @@ export function CondicionalPdfDocument({
                 key={`${item.nome}-${index}`}
                 style={[
                   styles.itemRow,
-                  index === itens.length - 1 ? { borderBottom: "0 solid transparent" } : {},
+                  index === 0 ? { borderTopWidth: 0 } : {},
                 ]}
               >
                 <Text style={[styles.td, styles.colProduto]}>{item.nome}</Text>
@@ -352,7 +311,7 @@ export function CondicionalPdfDocument({
               <Text style={styles.signatureText}>Assinatura / confirmação do cliente</Text>
             </View>
             <View style={styles.signature}>
-              <Text style={styles.signatureText}>Responsável Slow Office</Text>
+              <Text style={styles.signatureText}>Responsável — {nomeLoja}</Text>
             </View>
           </View>
         </View>

@@ -8,7 +8,8 @@ import {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modelos de PDF em PRETO & BRANCO (para impressão em folha branca).
-// Fundo branco, texto preto, bordas pretas. Sem cor.
+// Fundo branco, texto preto, bordas pretas. Layout de documento oficial:
+// cabeçalho, caixas de informação, tabelas, cláusulas e assinaturas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function brl(n: number) {
@@ -24,15 +25,29 @@ function fmtData(iso: string) {
   return `${d}/${m}/${a}`;
 }
 
+function hojeISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Número de documento a partir da data + sufixo curto (ex.: PROM-20260803-482).
+function gerarNumero(prefixo: string) {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+  const suf = String(Math.floor(Math.random() * 900) + 100);
+  return `${prefixo}-${ymd}-${suf}`;
+}
+
 const styles = StyleSheet.create({
   page: {
     backgroundColor: "#ffffff",
     color: "#111111",
-    paddingVertical: 42,
+    paddingVertical: 40,
     paddingHorizontal: 46,
-    paddingBottom: 60,
+    paddingBottom: 64,
     fontFamily: "Helvetica",
-    fontSize: 11,
+    fontSize: 10.5,
     lineHeight: 1.5,
   },
   header: {
@@ -42,10 +57,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "#000000",
     paddingBottom: 12,
-    marginBottom: 4,
   },
-  loja: { fontSize: 17, fontFamily: "Helvetica-Bold", color: "#000000" },
-  lojaSub: { fontSize: 8.5, color: "#555555", marginTop: 3, letterSpacing: 0.5 },
+  loja: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
+  lojaSub: { fontSize: 8, color: "#555555", marginTop: 3, letterSpacing: 0.5 },
   headRight: { alignItems: "flex-end" },
   docTitle: {
     fontSize: 12,
@@ -54,50 +68,76 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: "#000000",
   },
-  docCode: { fontSize: 9, color: "#555555", marginTop: 4 },
+  docMeta: { fontSize: 8.5, color: "#555555", marginTop: 4 },
   sectionTitle: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
     color: "#000000",
     marginTop: 18,
     marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#cccccc",
-    paddingBottom: 4,
   },
-  row: { flexDirection: "row", marginBottom: 5 },
-  rowLabel: { width: 135, color: "#555555" },
-  rowValue: { flex: 1, color: "#000000", fontFamily: "Helvetica-Bold" },
   paragraph: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: "#111111",
-    lineHeight: 1.65,
-    marginTop: 10,
+    lineHeight: 1.7,
+    marginTop: 12,
+    textAlign: "justify",
   },
-  valorLinha: { flexDirection: "row", alignItems: "baseline", marginTop: 14 },
+  // Destaque de valor
+  valorBox: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#000000",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   valorLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: "#555555",
     textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginRight: 8,
+    letterSpacing: 0.8,
   },
-  valorDestaque: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
+  valorForte: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
+  // Grade de informações (caixas)
+  infoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -5,
+  },
+  infoCard: { width: "50%", paddingHorizontal: 5, marginBottom: 10 },
+  infoInner: {
+    borderWidth: 1,
+    borderColor: "#111111",
+    padding: 10,
+    minHeight: 46,
+  },
+  infoLabel: {
+    fontSize: 7.5,
+    color: "#666666",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  infoValue: { fontSize: 11, color: "#000000", fontFamily: "Helvetica-Bold" },
+  // Tabela
   table: { borderWidth: 1, borderColor: "#000000", marginTop: 8 },
   tHead: { flexDirection: "row", backgroundColor: "#000000" },
   tHeadCell: {
     color: "#ffffff",
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
   tRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#dddddd" },
-  tCell: { fontSize: 10, color: "#111111", paddingVertical: 6, paddingHorizontal: 8 },
+  tCell: { fontSize: 9.5, color: "#111111", paddingVertical: 6, paddingHorizontal: 8 },
   totalBox: {
-    marginTop: 14,
+    marginTop: 12,
     borderWidth: 1.5,
     borderColor: "#000000",
     paddingVertical: 11,
@@ -113,7 +153,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   totalValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
-  signRow: { flexDirection: "row", gap: 30, marginTop: 54 },
+  // Cláusulas
+  clauseBox: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#cccccc",
+    padding: 12,
+  },
+  clauseText: {
+    fontSize: 9,
+    color: "#333333",
+    lineHeight: 1.55,
+    marginBottom: 4,
+  },
+  // Assinaturas
+  signRow: { flexDirection: "row", gap: 30, marginTop: 50 },
   sign: {
     flex: 1,
     borderTopWidth: 1,
@@ -130,7 +184,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#dddddd",
     paddingTop: 7,
-    fontSize: 8,
+    fontSize: 7.5,
     color: "#888888",
     textAlign: "center",
   },
@@ -139,31 +193,54 @@ const styles = StyleSheet.create({
 function Header({
   loja,
   titulo,
-  codigo,
+  numero,
 }: {
   loja: string;
   titulo: string;
-  codigo?: string;
+  numero: string;
 }) {
   return (
     <View style={styles.header}>
       <View>
-        <Text style={styles.loja}>{loja}</Text>
+        <Text style={styles.loja}>{loja || "Loja"}</Text>
         <Text style={styles.lojaSub}>Documento oficial da loja</Text>
       </View>
       <View style={styles.headRight}>
         <Text style={styles.docTitle}>{titulo}</Text>
-        {codigo ? <Text style={styles.docCode}>{codigo}</Text> : null}
+        <Text style={styles.docMeta}>Nº {numero}</Text>
+        <Text style={styles.docMeta}>Emitido em {fmtData(hojeISO())}</Text>
       </View>
     </View>
   );
 }
 
-function Campo({ label, value }: { label: string; value: string }) {
+function InfoGrid({
+  itens,
+}: {
+  itens: { label: string; value: string }[];
+}) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value || "—"}</Text>
+    <View style={styles.infoGrid}>
+      {itens.map((it, i) => (
+        <View key={i} style={styles.infoCard}>
+          <View style={styles.infoInner}>
+            <Text style={styles.infoLabel}>{it.label}</Text>
+            <Text style={styles.infoValue}>{it.value || "—"}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Clausulas({ itens }: { itens: string[] }) {
+  return (
+    <View style={styles.clauseBox}>
+      {itens.map((c, i) => (
+        <Text key={i} style={styles.clauseText}>
+          • {c}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -189,7 +266,7 @@ function Rodape({ loja }: { loja: string }) {
       style={styles.footer}
       fixed
       render={({ pageNumber, totalPages }) =>
-        `${loja}  ·  Documento gerado pelo sistema  ·  Página ${pageNumber}/${totalPages}`
+        `${loja || "Loja"}  ·  Documento gerado pelo sistema  ·  Página ${pageNumber}/${totalPages}`
       }
     />
   );
@@ -220,28 +297,41 @@ export function PromissoriaPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Nota Promissória" />
+        <Header loja={loja} titulo="Nota Promissória" numero={gerarNumero("PROM")} />
 
-        <View style={styles.valorLinha}>
-          <Text style={styles.valorLabel}>Valor</Text>
-          <Text style={styles.valorDestaque}>{brl(valor)}</Text>
+        <View style={styles.valorBox}>
+          <Text style={styles.valorLabel}>Valor a pagar</Text>
+          <Text style={styles.valorForte}>{brl(valor)}</Text>
         </View>
 
         <Text style={styles.paragraph}>
           No dia {fmtData(vencimento)}, pagarei por esta única via de NOTA
           PROMISSÓRIA a {loja || "credor"}, ou à sua ordem, a quantia de{" "}
-          {brl(valor)} em moeda corrente deste país.
+          {brl(valor)} em moeda corrente deste país, pagável em{" "}
+          {cidade || "praça do credor"}.
           {referencia ? ` Referente a: ${referencia}.` : ""}
         </Text>
 
         <Text style={styles.sectionTitle}>Dados do emitente</Text>
-        <Campo label="Emitente (devedor)" value={devedor} />
-        <Campo label="CPF / documento" value={cpf || "—"} />
-        <Campo
-          label="Local e data"
-          value={`${cidade ? cidade + ", " : ""}${fmtData(dataEmissao)}`}
+        <InfoGrid
+          itens={[
+            { label: "Emitente (devedor)", value: devedor },
+            { label: "CPF / documento", value: cpf || "—" },
+            {
+              label: "Local e data de emissão",
+              value: `${cidade ? cidade + ", " : ""}${fmtData(dataEmissao)}`,
+            },
+            { label: "Vencimento", value: fmtData(vencimento) },
+          ]}
         />
-        <Campo label="Vencimento" value={fmtData(vencimento)} />
+
+        <Clausulas
+          itens={[
+            "Esta nota promissória é líquida, certa e exigível na data de vencimento.",
+            "O não pagamento no vencimento sujeita o emitente aos acréscimos legais (juros e correção).",
+            "O foro da praça de pagamento fica eleito para dirimir eventuais dúvidas.",
+          ]}
+        />
 
         <Assinaturas esquerda="Assinatura do emitente" />
         <Rodape loja={loja} />
@@ -271,11 +361,11 @@ export function ValePdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Vale / Adiantamento" />
+        <Header loja={loja} titulo="Vale / Adiantamento" numero={gerarNumero("VALE")} />
 
-        <View style={styles.valorLinha}>
-          <Text style={styles.valorLabel}>Valor</Text>
-          <Text style={styles.valorDestaque}>{brl(valor)}</Text>
+        <View style={styles.valorBox}>
+          <Text style={styles.valorLabel}>Valor recebido</Text>
+          <Text style={styles.valorForte}>{brl(valor)}</Text>
         </View>
 
         <Text style={styles.paragraph}>
@@ -283,19 +373,27 @@ export function ValePdf({
           vale/adiantamento
           {motivo ? `, referente a ${motivo}` : ""}.
           {descontarEmFolha
-            ? " Este valor será descontado do meu próximo pagamento."
+            ? " Declaro estar ciente de que este valor será descontado do meu próximo pagamento."
             : ""}
         </Text>
 
-        <Text style={styles.sectionTitle}>Dados</Text>
-        <Campo label="Funcionário" value={funcionario} />
-        <Campo label="Data" value={fmtData(data)} />
-        <Campo
-          label="Descontar em folha"
-          value={descontarEmFolha ? "Sim" : "Não"}
+        <Text style={styles.sectionTitle}>Dados do recebimento</Text>
+        <InfoGrid
+          itens={[
+            { label: "Funcionário", value: funcionario },
+            { label: "Data", value: fmtData(data) },
+            { label: "Motivo", value: motivo || "—" },
+            {
+              label: "Descontar em folha",
+              value: descontarEmFolha ? "Sim" : "Não",
+            },
+          ]}
         />
 
-        <Assinaturas esquerda="Assinatura do funcionário" direita="Responsável pela loja" />
+        <Assinaturas
+          esquerda="Assinatura do funcionário"
+          direita="Responsável pela loja"
+        />
         <Rodape loja={loja} />
       </Page>
     </Document>
@@ -326,19 +424,22 @@ export function FolhaSalarialPdf({
   descontos,
   descontosLabel,
 }: FolhaProps) {
-  const liquido = (salarioBase || 0) + (bonus || 0) - (descontos || 0);
+  const proventos = (salarioBase || 0) + (bonus || 0);
+  const liquido = proventos - (descontos || 0);
 
-  const linhas: { desc: string; valor: string }[] = [
-    { desc: "Salário base", valor: `+ ${brl(salarioBase || 0)}` },
+  const linhas: { tipo: string; desc: string; valor: string }[] = [
+    { tipo: "Provento", desc: "Salário base", valor: brl(salarioBase || 0) },
   ];
   if (bonus > 0) {
     linhas.push({
+      tipo: "Provento",
       desc: bonusLabel?.trim() || "Bônus / adicional",
-      valor: `+ ${brl(bonus)}`,
+      valor: brl(bonus),
     });
   }
   if (descontos > 0) {
     linhas.push({
+      tipo: "Desconto",
       desc: descontosLabel?.trim() || "Descontos",
       valor: `- ${brl(descontos)}`,
     });
@@ -347,42 +448,62 @@ export function FolhaSalarialPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Recibo de Pagamento" />
+        <Header loja={loja} titulo="Recibo de Pagamento" numero={gerarNumero("REC")} />
 
         <Text style={styles.sectionTitle}>Funcionário</Text>
-        <Campo label="Nome" value={funcionario} />
-        {cargo ? <Campo label="Cargo" value={cargo} /> : null}
-        <Campo label="Referência" value={referencia} />
+        <InfoGrid
+          itens={[
+            { label: "Nome", value: funcionario },
+            { label: "Cargo", value: cargo || "—" },
+            { label: "Referência", value: referencia },
+            { label: "Emissão", value: fmtData(hojeISO()) },
+          ]}
+        />
 
-        <Text style={styles.sectionTitle}>Composição</Text>
+        <Text style={styles.sectionTitle}>Composição do pagamento</Text>
         <View style={styles.table}>
           <View style={styles.tHead}>
+            <Text style={[styles.tHeadCell, { width: 84 }]}>Tipo</Text>
             <Text style={[styles.tHeadCell, { flex: 1 }]}>Descrição</Text>
-            <Text style={[styles.tHeadCell, { width: 130, textAlign: "right" }]}>
+            <Text style={[styles.tHeadCell, { width: 120, textAlign: "right" }]}>
               Valor
             </Text>
           </View>
           {linhas.map((l, i) => (
             <View key={i} style={styles.tRow}>
+              <Text style={[styles.tCell, { width: 84 }]}>{l.tipo}</Text>
               <Text style={[styles.tCell, { flex: 1 }]}>{l.desc}</Text>
-              <Text style={[styles.tCell, { width: 130, textAlign: "right" }]}>
+              <Text style={[styles.tCell, { width: 120, textAlign: "right" }]}>
                 {l.valor}
               </Text>
             </View>
           ))}
         </View>
 
+        <View style={{ marginTop: 12 }}>
+          <InfoGrid
+            itens={[
+              { label: "Total de proventos", value: brl(proventos) },
+              { label: "Total de descontos", value: brl(descontos || 0) },
+            ]}
+          />
+        </View>
+
         <View style={styles.totalBox}>
-          <Text style={styles.totalLabel}>Total líquido a receber</Text>
+          <Text style={styles.totalLabel}>Líquido a receber</Text>
           <Text style={styles.totalValue}>{brl(liquido)}</Text>
         </View>
 
         <Text style={styles.paragraph}>
           Recebi de {loja || "empresa"} a importância líquida de {brl(liquido)},
-          referente ao pagamento acima descrito, dando plena quitação.
+          referente ao pagamento acima descrito ({referencia}), dando plena e
+          geral quitação.
         </Text>
 
-        <Assinaturas esquerda="Assinatura do funcionário" direita="Responsável pela loja" />
+        <Assinaturas
+          esquerda="Assinatura do funcionário"
+          direita="Responsável pela loja"
+        />
         <Rodape loja={loja} />
       </Page>
     </Document>
@@ -423,42 +544,47 @@ export function RepasseTatuadorPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Repasse — Tatuagem" />
+        <Header loja={loja} titulo="Repasse — Tatuagem" numero={gerarNumero("REP")} />
 
         <Text style={styles.sectionTitle}>Referência</Text>
-        <Campo label="Tatuador" value={tatuador} />
-        <Campo
-          label="Período"
-          value={`${fmtData(periodoInicio)} a ${fmtData(periodoFim)}`}
+        <InfoGrid
+          itens={[
+            { label: "Tatuador", value: tatuador },
+            {
+              label: "Período",
+              value: `${fmtData(periodoInicio)} a ${fmtData(periodoFim)}`,
+            },
+            { label: "Atendimentos", value: String(itens.length) },
+            { label: "Total faturado", value: brl(faturado) },
+          ]}
         />
-        <Campo label="Atendimentos" value={String(itens.length)} />
 
         <Text style={styles.sectionTitle}>Atendimentos</Text>
         <View style={styles.table}>
           <View style={styles.tHead}>
-            <Text style={[styles.tHeadCell, { width: 62 }]}>Data</Text>
+            <Text style={[styles.tHeadCell, { width: 60 }]}>Data</Text>
             <Text style={[styles.tHeadCell, { flex: 1 }]}>Cliente</Text>
-            <Text style={[styles.tHeadCell, { width: 78, textAlign: "right" }]}>
+            <Text style={[styles.tHeadCell, { width: 76, textAlign: "right" }]}>
               Valor
             </Text>
-            <Text style={[styles.tHeadCell, { width: 34, textAlign: "right" }]}>
+            <Text style={[styles.tHeadCell, { width: 32, textAlign: "right" }]}>
               %
             </Text>
-            <Text style={[styles.tHeadCell, { width: 80, textAlign: "right" }]}>
+            <Text style={[styles.tHeadCell, { width: 78, textAlign: "right" }]}>
               À loja
             </Text>
           </View>
           {itens.map((it, i) => (
             <View key={i} style={styles.tRow}>
-              <Text style={[styles.tCell, { width: 62 }]}>{fmtData(it.data)}</Text>
+              <Text style={[styles.tCell, { width: 60 }]}>{fmtData(it.data)}</Text>
               <Text style={[styles.tCell, { flex: 1 }]}>{it.cliente}</Text>
-              <Text style={[styles.tCell, { width: 78, textAlign: "right" }]}>
+              <Text style={[styles.tCell, { width: 76, textAlign: "right" }]}>
                 {brl(it.valor || 0)}
               </Text>
-              <Text style={[styles.tCell, { width: 34, textAlign: "right" }]}>
+              <Text style={[styles.tCell, { width: 32, textAlign: "right" }]}>
                 {it.percentual}
               </Text>
-              <Text style={[styles.tCell, { width: 80, textAlign: "right" }]}>
+              <Text style={[styles.tCell, { width: 78, textAlign: "right" }]}>
                 {brl(((it.valor || 0) * (it.percentual || 0)) / 100)}
               </Text>
             </View>
@@ -466,8 +592,12 @@ export function RepasseTatuadorPdf({
         </View>
 
         <View style={{ marginTop: 12 }}>
-          <Campo label="Total faturado" value={brl(faturado)} />
-          <Campo label="Fica com o tatuador" value={brl(ficaTatuador)} />
+          <InfoGrid
+            itens={[
+              { label: "Total faturado", value: brl(faturado) },
+              { label: "Fica com o tatuador", value: brl(ficaTatuador) },
+            ]}
+          />
         </View>
 
         <View style={styles.totalBox}>
@@ -475,7 +605,10 @@ export function RepasseTatuadorPdf({
           <Text style={styles.totalValue}>{brl(aLoja)}</Text>
         </View>
 
-        <Assinaturas esquerda="Assinatura do tatuador" direita="Responsável pela loja" />
+        <Assinaturas
+          esquerda="Assinatura do tatuador"
+          direita="Responsável pela loja"
+        />
         <Rodape loja={loja} />
       </Page>
     </Document>
