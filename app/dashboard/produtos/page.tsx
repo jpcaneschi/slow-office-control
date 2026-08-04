@@ -36,6 +36,9 @@ const categoriaOptions = [
   "Outro",
 ];
 
+// Markup padrão sugerido no cadastro: preço de venda = custo × MARKUP.
+const MARKUP = 2.2;
+
 export default function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
@@ -499,6 +502,26 @@ export default function ProdutosPage() {
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   placeholder="0.00"
                 />
+                {parseFloat(custo) > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-[#94a3b8]">
+                      Sugestão (custo × {MARKUP.toLocaleString("pt-BR")}): R${" "}
+                      {(parseFloat(custo) * MARKUP).toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreco((parseFloat(custo) * MARKUP).toFixed(2))
+                      }
+                      className="font-semibold text-[#2563eb] hover:underline"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -507,7 +530,15 @@ export default function ProdutosPage() {
                   type="number"
                   step="0.01"
                   value={custo}
-                  onChange={(e) => setCusto(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCusto(v);
+                    // Sugere o preço automaticamente se ainda estiver vazio.
+                    const n = parseFloat(v);
+                    if (!preco && Number.isFinite(n) && n > 0) {
+                      setPreco((n * MARKUP).toFixed(2));
+                    }
+                  }}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   placeholder="0.00"
                 />
