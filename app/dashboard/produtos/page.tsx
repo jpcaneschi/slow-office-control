@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Package } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 
@@ -12,6 +13,7 @@ type Produto = {
   custo: number | null;
   estoque: number | null;
   status: string | null;
+  imagem_url: string | null;
 };
 
 type Movimentacao = {
@@ -64,6 +66,7 @@ export default function ProdutosPage() {
   const [custo, setCusto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [status, setStatus] = useState("ativo");
+  const [imagemUrl, setImagemUrl] = useState("");
 
   const [produtoMovimentoId, setProdutoMovimentoId] = useState("");
   const [tipoMovimento, setTipoMovimento] = useState("entrada");
@@ -73,7 +76,7 @@ export default function ProdutosPage() {
   async function carregarProdutos() {
     const { data, error } = await supabase
       .from("produtos")
-      .select("id, nome, categoria, preco, custo, estoque, status")
+      .select("id, nome, categoria, preco, custo, estoque, status, imagem_url")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -118,6 +121,7 @@ export default function ProdutosPage() {
     setCusto("");
     setEstoque("");
     setStatus("ativo");
+    setImagemUrl("");
     setEditandoId(null);
   }
 
@@ -136,6 +140,7 @@ export default function ProdutosPage() {
     setCusto(produto.custo?.toString() || "");
     setEstoque(produto.estoque?.toString() || "");
     setStatus(produto.status || "ativo");
+    setImagemUrl(produto.imagem_url || "");
     setErro("");
   }
 
@@ -197,6 +202,7 @@ export default function ProdutosPage() {
           custo: custoNumero,
           estoque: estoqueNumero,
           status,
+          imagem_url: imagemUrl.trim() || null,
         })
         .eq("id", editandoId);
 
@@ -213,6 +219,7 @@ export default function ProdutosPage() {
         custo: custoNumero,
         estoque: estoqueNumero,
         status,
+        imagem_url: imagemUrl.trim() || null,
       });
 
       if (error) {
@@ -572,6 +579,34 @@ export default function ProdutosPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Imagem (URL)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[#e8ecf4] bg-white">
+                    {imagemUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={imagemUrl}
+                        alt="Prévia"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[#cbd5e1]">
+                        <Package className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    value={imagemUrl}
+                    onChange={(e) => setImagemUrl(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={saving}
@@ -797,7 +832,23 @@ export default function ProdutosPage() {
                       className="rounded-[24px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
+                        <div className="flex gap-4">
+                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[#e8ecf4] bg-white">
+                            {produto.imagem_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={produto.imagem_url}
+                                alt={produto.nome}
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[#cbd5e1]">
+                                <Package className="h-7 w-7" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
                           <h3 className="text-lg font-black tracking-tight text-[#0f172a]">
                             {produto.nome}
                           </h3>
@@ -831,6 +882,7 @@ export default function ProdutosPage() {
                           <p className="mt-2 inline-flex rounded-full bg-[#2563eb]/10 px-3 py-1 text-xs font-bold text-[#2563eb]">
                             Status: {produto.status || "ativo"}
                           </p>
+                          </div>
                         </div>
 
                         <div className="flex gap-2">
