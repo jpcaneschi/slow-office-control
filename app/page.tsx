@@ -15,6 +15,7 @@ import {
   Check,
   X,
   Star,
+  ChevronDown,
 } from "lucide-react";
 
 const recursos = [
@@ -133,6 +134,73 @@ const depoimentos = [
   },
 ];
 
+const planos = [
+  {
+    nome: "Essencial",
+    preco: "49",
+    desc: "Pra começar a organizar a loja.",
+    destaque: false,
+    itens: [
+      "Produtos e estoque",
+      "Clientes e vendas",
+      "Relatórios em PDF",
+      "Acesso pelo celular",
+    ],
+  },
+  {
+    nome: "Profissional",
+    preco: "89",
+    desc: "O mais escolhido pelas lojas.",
+    destaque: true,
+    itens: [
+      "Tudo do Essencial",
+      "Financeiro completo",
+      "Condicional e promissórias",
+      "Agenda e lembretes",
+      "Contas recorrentes",
+    ],
+  },
+  {
+    nome: "Avançado",
+    preco: "149",
+    desc: "Pra quem quer o máximo.",
+    destaque: false,
+    itens: [
+      "Tudo do Profissional",
+      "Área de serviços (tatuagem)",
+      "Vários usuários",
+      "Suporte prioritário",
+    ],
+  },
+];
+
+const faqs = [
+  {
+    q: "Preciso instalar alguma coisa?",
+    a: "Não. O Nexo funciona direto no navegador, no computador ou no celular. É só entrar e usar.",
+  },
+  {
+    q: "Meus dados ficam seguros?",
+    a: "Sim. Cada loja tem seu espaço isolado, com acesso protegido por login. Ninguém vê os dados da sua loja além de você.",
+  },
+  {
+    q: "Serve para qualquer tipo de loja?",
+    a: "Sim. O Nexo foi feito pro comércio físico em geral — roupas, calçados, acessórios e serviços.",
+  },
+  {
+    q: "Dá pra importar meus produtos?",
+    a: "Dá. É possível importar seu catálogo, inclusive com as fotos, pra você não começar do zero.",
+  },
+  {
+    q: "Consigo usar no celular?",
+    a: "Consegue. O painel é responsivo e funciona bem no celular, pra você gerenciar de qualquer lugar.",
+  },
+  {
+    q: "Como começo a usar?",
+    a: "É só clicar em Entrar e acessar sua conta. Se ainda não tem acesso, fale com a gente que ajudamos você a começar.",
+  },
+];
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-[#0f172a]">
@@ -154,6 +222,9 @@ export default function LandingPage() {
             </a>
             <a href="#como-funciona" className="transition hover:text-[#2563eb]">
               Como funciona
+            </a>
+            <a href="#planos" className="transition hover:text-[#2563eb]">
+              Planos
             </a>
             <a href="#contato" className="transition hover:text-[#2563eb]">
               Contato
@@ -452,6 +523,99 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ─── Planos ────────────────────────────────────────────────── */}
+      <section id="planos" className="bg-[#f8fafc] py-20">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="reveal text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
+              Planos
+            </p>
+            <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
+              Escolha o plano da sua loja
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
+              Preços simples, sem surpresa. Cancele quando quiser.
+            </p>
+          </div>
+          <div className="reveal mt-12 grid items-start gap-6 md:grid-cols-3">
+            {planos.map((p) => (
+              <div
+                key={p.nome}
+                className={`rounded-3xl border bg-white p-7 ${
+                  p.destaque
+                    ? "border-[#2563eb] shadow-[0_20px_50px_rgba(37,99,235,0.16)] ring-1 ring-[#2563eb]/20 md:-mt-2"
+                    : "border-[#eef2f7] shadow-[0_2px_12px_rgba(15,23,42,0.05)]"
+                }`}
+              >
+                {p.destaque && (
+                  <span className="mb-3 inline-block rounded-full bg-[#2563eb] px-3 py-1 text-xs font-bold text-white">
+                    Mais popular
+                  </span>
+                )}
+                <h3 className="text-xl font-black text-[#0f172a]">{p.nome}</h3>
+                <p className="mt-1 text-sm text-[#64748b]">{p.desc}</p>
+                <p className="mt-5">
+                  <span className="text-4xl font-black text-[#0f172a]">
+                    R$ {p.preco}
+                  </span>
+                  <span className="text-sm text-[#94a3b8]">/mês</span>
+                </p>
+                <ul className="mt-6 space-y-2.5">
+                  {p.itens.map((it) => (
+                    <li
+                      key={it}
+                      className="flex items-start gap-2 text-sm text-[#475569]"
+                    >
+                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#16a34a]" />
+                      {it}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login"
+                  className={`mt-7 block rounded-full px-5 py-3 text-center text-sm font-bold transition ${
+                    p.destaque
+                      ? "bg-[#2563eb] text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] hover:bg-[#1d4ed8]"
+                      : "border border-[#e2e8f0] text-[#334155] hover:bg-[#f8fafc]"
+                  }`}
+                >
+                  Começar
+                </Link>
+              </div>
+            ))}
+          </div>
+          <p className="reveal mt-6 text-center text-xs text-[#94a3b8]">
+            * Valores ilustrativos — ajuste conforme o seu modelo de cobrança.
+          </p>
+        </div>
+      </section>
+
+      {/* ─── FAQ ───────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-3xl px-5 py-20">
+        <div className="reveal text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
+            Dúvidas
+          </p>
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
+            Perguntas frequentes
+          </h2>
+        </div>
+        <div className="reveal mt-10 space-y-3">
+          {faqs.map((f) => (
+            <details
+              key={f.q}
+              className="group rounded-2xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.04)]"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-[#0f172a] [&::-webkit-details-marker]:hidden">
+                {f.q}
+                <ChevronDown className="h-5 w-5 shrink-0 text-[#94a3b8] transition group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 leading-7 text-[#64748b]">{f.a}</p>
+            </details>
+          ))}
         </div>
       </section>
 
