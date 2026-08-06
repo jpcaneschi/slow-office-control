@@ -16,6 +16,7 @@ import {
   X,
   Star,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 
 const recursos = [
@@ -230,12 +231,20 @@ export default function LandingPage() {
               Contato
             </a>
           </nav>
-          <Link
-            href="/login"
-            className="rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_rgba(37,99,235,0.25)] transition hover:bg-[#1d4ed8]"
-          >
-            Entrar
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="hidden text-sm font-semibold text-[#475569] transition hover:text-[#2563eb] sm:block"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/login?novo=1"
+              className="rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_rgba(37,99,235,0.25)] transition hover:bg-[#1d4ed8]"
+            >
+              Criar conta grátis
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -258,20 +267,35 @@ export default function LandingPage() {
               painel simples e seguro — feito para lojas de verdade, no lugar de
               planilhas soltas e cadernos.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <form
+              action="/login"
+              method="get"
+              className="mt-8 flex w-full max-w-md flex-col gap-3 sm:flex-row"
+            >
+              <input type="hidden" name="novo" value="1" />
+              <input
+                type="email"
+                name="email"
+                required
+                placeholder="Seu melhor e-mail"
+                className="flex-1 rounded-full border border-[#e2e8f0] bg-white px-5 py-3.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/15"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#2563eb] px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] transition hover:bg-[#1d4ed8]"
+              >
+                Criar conta grátis <ArrowRight className="h-4 w-4" />
+              </button>
+            </form>
+            <p className="mt-3 text-sm text-[#94a3b8]">
+              Comece grátis · Leva 1 minuto ·{" "}
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-full bg-[#2563eb] px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] transition hover:bg-[#1d4ed8]"
+                className="font-semibold text-[#2563eb] hover:underline"
               >
-                Entrar no sistema <ArrowRight className="h-4 w-4" />
+                Já tenho conta
               </Link>
-              <a
-                href="#recursos"
-                className="inline-flex items-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-6 py-3.5 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc]"
-              >
-                Ver recursos
-              </a>
-            </div>
+            </p>
             <div className="mt-6 flex flex-wrap gap-2.5">
               {[
                 { icon: Check, t: "Simples de usar" },
@@ -575,7 +599,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/login"
+                  href="/login?novo=1"
                   className={`mt-7 block rounded-full px-5 py-3 text-center text-sm font-bold transition ${
                     p.destaque
                       ? "bg-[#2563eb] text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] hover:bg-[#1d4ed8]"
@@ -630,10 +654,10 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/login"
+              href="/login?novo=1"
               className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-[#2563eb] transition hover:bg-[#f0f4ff]"
             >
-              Entrar agora <ArrowRight className="h-4 w-4" />
+              Criar conta grátis <ArrowRight className="h-4 w-4" />
             </Link>
             <a
               href="mailto:contato@nexo.com.br"
@@ -661,6 +685,18 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
+
+      {/* WhatsApp flutuante (híbrido: quem prefere ajuda humana) */}
+      <a
+        href="https://wa.me/5500000000000?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20Nexo."
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Falar no WhatsApp"
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#25d366] px-4 py-3.5 font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] transition hover:brightness-105"
+      >
+        <MessageCircle className="h-5 w-5" />
+        <span className="hidden sm:inline">Fale no WhatsApp</span>
+      </a>
     </div>
   );
 }

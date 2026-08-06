@@ -22,6 +22,14 @@ export default function LoginPage() {
     });
   }, [router]);
 
+  // Vindo da landing com "?novo=1" abre já no modo criar conta (e pré-preenche o e-mail).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("novo") === "1") setModo("criar");
+    const em = p.get("email");
+    if (em) setEmail(em);
+  }, []);
+
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
@@ -61,7 +69,7 @@ export default function LoginPage() {
         return;
       }
       if (data.session) {
-        router.replace("/dashboard");
+        router.replace("/onboarding");
       } else {
         setModo("entrar");
         setAviso(
@@ -75,11 +83,11 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1e40af] to-[#2563eb] p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
         <div className="mb-6 text-center">
-          <p className="text-[22px] font-black leading-none tracking-tight text-[#2563eb]">
-            SLOW OFFICE
+          <p className="text-[26px] font-black leading-none tracking-tight text-[#2563eb]">
+            Nexo
           </p>
           <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.42em] text-[#94a3b8]">
-            Control
+            Gestão
           </p>
         </div>
 
