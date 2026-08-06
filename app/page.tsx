@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Check,
   X,
+  Star,
 } from "lucide-react";
 
 const recursos = [
@@ -105,6 +106,30 @@ const destaques = [
     icon: CircleDollarSign,
     titulo: "Visão de dono",
     texto: "Números claros do seu negócio pra decidir com segurança, sem achismo.",
+  },
+];
+
+const depoimentos = [
+  {
+    nome: "Rafael Souza",
+    papel: "Loja de streetwear",
+    foto: "/depo-1.png",
+    texto:
+      "Antes eu vivia perdido em planilha. Agora vejo o estoque e o caixa em segundos — mudou minha rotina.",
+  },
+  {
+    nome: "Camila Nunes",
+    papel: "Boutique feminina",
+    foto: "/depo-2.png",
+    texto:
+      "As promissórias e o condicional ficaram organizados de vez. Gerar os PDFs pra cliente é um clique.",
+  },
+  {
+    nome: "Sérgio Almeida",
+    papel: "Loja de calçados",
+    foto: "/depo-3.png",
+    texto:
+      "Simples até pra mim, que não sou muito de tecnologia. Uso do balcão e do celular sem complicação.",
   },
 ];
 
@@ -379,6 +404,54 @@ export default function LandingPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ─── Depoimentos ───────────────────────────────────────────── */}
+      <section className="bg-[#f8fafc] py-20">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="reveal text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
+              Depoimentos
+            </p>
+            <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
+              Quem usa, recomenda
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
+              Lojistas que trocaram a papelada pela organização do Nexo.
+            </p>
+          </div>
+          <div className="reveal mt-12 grid gap-6 md:grid-cols-3">
+            {depoimentos.map((d) => (
+              <div
+                key={d.nome}
+                className="rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)]"
+              >
+                <div className="flex items-center gap-0.5 text-[#f59e0b]">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <Star key={i} className="h-4 w-4 fill-current" />
+                  ))}
+                </div>
+                <p className="mt-4 leading-7 text-[#475569]">
+                  &ldquo;{d.texto}&rdquo;
+                </p>
+                <div className="mt-5 flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={d.foto}
+                    alt={d.nome}
+                    width={44}
+                    height={44}
+                    className="h-11 w-11 rounded-full object-cover"
+                  />
+                  <div>
+                    <p className="text-sm font-black text-[#0f172a]">{d.nome}</p>
+                    <p className="text-xs text-[#64748b]">{d.papel}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
