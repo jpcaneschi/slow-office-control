@@ -18,41 +18,49 @@ import {
 const recursos = [
   {
     icon: ShoppingCart,
+    cor: "#2563eb",
     titulo: "Vendas",
     texto: "Registre vendas rápido, com desconto no Pix e parcelamento, e veja o caixa crescer em tempo real.",
   },
   {
     icon: Package,
+    cor: "#7c3aed",
     titulo: "Produtos & Estoque",
     texto: "Catálogo completo com foto, custo e preço. O estoque baixa sozinho e avisa quando algo está acabando.",
   },
   {
     icon: Users,
+    cor: "#db2777",
     titulo: "Clientes",
     texto: "Cadastro de clientes com histórico, aniversários e status — pra você atender melhor e vender mais.",
   },
   {
     icon: CircleDollarSign,
+    cor: "#059669",
     titulo: "Financeiro",
     texto: "Receitas, despesas, contas fixas do mês e resultado. Saiba exatamente quanto entra e quanto sai.",
   },
   {
     icon: ClipboardList,
+    cor: "#ea580c",
     titulo: "Condicional & Promissórias",
     texto: "Controle peças em condicional e vendas a prazo, com prazos e documentos organizados.",
   },
   {
     icon: CalendarDays,
+    cor: "#0891b2",
     titulo: "Agenda & Lembretes",
     texto: "Calendário com vencimentos, aniversários e feriados — nada mais passa despercebido.",
   },
   {
     icon: FileText,
+    cor: "#4f46e5",
     titulo: "Relatórios em PDF",
     texto: "Promissória, vale, folha e recibos prontos pra imprimir, com visual limpo em preto e branco.",
   },
   {
     icon: PenTool,
+    cor: "#c026d3",
     titulo: "Área de serviços",
     texto: "Módulos extras como tatuagem, com repasse automático e integração direta com o financeiro.",
   },
@@ -136,6 +144,8 @@ export default function LandingPage() {
       {/* ─── Hero ──────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#eff6ff] to-white" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#3b82f6]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 top-40 h-64 w-64 rounded-full bg-[#7c3aed]/10 blur-3xl" />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:py-24 lg:grid-cols-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
@@ -164,60 +174,106 @@ export default function LandingPage() {
                 Ver recursos
               </a>
             </div>
-            <p className="mt-4 text-sm text-[#94a3b8]">
-              Simples de usar • Acesso pelo celular • Seus dados protegidos
-            </p>
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              {[
+                { icon: Check, t: "Simples de usar" },
+                { icon: Smartphone, t: "Acesso pelo celular" },
+                { icon: ShieldCheck, t: "Dados protegidos" },
+              ].map((c) => {
+                const Ic = c.icon;
+                return (
+                  <span
+                    key={c.t}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#475569] backdrop-blur"
+                  >
+                    <Ic className="h-3.5 w-3.5 text-[#2563eb]" />
+                    {c.t}
+                  </span>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Mockup do painel (CSS puro) */}
-          <div className="relative">
-            <div className="overflow-hidden rounded-[28px] border border-[#e8ecf4] bg-white shadow-[0_30px_60px_rgba(15,23,42,0.14)]">
-              <div className="flex items-center gap-1.5 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
-                <span className="h-3 w-3 rounded-full bg-[#fca5a5]" />
-                <span className="h-3 w-3 rounded-full bg-[#fcd34d]" />
-                <span className="h-3 w-3 rounded-full bg-[#86efac]" />
-                <span className="ml-3 text-xs font-semibold text-[#94a3b8]">
-                  Nexo · Painel
-                </span>
-              </div>
-              <div className="space-y-4 p-5">
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { l: "Vendas", v: "R$ 4,2k", c: "#2563eb" },
-                    { l: "Faturamento", v: "R$ 18k", c: "#7c3aed" },
-                    { l: "A receber", v: "R$ 3,1k", c: "#0891b2" },
-                  ].map((m) => (
-                    <div
-                      key={m.l}
-                      className="rounded-2xl border border-[#eef2f7] bg-white p-3"
-                    >
-                      <p className="text-[10px] font-semibold text-[#94a3b8]">
-                        {m.l}
-                      </p>
-                      <p
-                        className="mt-1 text-sm font-black"
-                        style={{ color: m.c }}
-                      >
-                        {m.v}
-                      </p>
-                    </div>
-                  ))}
+          {/* Composição de dispositivos (CSS puro): notebook + celular + cartão */}
+          <div className="relative mx-auto w-full max-w-lg pb-10">
+            {/* Notebook */}
+            <div className="relative z-10">
+              <div className="overflow-hidden rounded-t-2xl border border-[#e8ecf4] bg-white shadow-[0_30px_60px_rgba(15,23,42,0.16)]">
+                <div className="flex items-center gap-1.5 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+                  <span className="h-3 w-3 rounded-full bg-[#fca5a5]" />
+                  <span className="h-3 w-3 rounded-full bg-[#fcd34d]" />
+                  <span className="h-3 w-3 rounded-full bg-[#86efac]" />
+                  <span className="ml-3 text-xs font-semibold text-[#94a3b8]">
+                    Nexo · Painel
+                  </span>
                 </div>
-                <div className="rounded-2xl border border-[#eef2f7] bg-white p-4">
-                  <p className="mb-3 text-xs font-bold text-[#334155]">
-                    Vendas da semana
-                  </p>
-                  <div className="flex h-28 items-end justify-between gap-2">
-                    {[40, 65, 50, 80, 60, 95, 72].map((h, i) => (
+                <div className="space-y-4 p-5">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { l: "Vendas", v: "R$ 4,2k", c: "#2563eb" },
+                      { l: "Faturamento", v: "R$ 18k", c: "#7c3aed" },
+                      { l: "A receber", v: "R$ 3,1k", c: "#0891b2" },
+                    ].map((m) => (
                       <div
-                        key={i}
-                        className="w-full rounded-t-lg bg-gradient-to-t from-[#93c5fd] to-[#2563eb]"
-                        style={{ height: `${h}%` }}
-                      />
+                        key={m.l}
+                        className="rounded-2xl border border-[#eef2f7] bg-white p-3"
+                      >
+                        <p className="text-[10px] font-semibold text-[#94a3b8]">
+                          {m.l}
+                        </p>
+                        <p
+                          className="mt-1 text-sm font-black"
+                          style={{ color: m.c }}
+                        >
+                          {m.v}
+                        </p>
+                      </div>
                     ))}
+                  </div>
+                  <div className="rounded-2xl border border-[#eef2f7] bg-white p-4">
+                    <p className="mb-3 text-xs font-bold text-[#334155]">
+                      Vendas da semana
+                    </p>
+                    <div className="flex h-24 items-end justify-between gap-2">
+                      {[40, 65, 50, 80, 60, 95, 72].map((h, i) => (
+                        <div
+                          key={i}
+                          className="w-full rounded-t-lg bg-gradient-to-t from-[#93c5fd] to-[#2563eb]"
+                          style={{ height: `${h}%` }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
+              {/* Base do notebook */}
+              <div className="mx-auto h-3 w-[116%] -translate-x-[7%] rounded-b-xl bg-gradient-to-b from-[#e2e8f0] to-[#94a3b8]" />
+            </div>
+
+            {/* Celular */}
+            <div className="absolute -bottom-2 left-0 z-20 w-24 rounded-[1.4rem] border-[5px] border-[#0f172a] bg-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] sm:w-28">
+              <div className="mx-auto mt-1.5 h-1 w-8 rounded-full bg-[#0f172a]/25" />
+              <div className="space-y-1.5 p-2">
+                <div className="rounded-lg bg-gradient-to-r from-[#1e40af] to-[#2563eb] px-2 py-1.5">
+                  <p className="text-[7px] font-bold text-white/80">Vendas hoje</p>
+                  <p className="text-[11px] font-black text-white">R$ 1.240</p>
+                </div>
+                <div className="h-2 rounded bg-[#eef2f7]" />
+                <div className="h-2 w-2/3 rounded bg-[#eef2f7]" />
+                <div className="flex gap-1">
+                  <div className="h-8 flex-1 rounded bg-[#eff6ff]" />
+                  <div className="h-8 flex-1 rounded bg-[#eff6ff]" />
+                </div>
+              </div>
+            </div>
+
+            {/* Cartão */}
+            <div className="absolute -bottom-1 right-2 z-20 w-40 rotate-[-8deg] rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] p-4 shadow-[0_20px_40px_rgba(30,58,138,0.35)] sm:right-6">
+              <p className="text-sm font-black tracking-tight text-white">Nexo</p>
+              <div className="mt-5 h-5 w-7 rounded-md bg-gradient-to-br from-[#fde68a] to-[#f59e0b]" />
+              <p className="mt-3 text-[9px] font-semibold tracking-[0.2em] text-white/70">
+                •••• •••• •••• 4211
+              </p>
             </div>
           </div>
         </div>
@@ -304,7 +360,10 @@ export default function LandingPage() {
                 key={r.titulo}
                 className="rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)]"
               >
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563eb]/10 text-[#2563eb]">
+                <span
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: `${r.cor}1a`, color: r.cor }}
+                >
                   <Icon className="h-6 w-6" />
                 </span>
                 <h3 className="mt-4 text-lg font-black text-[#0f172a]">
