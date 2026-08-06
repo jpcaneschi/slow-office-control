@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import {
   ShoppingCart,
   Package,
@@ -110,6 +111,7 @@ const destaques = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-[#0f172a]">
+      <ScrollReveal />
       {/* ─── Navegação ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-[#eef2f7] bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
@@ -194,93 +196,47 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Composição de dispositivos (CSS puro): notebook + celular + cartão */}
-          <div className="relative mx-auto w-full max-w-lg pb-10">
-            {/* Notebook */}
-            <div className="relative z-10">
-              <div className="overflow-hidden rounded-t-2xl border border-[#e8ecf4] bg-white shadow-[0_30px_60px_rgba(15,23,42,0.16)]">
-                <div className="flex items-center gap-1.5 border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
-                  <span className="h-3 w-3 rounded-full bg-[#fca5a5]" />
-                  <span className="h-3 w-3 rounded-full bg-[#fcd34d]" />
-                  <span className="h-3 w-3 rounded-full bg-[#86efac]" />
-                  <span className="ml-3 text-xs font-semibold text-[#94a3b8]">
-                    Nexo · Painel
-                  </span>
-                </div>
-                <div className="space-y-4 p-5">
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { l: "Vendas", v: "R$ 4,2k", c: "#2563eb" },
-                      { l: "Faturamento", v: "R$ 18k", c: "#7c3aed" },
-                      { l: "A receber", v: "R$ 3,1k", c: "#0891b2" },
-                    ].map((m) => (
-                      <div
-                        key={m.l}
-                        className="rounded-2xl border border-[#eef2f7] bg-white p-3"
-                      >
-                        <p className="text-[10px] font-semibold text-[#94a3b8]">
-                          {m.l}
-                        </p>
-                        <p
-                          className="mt-1 text-sm font-black"
-                          style={{ color: m.c }}
-                        >
-                          {m.v}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-2xl border border-[#eef2f7] bg-white p-4">
-                    <p className="mb-3 text-xs font-bold text-[#334155]">
-                      Vendas da semana
-                    </p>
-                    <div className="flex h-24 items-end justify-between gap-2">
-                      {[40, 65, 50, 80, 60, 95, 72].map((h, i) => (
-                        <div
-                          key={i}
-                          className="w-full rounded-t-lg bg-gradient-to-t from-[#93c5fd] to-[#2563eb]"
-                          style={{ height: `${h}%` }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Base do notebook */}
-              <div className="mx-auto h-3 w-[116%] -translate-x-[7%] rounded-b-xl bg-gradient-to-b from-[#e2e8f0] to-[#94a3b8]" />
+          {/* Foto (gerada) + cards flutuantes do painel */}
+          <div className="relative mx-auto w-full max-w-md pb-6">
+            <div className="overflow-hidden rounded-[28px] border-4 border-white bg-white shadow-[0_30px_60px_rgba(15,23,42,0.18)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hero-pessoas.png"
+                alt="Empreendedores de diferentes idades usando o Nexo"
+                width={1024}
+                height={1024}
+                className="w-full"
+              />
             </div>
 
-            {/* Celular */}
-            <div className="absolute -bottom-2 left-0 z-20 w-24 rounded-[1.4rem] border-[5px] border-[#0f172a] bg-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] sm:w-28">
-              <div className="mx-auto mt-1.5 h-1 w-8 rounded-full bg-[#0f172a]/25" />
-              <div className="space-y-1.5 p-2">
-                <div className="rounded-lg bg-gradient-to-r from-[#1e40af] to-[#2563eb] px-2 py-1.5">
-                  <p className="text-[7px] font-bold text-white/80">Vendas hoje</p>
-                  <p className="text-[11px] font-black text-white">R$ 1.240</p>
-                </div>
-                <div className="h-2 rounded bg-[#eef2f7]" />
-                <div className="h-2 w-2/3 rounded bg-[#eef2f7]" />
-                <div className="flex gap-1">
-                  <div className="h-8 flex-1 rounded bg-[#eff6ff]" />
-                  <div className="h-8 flex-1 rounded bg-[#eff6ff]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Cartão */}
-            <div className="absolute -bottom-1 right-2 z-20 w-40 rotate-[-8deg] rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] p-4 shadow-[0_20px_40px_rgba(30,58,138,0.35)] sm:right-6">
-              <p className="text-sm font-black tracking-tight text-white">Nexo</p>
-              <div className="mt-5 h-5 w-7 rounded-md bg-gradient-to-br from-[#fde68a] to-[#f59e0b]" />
-              <p className="mt-3 text-[9px] font-semibold tracking-[0.2em] text-white/70">
-                •••• •••• •••• 4211
+            {/* Card flutuante: mini painel */}
+            <div className="absolute -bottom-5 -left-4 w-44 rounded-2xl border border-[#eef2f7] bg-white/95 p-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)] backdrop-blur">
+              <p className="text-[10px] font-semibold text-[#94a3b8]">
+                Vendas hoje
               </p>
+              <p className="text-xl font-black text-[#2563eb]">R$ 1.240</p>
+              <div className="mt-2 flex h-8 items-end gap-1">
+                {[40, 70, 55, 85, 60, 95].map((h, i) => (
+                  <div
+                    key={i}
+                    className="w-full rounded-t bg-gradient-to-t from-[#93c5fd] to-[#2563eb]"
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Badge flutuante: estoque */}
+            <div className="absolute -right-3 top-6 rounded-2xl border border-[#eef2f7] bg-white/95 px-3 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+              <p className="text-[10px] font-semibold text-[#94a3b8]">Estoque</p>
+              <p className="text-sm font-black text-[#059669]">155 itens ✓</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* ─── Sobre ─────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-4xl px-5 py-16 text-center">
+      <section className="reveal mx-auto max-w-4xl px-5 py-16 text-center">
         <h2 className="text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
           O que é o Nexo?
         </h2>
@@ -298,7 +254,7 @@ export default function LandingPage() {
           <h2 className="text-center text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
             Do caos à clareza
           </h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="reveal mt-10 grid gap-6 md:grid-cols-2">
             <div className="rounded-3xl border border-[#fecaca] bg-white p-7">
               <p className="text-sm font-bold uppercase tracking-wide text-[#dc2626]">
                 Sem o Nexo
@@ -352,7 +308,7 @@ export default function LandingPage() {
             Um sistema completo, sem precisar de dez ferramentas diferentes.
           </p>
         </div>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="reveal mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {recursos.map((r) => {
             const Icon = r.icon;
             return (
@@ -387,7 +343,7 @@ export default function LandingPage() {
               Começar é simples
             </h2>
           </div>
-          <div className="mt-12 grid gap-6 md:grid-cols-4">
+          <div className="reveal mt-12 grid gap-6 md:grid-cols-4">
             {passos.map((p) => (
               <div
                 key={p.n}
@@ -406,7 +362,7 @@ export default function LandingPage() {
 
       {/* ─── Destaques ─────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-5 py-20">
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="reveal grid gap-6 md:grid-cols-3">
           {destaques.map((d) => {
             const Icon = d.icon;
             return (
@@ -428,7 +384,7 @@ export default function LandingPage() {
 
       {/* ─── CTA final ─────────────────────────────────────────────── */}
       <section id="contato" className="px-5 pb-20">
-        <div className="mx-auto max-w-4xl rounded-[32px] bg-gradient-to-br from-[#1e40af] to-[#2563eb] px-8 py-14 text-center text-white shadow-[0_30px_60px_rgba(37,99,235,0.25)]">
+        <div className="reveal mx-auto max-w-4xl rounded-[32px] bg-gradient-to-br from-[#1e40af] to-[#2563eb] px-8 py-14 text-center text-white shadow-[0_30px_60px_rgba(37,99,235,0.25)]">
           <h2 className="text-2xl font-black tracking-tight md:text-3xl">
             Pronto para organizar sua loja?
           </h2>
