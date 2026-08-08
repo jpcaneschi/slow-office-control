@@ -1,17 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Content Security Policy com nonce por requisição (convenção "proxy" do Next 16).
-// - script-src: só scripts com o nonce do Next (+ strict-dynamic para os
-//   chunks que eles carregam). Bloqueia <script> injetado por XSS.
-// - wasm-unsafe-eval: necessário para o yoga-layout (WASM) do @react-pdf.
-// - connect-src: só o próprio site e o Supabase.
-export function proxy(request: NextRequest) {
-  const nonce = btoa(crypto.randomUUID());
+// Content Security Policy compatível com as páginas ESTÁTICAS do Next.
+// (A versão com nonce exigiria renderização dinâmica em todas as páginas e
+// quebrava os scripts do próprio Next em produção -> tela branca.)
+// 'unsafe-inline'/'self' liberam os scripts do Next; ainda assim bloqueamos
+// scripts de outros domínios, conexões fora do Supabase, iframes e afins.
+export function proxy(_request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
 
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${
       isDev ? " 'unsafe-eval'" : ""
     }`,
     `style-src 'self' 'unsafe-inline'`,
@@ -25,12 +24,7 @@ export function proxy(request: NextRequest) {
     `object-src 'none'`,
   ].join("; ");
 
-  // Encaminha o nonce/CSP na requisição para o Next aplicar o nonce nos scripts.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("content-security-policy", csp);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next();
   response.headers.set("content-security-policy", csp);
   return response;
 }
