@@ -67,6 +67,7 @@ export default function VendasPage() {
   const [clienteId, setClienteId] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
+  const [paginaVendas, setPaginaVendas] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [descontoManual, setDescontoManual] = useState("0");
   const [observacao, setObservacao] = useState("");
@@ -353,6 +354,17 @@ export default function VendasPage() {
     await carregarDados();
   }
 
+  const porPaginaVendas = 5;
+  const totalPaginasVendas = Math.max(
+    1,
+    Math.ceil(vendas.length / porPaginaVendas)
+  );
+  const paginaAtual = Math.min(paginaVendas, totalPaginasVendas - 1);
+  const vendasPagina = vendas.slice(
+    paginaAtual * porPaginaVendas,
+    paginaAtual * porPaginaVendas + porPaginaVendas
+  );
+
   return (
     <section className="space-y-6">
       <PageHeader
@@ -574,7 +586,10 @@ export default function VendasPage() {
 
           <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
             <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Vendas registradas
+              Vendas registradas{" "}
+              <span className="text-sm font-semibold text-[#94a3b8]">
+                ({vendas.length})
+              </span>
             </h2>
 
             {loading ? (
@@ -582,8 +597,9 @@ export default function VendasPage() {
             ) : vendas.length === 0 ? (
               <p className="mt-4 text-[#64748b]">Nenhuma venda cadastrada ainda.</p>
             ) : (
+              <>
               <div className="mt-5 space-y-4">
-                {vendas.map((venda) => {
+                {vendasPagina.map((venda) => {
                   const itensDaVenda = itensVenda.filter(
                     (item) => item.venda_id === venda.id
                   );
@@ -659,6 +675,35 @@ export default function VendasPage() {
                   );
                 })}
               </div>
+
+              {totalPaginasVendas > 1 && (
+                <div className="mt-5 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setPaginaVendas((p) => Math.max(0, p - 1))}
+                    disabled={paginaAtual === 0}
+                    className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb] disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-[#64748b]">
+                    Página {paginaAtual + 1} de {totalPaginasVendas}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPaginaVendas((p) =>
+                        Math.min(totalPaginasVendas - 1, p + 1)
+                      )
+                    }
+                    disabled={paginaAtual >= totalPaginasVendas - 1}
+                    className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb] disabled:opacity-40"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>
