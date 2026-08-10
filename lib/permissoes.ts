@@ -44,7 +44,6 @@ const ACESSO: Record<Papel, string[]> = {
     "/dashboard/vendas",
     "/dashboard/condicional",
     "/dashboard/clientes",
-    "/dashboard/produtos",
     "/dashboard/promissorias",
     "/dashboard/agenda",
   ],
