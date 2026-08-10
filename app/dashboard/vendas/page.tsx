@@ -69,6 +69,11 @@ export default function VendasPage() {
   const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
   const [paginaVendas, setPaginaVendas] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("pix");
+  const [pixDesconto, setPixDesconto] = useState(5);
+  const [maxParcelasCfg, setMaxParcelasCfg] = useState(6);
+  const [valorRecebido, setValorRecebido] = useState("");
+  const [parcelas, setParcelas] = useState("1");
+  const [taxaCartao, setTaxaCartao] = useState("0");
   const [descontoManual, setDescontoManual] = useState("0");
   const [observacao, setObservacao] = useState("");
 
@@ -110,6 +115,8 @@ export default function VendasPage() {
 
     const cfg = await carregarConfigEmpresa();
     setResponsaveisConfig(cfg.responsaveis);
+    setPixDesconto(cfg.pix_desconto);
+    setMaxParcelasCfg(cfg.max_parcelas);
     setLoading(false);
   }
 
@@ -138,12 +145,26 @@ export default function VendasPage() {
 
   const descontoManualNumero = Number(descontoManual || 0);
   const descontoPixNumero =
-    formaPagamento === "pix" ? calcularDescontoPix(subtotalRascunho, 5) : 0;
+    formaPagamento === "pix"
+      ? calcularDescontoPix(subtotalRascunho, pixDesconto)
+      : 0;
   const totalRascunho = calcularTotal(
     subtotalRascunho,
     descontoManualNumero,
     descontoPixNumero
   );
+
+  const recebidoNum = Number(valorRecebido || 0);
+  const trocoRascunho =
+    formaPagamento === "dinheiro"
+      ? Math.max(0, recebidoNum - totalRascunho)
+      : 0;
+  const taxaNum = Number(taxaCartao || 0);
+  const parcelasNum = Math.max(1, parseInt(parcelas) || 1);
+  const valorLiquidoRascunho =
+    formaPagamento === "cartao"
+      ? totalRascunho * (1 - taxaNum / 100)
+      : totalRascunho;
 
   function getClienteNome(id: string | null) {
     if (!id) return "Cliente avulso";
@@ -231,6 +252,9 @@ export default function VendasPage() {
     setClienteId("");
     setResponsavel("");
     setFormaPagamento("pix");
+    setValorRecebido("");
+    setParcelas("1");
+    setTaxaCartao("0");
     setDescontoManual("0");
     setObservacao("");
     setProdutoId("");
@@ -261,6 +285,11 @@ export default function VendasPage() {
           responsavel,
           forma_pagamento: formaPagamento,
           desconto_pix: descontoPixNumero,
+          parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
+          taxa: formaPagamento === "cartao" ? taxaNum : 0,
+          valor_liquido: valorLiquidoRascunho,
+          valor_recebido: formaPagamento === "dinheiro" ? recebidoNum : null,
+          troco: formaPagamento === "dinheiro" ? trocoRascunho : null,
           subtotal: subtotalRascunho,
           desconto: descontoManualNumero,
           total: totalRascunho,
@@ -456,6 +485,65 @@ export default function VendasPage() {
                   <option value="misto">Misto</option>
                 </select>
               </div>
+
+              {formaPagamento === "dinheiro" && (
+                <div>
+                  <label className="mb-2 block text-sm text-[#475569]">
+                    Valor recebido
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={valorRecebido}
+                    onChange={(e) => setValorRecebido(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    placeholder="0,00"
+                  />
+                  <p className="mt-1.5 text-xs font-semibold text-[#15803d]">
+                    Troco: {formatCurrency(trocoRascunho)}
+                  </p>
+                </div>
+              )}
+
+              {formaPagamento === "cartao" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-2 block text-sm text-[#475569]">
+                      Parcelas
+                    </label>
+                    <select
+                      value={parcelas}
+                      onChange={(e) => setParcelas(e.target.value)}
+                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    >
+                      {Array.from({ length: maxParcelasCfg }, (_, i) => i + 1).map(
+                        (n) => (
+                          <option key={n} value={n}>
+                            {n}x
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm text-[#475569]">
+                      Taxa (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={taxaCartao}
+                      onChange={(e) => setTaxaCartao(e.target.value)}
+                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs font-semibold text-[#1d4ed8]">
+                    Você recebe (líquido): {formatCurrency(valorLiquidoRascunho)}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Desconto manual</label>
