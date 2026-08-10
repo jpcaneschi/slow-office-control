@@ -74,6 +74,20 @@ export default function RelatoriosPage() {
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState("");
 
+  // Dados reais para Vale / Folha
+  const [funcionarios, setFuncionarios] = useState<
+    { id: string; nome: string; comissao_percentual: number; salario_fixo: number }[]
+  >([]);
+  const [valesReais, setValesReais] = useState<
+    { funcionario_id: string; valor: number; data: string }[]
+  >([]);
+  const [vendasFolha, setVendasFolha] = useState<
+    { funcionario_id: string | null; total: number; status: string; created_at: string }[]
+  >([]);
+  const [servFolha, setServFolha] = useState<
+    { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
+  >([]);
+
   // Promissória
   const [pDevedor, setPDevedor] = useState("");
   const [pCpf, setPCpf] = useState("");
@@ -91,6 +105,9 @@ export default function RelatoriosPage() {
   const [vDescontar, setVDescontar] = useState(true);
 
   // Folha
+  const [fFuncId, setFFuncId] = useState("");
+  const [fInicio, setFInicio] = useState(primeiroDiaMes());
+  const [fFim, setFFim] = useState(hoje());
   const [fFunc, setFFunc] = useState("");
   const [fCargo, setFCargo] = useState("");
   const [fRef, setFRef] = useState(refMesAno());
@@ -107,20 +124,45 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     (async () => {
-      const [confRes, atendRes] = await Promise.all([
-        supabase
-          .from("configuracoes")
-          .select("nome_operacao")
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("tatuagem_atendimentos")
-          .select("cliente_nome, tatuador, data, valor, percentual")
-          .order("data", { ascending: true }),
-      ]);
+      const [confRes, atendRes, funcRes, valesRes, vendasRes, servRes] =
+        await Promise.all([
+          supabase
+            .from("configuracoes")
+            .select("nome_operacao")
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("tatuagem_atendimentos")
+            .select("cliente_nome, tatuador, data, valor, percentual")
+            .order("data", { ascending: true }),
+          supabase
+            .from("funcionarios")
+            .select("id, nome, comissao_percentual, salario_fixo, ativo")
+            .order("nome"),
+          supabase.from("vales").select("funcionario_id, valor, data"),
+          supabase
+            .from("vendas")
+            .select("funcionario_id, total, status, created_at"),
+          supabase
+            .from("atendimentos_servico")
+            .select("funcionario_id, valor, percentual_loja, data"),
+        ]);
       if (confRes.data?.nome_operacao) setLoja(confRes.data.nome_operacao);
       setAtendimentos(atendRes.data || []);
+      setFuncionarios(
+        (funcRes.data || [])
+          .filter((f) => f.ativo !== false)
+          .map((f) => ({
+            id: f.id as string,
+            nome: f.nome as string,
+            comissao_percentual: Number(f.comissao_percentual || 0),
+            salario_fixo: Number(f.salario_fixo || 0),
+          }))
+      );
+      setValesReais(valesRes.data || []);
+      setVendasFolha(vendasRes.data || []);
+      setServFolha(servRes.data || []);
     })();
   }, []);
 
@@ -153,6 +195,51 @@ export default function RelatoriosPage() {
       ),
     [repasseItens]
   );
+
+  // Folha real: salário + comissão (vendas) + repasse (serviços) − vales, no período.
+  const folhaCalc = useMemo(() => {
+    const f = funcionarios.find((x) => x.id === fFuncId);
+    if (!f) return null;
+    const noPeriodo = (d: string) =>
+      (!fInicio || d >= fInicio) && (!fFim || d <= fFim);
+    const comissaoVendas = vendasFolha
+      .filter(
+        (v) =>
+          v.funcionario_id === f.id &&
+          v.status === "concluida" &&
+          noPeriodo((v.created_at || "").slice(0, 10))
+      )
+      .reduce((s, v) => s + Number(v.total || 0) * (f.comissao_percentual / 100), 0);
+    const repasseServicos = servFolha
+      .filter((a) => a.funcionario_id === f.id && noPeriodo(a.data))
+      .reduce(
+        (s, a) =>
+          s + Number(a.valor || 0) * (1 - Number(a.percentual_loja || 0) / 100),
+        0
+      );
+    const valesTotal = valesReais
+      .filter((vl) => vl.funcionario_id === f.id && noPeriodo(vl.data))
+      .reduce((s, vl) => s + Number(vl.valor || 0), 0);
+    return {
+      nome: f.nome,
+      salario: f.salario_fixo,
+      comissaoVendas,
+      repasseServicos,
+      bonus: comissaoVendas + repasseServicos,
+      vales: valesTotal,
+    };
+  }, [funcionarios, fFuncId, fInicio, fFim, vendasFolha, servFolha, valesReais]);
+
+  // Ao trocar de funcionário/período, preenche os campos da folha com dados reais.
+  useEffect(() => {
+    if (!folhaCalc) return;
+    setFFunc(folhaCalc.nome);
+    setFBase(String(folhaCalc.salario));
+    setFBonus(folhaCalc.bonus.toFixed(2));
+    setFBonusLabel("Comissão + serviços do período");
+    setFDesc(folhaCalc.vales.toFixed(2));
+    setFDescLabel("Vales do período");
+  }, [folhaCalc]);
 
   function construirDocumento(): { doc: React.ReactElement; nome: string } | null {
     if (tipo === "promissoria") {
@@ -400,11 +487,17 @@ export default function RelatoriosPage() {
             <div className="md:col-span-2">
               <label className={labelClass}>Funcionário</label>
               <input
+                list="rel-funcionarios"
                 value={vFunc}
                 onChange={(e) => setVFunc(e.target.value)}
                 className={inputClass}
                 placeholder="Nome do funcionário"
               />
+              <datalist id="rel-funcionarios">
+                {funcionarios.map((f) => (
+                  <option key={f.id} value={f.nome} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className={labelClass}>Valor (R$)</label>
@@ -455,12 +548,27 @@ export default function RelatoriosPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className={labelClass}>Funcionário</label>
-              <input
-                value={fFunc}
-                onChange={(e) => setFFunc(e.target.value)}
-                className={inputClass}
-                placeholder="Nome do funcionário"
-              />
+              {funcionarios.length > 0 ? (
+                <select
+                  value={fFuncId}
+                  onChange={(e) => setFFuncId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Selecione…</option>
+                  {funcionarios.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={fFunc}
+                  onChange={(e) => setFFunc(e.target.value)}
+                  className={inputClass}
+                  placeholder="Nome do funcionário"
+                />
+              )}
             </div>
             <div>
               <label className={labelClass}>Cargo (opcional)</label>
@@ -480,6 +588,32 @@ export default function RelatoriosPage() {
                 placeholder="Ex: Agosto/2026"
               />
             </div>
+            <div>
+              <label className={labelClass}>Período — início</label>
+              <input
+                type="date"
+                value={fInicio}
+                onChange={(e) => setFInicio(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Período — fim</label>
+              <input
+                type="date"
+                value={fFim}
+                onChange={(e) => setFFim(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            {folhaCalc && (
+              <div className="rounded-xl border border-[#e8ecf4] bg-[#f8fafc] p-4 text-sm text-[#475569] md:col-span-2">
+                Preenchido com dados reais do período: comissão de vendas{" "}
+                <b>{brl(folhaCalc.comissaoVendas)}</b> + serviços{" "}
+                <b>{brl(folhaCalc.repasseServicos)}</b> · vales{" "}
+                <b>{brl(folhaCalc.vales)}</b>. Você ainda pode ajustar abaixo.
+              </div>
+            )}
             <div>
               <label className={labelClass}>Salário base (R$)</label>
               <input

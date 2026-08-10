@@ -48,6 +48,9 @@ export default function FuncionariosPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [vales, setVales] = useState<Vale[]>([]);
   const [vendas, setVendas] = useState<VendaLite[]>([]);
+  const [atendServico, setAtendServico] = useState<
+    { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -68,7 +71,7 @@ export default function FuncionariosPage() {
   async function carregar() {
     setLoading(true);
     setErro("");
-    const [funcRes, valesRes, vendasRes] = await Promise.all([
+    const [funcRes, valesRes, vendasRes, servRes] = await Promise.all([
       supabase
         .from("funcionarios")
         .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao")
@@ -77,11 +80,15 @@ export default function FuncionariosPage() {
       supabase
         .from("vendas")
         .select("id, funcionario_id, total, status, created_at"),
+      supabase
+        .from("atendimentos_servico")
+        .select("funcionario_id, valor, percentual_loja, data"),
     ]);
     if (funcRes.error) setErro(funcRes.error.message);
     setFuncionarios(funcRes.data || []);
     setVales(valesRes.data || []);
     setVendas(vendasRes.data || []);
+    setAtendServico(servRes.data || []);
     setLoading(false);
   }
 
@@ -191,6 +198,20 @@ export default function FuncionariosPage() {
       });
       const vendido = vendasFunc.reduce((a, v) => a + Number(v.total || 0), 0);
       const comissaoValor = vendido * (Number(f.comissao_percentual || 0) / 100);
+      // Repasse de serviços: parte do valor que NÃO é da loja (100% − % loja).
+      const repasseServicos = atendServico
+        .filter((a) => {
+          const t = isoToDate(a.data).getTime();
+          return (
+            a.funcionario_id === f.id && t >= janela.ini && t < janela.fim
+          );
+        })
+        .reduce(
+          (s, a) =>
+            s +
+            Number(a.valor || 0) * (1 - Number(a.percentual_loja || 0) / 100),
+          0
+        );
       const valesPeriodo = vales
         .filter((vl) => {
           const t = isoToDate(vl.data).getTime();
@@ -198,18 +219,20 @@ export default function FuncionariosPage() {
         })
         .reduce((a, vl) => a + Number(vl.valor || 0), 0);
       const salarioFixo = Number(f.salario_fixo || 0);
-      const aPagar = salarioFixo + comissaoValor - valesPeriodo;
+      const aPagar =
+        salarioFixo + comissaoValor + repasseServicos - valesPeriodo;
       return {
         funcionario: f,
         qtdVendas: vendasFunc.length,
         vendido,
         comissaoValor,
+        repasseServicos,
         valesPeriodo,
         salarioFixo,
         aPagar,
       };
     });
-  }, [funcionarios, vendas, vales, janela]);
+  }, [funcionarios, vendas, vales, atendServico, janela]);
 
   const inputCls =
     "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none";
@@ -416,6 +439,12 @@ export default function FuncionariosPage() {
                         Comissão:{" "}
                         <span className="font-bold text-[#15803d]">
                           {formatCurrency(a.comissaoValor)}
+                        </span>
+                      </p>
+                      <p className="text-[#64748b]">
+                        Serviços:{" "}
+                        <span className="font-bold text-[#15803d]">
+                          {formatCurrency(a.repasseServicos)}
                         </span>
                       </p>
                       <p className="text-[#64748b]">
