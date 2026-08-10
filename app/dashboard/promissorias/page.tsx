@@ -318,7 +318,7 @@ export default function PromissoriasPage() {
               Regras atuais da loja
             </h2>
             <div className="mt-4 space-y-3 text-sm text-[#475569]">
-              <p>• O prazo máximo é de 4 meses.</p>
+              <p>• O prazo máximo segue o definido em Configurações.</p>
               <p>• A parcela mínima deve ser de R$ 300 por mês.</p>
               <p>• O sistema só deve aceitar promissórias dentro dessa regra.</p>
             </div>

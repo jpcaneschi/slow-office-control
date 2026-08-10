@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import {
   calcularDescontoPix,
   calcularTotal,
@@ -63,7 +64,8 @@ export default function VendasPage() {
   const [salvando, setSalvando] = useState(false);
 
   const [clienteId, setClienteId] = useState("");
-  const [responsavel, setResponsavel] = useState("João Pedro");
+  const [responsavel, setResponsavel] = useState("");
+  const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [descontoManual, setDescontoManual] = useState("0");
   const [observacao, setObservacao] = useState("");
@@ -103,6 +105,9 @@ export default function VendasPage() {
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
     setVendas(vendasRes.data || []);
     setItensVenda(itensRes.data || []);
+
+    const cfg = await carregarConfigEmpresa();
+    setResponsaveisConfig(cfg.responsaveis);
     setLoading(false);
   }
 
@@ -222,7 +227,7 @@ export default function VendasPage() {
 
   function limparFormulario() {
     setClienteId("");
-    setResponsavel("João Pedro");
+    setResponsavel("");
     setFormaPagamento("pix");
     setDescontoManual("0");
     setObservacao("");
@@ -388,8 +393,12 @@ export default function VendasPage() {
                   onChange={(e) => setResponsavel(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
-                  <option value="João Pedro">João Pedro</option>
-                  <option value="Maria Eduarda">Maria Eduarda</option>
+                  <option value="">Selecione…</option>
+                  {responsaveisConfig.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 
 type Configuracao = {
   id: string;
@@ -10,6 +11,11 @@ type Configuracao = {
   pix_desconto: number;
   tatuagem_percentual: number;
   max_parcelas: number;
+  condicional_prazo_dias: number;
+  parcela_minima: number;
+  promissoria_prazo_meses: number;
+  categorias_produto: string[];
+  responsaveis: string[];
 };
 
 type Profile = {
@@ -37,6 +43,13 @@ export default function ConfiguracoesPage() {
   const [pixDesconto, setPixDesconto] = useState("");
   const [tatuagemPercentual, setTatuagemPercentual] = useState("");
   const [maxParcelas, setMaxParcelas] = useState("");
+  const [condicionalPrazo, setCondicionalPrazo] = useState("2");
+  const [parcelaMinima, setParcelaMinima] = useState("0");
+  const [promissoriaPrazo, setPromissoriaPrazo] = useState("4");
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [novaCategoria, setNovaCategoria] = useState("");
+  const [responsaveis, setResponsaveis] = useState<string[]>([]);
+  const [novoResponsavel, setNovoResponsavel] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
@@ -71,7 +84,9 @@ export default function ConfiguracoesPage() {
         .maybeSingle(),
       supabase
         .from("configuracoes")
-        .select("id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas")
+        .select(
+          "id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, condicional_prazo_dias, parcela_minima, promissoria_prazo_meses, categorias_produto, responsaveis"
+        )
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle(),
@@ -104,6 +119,18 @@ export default function ConfiguracoesPage() {
       setPixDesconto(String(configuracaoData.pix_desconto ?? 5));
       setTatuagemPercentual(String(configuracaoData.tatuagem_percentual ?? 10));
       setMaxParcelas(String(configuracaoData.max_parcelas ?? 6));
+      setCondicionalPrazo(String(configuracaoData.condicional_prazo_dias ?? 2));
+      setParcelaMinima(String(configuracaoData.parcela_minima ?? 0));
+      setPromissoriaPrazo(String(configuracaoData.promissoria_prazo_meses ?? 4));
+      setCategorias(
+        configuracaoData.categorias_produto?.length
+          ? configuracaoData.categorias_produto
+          : CATEGORIAS_PADRAO
+      );
+      setResponsaveis(configuracaoData.responsaveis ?? []);
+    } else {
+      // Ainda sem configuração: já mostra os padrões pra facilitar o 1º salvamento.
+      setCategorias(CATEGORIAS_PADRAO);
     }
 
     setLoading(false);
@@ -266,6 +293,11 @@ export default function ConfiguracoesPage() {
       pix_desconto: pixNumero,
       tatuagem_percentual: tatuagemNumero,
       max_parcelas: parcelasNumero,
+      condicional_prazo_dias: Math.max(0, Math.round(Number(condicionalPrazo) || 0)),
+      parcela_minima: Math.max(0, Number(parcelaMinima) || 0),
+      promissoria_prazo_meses: Math.max(0, Math.round(Number(promissoriaPrazo) || 0)),
+      categorias_produto: categorias,
+      responsaveis,
     };
 
     // Atualiza se já existe config; senão cria (nova empresa).
@@ -282,6 +314,17 @@ export default function ConfiguracoesPage() {
     setSucesso("Configurações do sistema salvas com sucesso.");
     await carregarDados();
     setSalvandoSistema(false);
+  }
+
+  function addCategoria() {
+    const v = novaCategoria.trim();
+    if (v && !categorias.includes(v)) setCategorias([...categorias, v]);
+    setNovaCategoria("");
+  }
+  function addResponsavel() {
+    const v = novoResponsavel.trim();
+    if (v && !responsaveis.includes(v)) setResponsaveis([...responsaveis, v]);
+    setNovoResponsavel("");
   }
 
   return (
@@ -512,6 +555,151 @@ export default function ConfiguracoesPage() {
                   onChange={(e) => setMaxParcelas(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Prazo padrão do condicional (dias)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={condicionalPrazo}
+                  onChange={(e) => setCondicionalPrazo(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Parcela mínima (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={parcelaMinima}
+                  onChange={(e) => setParcelaMinima(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
+                  Prazo máx. da promissória (meses)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={promissoriaPrazo}
+                  onChange={(e) => setPromissoriaPrazo(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Categorias e responsáveis (chips) */}
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#475569]">
+                  Categorias de produto
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {categorias.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#eff6ff] px-3 py-1.5 text-xs font-semibold text-[#1d4ed8]"
+                    >
+                      {c}
+                      <button
+                        type="button"
+                        onClick={() => setCategorias(categorias.filter((x) => x !== c))}
+                        aria-label={`Remover ${c}`}
+                        className="text-[#93c5fd] transition hover:text-[#1d4ed8]"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {categorias.length === 0 && (
+                    <span className="text-xs text-[#94a3b8]">Nenhuma categoria.</span>
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={novaCategoria}
+                    onChange={(e) => setNovaCategoria(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCategoria();
+                      }
+                    }}
+                    placeholder="Nova categoria"
+                    className="w-full rounded-xl border border-[#e8ecf4] bg-[#f8fafc] px-3 py-2 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCategoria}
+                    className="shrink-0 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#475569]">
+                  Responsáveis / equipe
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {responsaveis.map((r) => (
+                    <span
+                      key={r}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#f1f5f9] px-3 py-1.5 text-xs font-semibold text-[#334155]"
+                    >
+                      {r}
+                      <button
+                        type="button"
+                        onClick={() => setResponsaveis(responsaveis.filter((x) => x !== r))}
+                        aria-label={`Remover ${r}`}
+                        className="text-[#94a3b8] transition hover:text-[#334155]"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {responsaveis.length === 0 && (
+                    <span className="text-xs text-[#94a3b8]">
+                      Nenhum responsável cadastrado.
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={novoResponsavel}
+                    onChange={(e) => setNovoResponsavel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addResponsavel();
+                      }
+                    }}
+                    placeholder="Nome do responsável"
+                    className="w-full rounded-xl border border-[#e8ecf4] bg-[#f8fafc] px-3 py-2 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={addResponsavel}
+                    className="shrink-0 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-[#94a3b8]">
+                  Viram opção de &quot;responsável&quot; em Vendas, Condicional e
+                  Financeiro.
+                </p>
               </div>
             </div>
 

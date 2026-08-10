@@ -69,7 +69,7 @@ const tipos: { key: Tipo; label: string; icon: typeof FileText }[] = [
 
 export default function RelatoriosPage() {
   const [tipo, setTipo] = useState<Tipo>("promissoria");
-  const [loja, setLoja] = useState("Slow Office");
+  const [loja, setLoja] = useState("");
   const [atendimentos, setAtendimentos] = useState<AtendimentoRef[]>([]);
   const [baixando, setBaixando] = useState(false);
   const [erro, setErro] = useState("");

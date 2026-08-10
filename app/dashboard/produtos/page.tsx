@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Package } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CATEGORIAS_PADRAO, carregarConfigEmpresa } from "@/lib/empresa-config";
 
 type Produto = {
   id: string;
@@ -26,17 +27,6 @@ type Movimentacao = {
 };
 
 const statusOptions = ["ativo", "inativo"];
-const categoriaOptions = [
-  "Camiseta",
-  "Calças",
-  "Calçados",
-  "Moletons & Jaquetas",
-  "Bonés & Gorros",
-  "Shorts",
-  "Acessórios",
-  "Bags & Mochilas",
-  "Outro",
-];
 
 // Markup padrão sugerido no cadastro: preço de venda = custo × MARKUP.
 const MARKUP = 2.2;
@@ -49,6 +39,8 @@ export default function ProdutosPage() {
   const [savingMovimento, setSavingMovimento] = useState(false);
   const [erro, setErro] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [categoriaOptions, setCategoriaOptions] =
+    useState<string[]>(CATEGORIAS_PADRAO);
 
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -104,6 +96,9 @@ export default function ProdutosPage() {
   async function carregarDados() {
     setLoading(true);
     setErro("");
+
+    const cfg = await carregarConfigEmpresa();
+    setCategoriaOptions(cfg.categorias_produto);
 
     await Promise.all([carregarProdutos(), carregarMovimentacoes()]);
 

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CondicionalPdfDocument } from "@/components/pdf/condicional-pdf-document";
+import { carregarConfigEmpresa } from "@/lib/empresa-config";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -72,7 +73,7 @@ export default function CondicionalPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [condicionalItens, setCondicionalItens] = useState<CondicionalItem[]>([]);
-  const [nomeOperacao, setNomeOperacao] = useState("Slow Office Control");
+  const [nomeOperacao, setNomeOperacao] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -80,7 +81,9 @@ export default function CondicionalPage() {
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [clienteId, setClienteId] = useState("");
-  const [responsavel, setResponsavel] = useState("João Pedro");
+  const [responsavel, setResponsavel] = useState("");
+  const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
+  const [prazoDias, setPrazoDias] = useState(2);
   const [dataSaida, setDataSaida] = useState(hoje);
   const [dataLimite, setDataLimite] = useState(somarDias(hoje, 2));
   const [observacao, setObservacao] = useState("");
@@ -127,7 +130,12 @@ export default function CondicionalPage() {
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
     setCondicionais(condicionaisRes.data || []);
     setCondicionalItens(itensRes.data || []);
-    setNomeOperacao(configRes.data?.nome_operacao || "Slow Office Control");
+
+    const cfg = await carregarConfigEmpresa();
+    setNomeOperacao(cfg.nome_operacao || "Sua loja");
+    setResponsaveisConfig(cfg.responsaveis);
+    setPrazoDias(cfg.condicional_prazo_dias);
+    setDataLimite(somarDias(dataSaida, cfg.condicional_prazo_dias));
     setLoading(false);
   }
 
@@ -268,7 +276,7 @@ export default function CondicionalPage() {
 
   function limparFormulario() {
     setClienteId("");
-    setResponsavel("João Pedro");
+    setResponsavel("");
     setDataSaida(hoje);
     setDataLimite(somarDias(hoje, 2));
     setObservacao("");
@@ -476,8 +484,12 @@ export default function CondicionalPage() {
                   onChange={(e) => setResponsavel(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
-                  <option value="João Pedro">João Pedro</option>
-                  <option value="Maria Eduarda">Maria Eduarda</option>
+                  <option value="">Selecione…</option>
+                  {responsaveisConfig.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -488,7 +500,7 @@ export default function CondicionalPage() {
                   value={dataSaida}
                   onChange={(e) => {
                     setDataSaida(e.target.value);
-                    setDataLimite(somarDias(e.target.value, 2));
+                    setDataLimite(somarDias(e.target.value, prazoDias));
                   }}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
@@ -609,7 +621,7 @@ export default function CondicionalPage() {
 
             <div className="mt-4 space-y-3 text-sm text-[#475569]">
               <p>• O condicional não é venda.</p>
-              <p>• O prazo padrão é de 2 dias.</p>
+              <p>• O prazo padrão é de {prazoDias} {prazoDias === 1 ? "dia" : "dias"}.</p>
               <p>• As peças saem temporariamente do estoque.</p>
               <p>• Quando recolhido, o produto volta ao estoque.</p>
               <p>• Depois vamos permitir converter itens escolhidos em venda.</p>
