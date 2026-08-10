@@ -14,6 +14,13 @@ type Venda = {
   observacao: string | null;
   responsavel: string | null;
   cliente_id: string | null;
+  status: string | null;
+};
+
+type VendaItem = {
+  venda_id: string;
+  quantidade: number;
+  custo_unitario: number;
 };
 
 type Despesa = {
@@ -61,6 +68,7 @@ const inputRec =
 
 export default function FinanceiroPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
+  const [itensVenda, setItensVenda] = useState<VendaItem[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
@@ -86,10 +94,10 @@ export default function FinanceiroPage() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, despesasRes, atendRes, recRes] = await Promise.all([
+    const [vendasRes, despesasRes, atendRes, recRes, itensRes] = await Promise.all([
       supabase
         .from("vendas")
-        .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id")
+        .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("despesas")
@@ -100,14 +108,17 @@ export default function FinanceiroPage() {
         .from("despesas_recorrentes")
         .select("id, descricao, categoria, valor, dia_vencimento, ativo")
         .order("created_at", { ascending: true }),
+      supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
     ]);
 
     if (vendasRes.error) setErro(vendasRes.error.message);
     if (despesasRes.error) setErro(despesasRes.error.message);
     if (atendRes.error) setErro(atendRes.error.message);
     if (recRes.error) setErro(recRes.error.message);
+    if (itensRes.error) setErro(itensRes.error.message);
 
     setVendas(vendasRes.data || []);
+    setItensVenda(itensRes.data || []);
     setDespesas(despesasRes.data || []);
     setAtendimentos(atendRes.data || []);
     setRecorrentes(recRes.data || []);
@@ -121,9 +132,20 @@ export default function FinanceiroPage() {
     carregarDados();
   }, []);
 
+  // Só vendas CONCLUÍDAS entram no financeiro (canceladas ficam de fora).
+  const idsConcluidas = useMemo(
+    () =>
+      new Set(
+        vendas.filter((v) => (v.status || "") === "concluida").map((v) => v.id)
+      ),
+    [vendas]
+  );
+
   const receitaVendas = useMemo(() => {
-    return vendas.reduce((acc, venda) => acc + Number(venda.total || 0), 0);
-  }, [vendas]);
+    return vendas
+      .filter((v) => idsConcluidas.has(v.id))
+      .reduce((acc, venda) => acc + Number(venda.total || 0), 0);
+  }, [vendas, idsConcluidas]);
 
   const receitaTatuagem = useMemo(() => {
     return atendimentos.reduce(
@@ -135,11 +157,24 @@ export default function FinanceiroPage() {
 
   const receita = receitaVendas + receitaTatuagem;
 
+  // Custo dos produtos vendidos (COGS) — custo histórico dos itens concluídos.
+  const custoProdutos = useMemo(() => {
+    return itensVenda
+      .filter((it) => idsConcluidas.has(it.venda_id))
+      .reduce(
+        (acc, it) =>
+          acc + (Number(it.custo_unitario) || 0) * (Number(it.quantidade) || 0),
+        0
+      );
+  }, [itensVenda, idsConcluidas]);
+
+  const lucroBruto = receita - custoProdutos;
+
   const despesasTotal = useMemo(() => {
     return despesas.reduce((acc, despesa) => acc + Number(despesa.valor || 0), 0);
   }, [despesas]);
 
-  const resultado = receita - despesasTotal;
+  const resultado = lucroBruto - despesasTotal;
 
   const vendasPix = useMemo(() => {
     return vendas.filter((venda) => venda.forma_pagamento === "pix").length;
@@ -283,7 +318,7 @@ export default function FinanceiroPage() {
       <PageHeader
         eyebrow="Gestão financeira"
         title="Financeiro"
-        description="Acompanhe receita, despesas e resultado simples da operação com uma leitura clara do dia a dia."
+        description="Acompanhe receita, custo, lucro e resultado da operação — só vendas concluídas entram na conta."
       />
 
       {erro && (
@@ -292,10 +327,10 @@ export default function FinanceiroPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-[28px] border border-[#e8ecf4] bg-[#f8fafc] p-5">
           <p className="text-sm font-bold text-[#475569]">Receita</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(receita)}
           </p>
           <p className="mt-2 text-xs text-[#94a3b8]">
@@ -304,25 +339,35 @@ export default function FinanceiroPage() {
           </p>
         </div>
 
+        <div className="rounded-[28px] border border-[#fed7aa] bg-[#fff7ed] p-5">
+          <p className="text-sm font-bold text-[#c2410c]">Custo dos produtos</p>
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
+            {formatCurrency(custoProdutos)}
+          </p>
+          <p className="mt-2 text-xs text-[#94a3b8]">Custo das vendas (COGS)</p>
+        </div>
+
+        <div className="rounded-[28px] border border-[#bfdbfe] bg-[#eff6ff] p-5">
+          <p className="text-sm font-bold text-[#1d4ed8]">Lucro bruto</p>
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
+            {formatCurrency(lucroBruto)}
+          </p>
+          <p className="mt-2 text-xs text-[#94a3b8]">Receita − custo</p>
+        </div>
+
         <div className="rounded-[28px] border border-[#fecaca] bg-[#fef2f2] p-5">
           <p className="text-sm font-bold text-[#b91c1c]">Despesas</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(despesasTotal)}
           </p>
         </div>
 
         <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
           <p className="text-sm font-bold text-[#15803d]">Resultado</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(resultado)}
           </p>
-        </div>
-
-        <div className="rounded-[28px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-5">
-          <p className="text-sm font-bold text-[#2563eb]">Vendas Pix</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
-            {vendasPix}
-          </p>
+          <p className="mt-2 text-xs text-[#94a3b8]">Lucro − despesas</p>
         </div>
       </div>
 
@@ -584,8 +629,10 @@ export default function FinanceiroPage() {
             <div className="mt-4 space-y-3 text-sm text-[#475569]">
               <p>• Receita total: {formatCurrency(receita)}</p>
               <p>• Repasse de tatuagem: {formatCurrency(receitaTatuagem)}</p>
+              <p>• Custo dos produtos: {formatCurrency(custoProdutos)}</p>
+              <p>• Lucro bruto: {formatCurrency(lucroBruto)}</p>
               <p>• Total de despesas: {formatCurrency(despesasTotal)}</p>
-              <p>• Resultado simples: {formatCurrency(resultado)}</p>
+              <p>• Resultado líquido: {formatCurrency(resultado)}</p>
               <p>• Vendas no Pix: {vendasPix}</p>
             </div>
           </div>

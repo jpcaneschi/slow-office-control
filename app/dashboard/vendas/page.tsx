@@ -20,6 +20,7 @@ type Produto = {
   id: string;
   nome: string;
   preco: number | null;
+  custo: number | null;
   estoque: number | null;
   status: string | null;
 };
@@ -85,7 +86,7 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, estoque, status")
+        .select("id, nome, preco, custo, estoque, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
@@ -272,13 +273,17 @@ export default function VendasPage() {
         throw new Error(vendaError.message);
       }
 
-      const itensParaInserir = itensRascunho.map((item) => ({
-        venda_id: vendaCriada.id,
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_unitario: item.preco_unitario,
-        total_item: item.quantidade * item.preco_unitario,
-      }));
+      const itensParaInserir = itensRascunho.map((item) => {
+        const prod = produtos.find((p) => p.id === item.produto_id);
+        return {
+          venda_id: vendaCriada.id,
+          produto_id: item.produto_id,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco_unitario,
+          total_item: item.quantidade * item.preco_unitario,
+          custo_unitario: Number(prod?.custo || 0),
+        };
+      });
 
       const { error: itensError } = await supabase
         .from("venda_itens")
