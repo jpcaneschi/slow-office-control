@@ -25,6 +25,9 @@ import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { AuthGuard } from "@/components/dashboard/auth-guard";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import { RoleProvider, usePapel } from "@/components/dashboard/role-context";
+import { RouteGuard } from "@/components/dashboard/route-guard";
+import { podeAcessar } from "@/lib/permissoes";
 
 type NavItem = {
   href: string;
@@ -85,9 +88,17 @@ function NavSections({
   isActive: (href: string) => boolean;
   onNavigate?: () => void;
 }) {
+  const { papel } = usePapel();
+  const gruposVisiveis = navGroups
+    .map((grupo) => ({
+      ...grupo,
+      itens: grupo.itens.filter((item) => podeAcessar(papel, item.href)),
+    }))
+    .filter((grupo) => grupo.itens.length > 0);
+
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-8">
-      {navGroups.map((grupo, i) => (
+      {gruposVisiveis.map((grupo, i) => (
         <div key={i} className="space-y-1">
           {grupo.titulo && (
             <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
@@ -119,6 +130,42 @@ function NavSections({
   );
 }
 
+function MobileBottomNav({
+  isActive,
+}: {
+  isActive: (href: string) => boolean;
+}) {
+  const { papel } = usePapel();
+  const itens = mobileNavItems.filter((item) => podeAcessar(papel, item.href));
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
+      <div
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
+      >
+        {itens.map((item) => {
+          const active = isActive(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold transition ${
+                active
+                  ? "bg-[#2563eb]/10 text-[#2563eb]"
+                  : "text-[#64748b] hover:bg-[#f4f6fb]"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
@@ -143,6 +190,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
+    <RoleProvider>
     <PeriodProvider>
     <div className="min-h-screen bg-[#f4f6fb] text-[#0f172a]">
       <div className="flex min-h-screen">
@@ -248,37 +296,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/* Conteúdo */}
           <main className="flex-1 px-4 py-6 pb-24 md:px-8 xl:pb-6">
-            <div className="mx-auto max-w-[1400px]">{children}</div>
+            <div className="mx-auto max-w-[1400px]">
+              <RouteGuard>{children}</RouteGuard>
+            </div>
           </main>
 
           {/* Navegação inferior (mobile) */}
-          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
-            <div className="grid grid-cols-5 gap-1">
-              {mobileNavItems.map((item) => {
-                const active = isActive(item.href);
-                const Icon = item.icon;
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold transition ${
-                      active
-                        ? "bg-[#2563eb]/10 text-[#2563eb]"
-                        : "text-[#64748b] hover:bg-[#f4f6fb]"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
+          <MobileBottomNav isActive={isActive} />
         </div>
       </div>
     </div>
     </PeriodProvider>
+    </RoleProvider>
     </AuthGuard>
   );
 }

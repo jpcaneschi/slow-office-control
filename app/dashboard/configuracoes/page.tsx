@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
+import { EquipeSection } from "@/components/dashboard/equipe-section";
 
 type Configuracao = {
   id: string;
@@ -353,6 +354,8 @@ export default function ConfiguracoesPage() {
         </div>
       ) : (
         <div className="grid gap-6">
+          <EquipeSection />
+
           <div className="grid gap-6 xl:grid-cols-2">
             <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
               <h2 className="text-xl font-black tracking-tight text-[#0f172a]">

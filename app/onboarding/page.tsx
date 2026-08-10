@@ -57,20 +57,34 @@ export default function OnboardingPage() {
     }
     setSalvando(true);
 
-    // Cria empresa + unidade + membership (se ainda não existir).
+    // Cria empresa + unidade + membership — ou entra na empresa de um convite.
     await garantirEmpresa(nomeLoja);
 
-    const { error } = configId
-      ? await supabase
-          .from("configuracoes")
-          .update({ nome_operacao: nomeLoja.trim() })
-          .eq("id", configId)
-      : await supabase.from("configuracoes").insert({
-          nome_operacao: nomeLoja.trim(),
-          pix_desconto: 5,
-          tatuagem_percentual: 10,
-          max_parcelas: 6,
-        });
+    // Reconsulta: se a empresa já tem config (ex.: entrei por convite de equipe),
+    // não duplica nem sobrescreve — apenas segue para o painel.
+    const { data: confExistente } = await supabase
+      .from("configuracoes")
+      .select("id")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    let error = null;
+    if (confExistente?.id) {
+      // Empresa já configurada pelo dono — nada a fazer aqui.
+    } else if (configId) {
+      ({ error } = await supabase
+        .from("configuracoes")
+        .update({ nome_operacao: nomeLoja.trim() })
+        .eq("id", configId));
+    } else {
+      ({ error } = await supabase.from("configuracoes").insert({
+        nome_operacao: nomeLoja.trim(),
+        pix_desconto: 5,
+        tatuagem_percentual: 10,
+        max_parcelas: 6,
+      }));
+    }
 
     if (error) {
       setErro(error.message);

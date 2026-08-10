@@ -66,6 +66,32 @@ export async function garantirEmpresa(
     .maybeSingle();
   if (mem?.organization_id) return mem.organization_id as string;
 
+  // Convite pendente para este e-mail? → entra na empresa do convite (não cria nova).
+  const email = (user.email || "").toLowerCase();
+  if (email) {
+    const { data: convite } = await supabase
+      .from("organization_invites")
+      .select("id, organization_id, papel")
+      .ilike("email", email)
+      .eq("status", "pendente")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (convite?.organization_id) {
+      await supabase.from("organization_members").insert({
+        organization_id: convite.organization_id,
+        user_id: user.id,
+        papel: (convite.papel as string) || "caixa",
+        email: user.email || null,
+      });
+      await supabase
+        .from("organization_invites")
+        .update({ status: "aceito" })
+        .eq("id", convite.id);
+      return convite.organization_id as string;
+    }
+  }
+
   const { data: org, error } = await supabase
     .from("organizations")
     .insert({ nome: nomeLoja.trim() || "Minha empresa", owner_user_id: user.id })
@@ -74,9 +100,12 @@ export async function garantirEmpresa(
   if (error || !org) return null;
 
   // Ordem importa: membership antes da unidade (RLS da store exige membership).
-  await supabase
-    .from("organization_members")
-    .insert({ organization_id: org.id, user_id: user.id, papel: "owner" });
+  await supabase.from("organization_members").insert({
+    organization_id: org.id,
+    user_id: user.id,
+    papel: "owner",
+    email: user.email || null,
+  });
   await supabase
     .from("stores")
     .insert({ organization_id: org.id, nome: "Unidade principal" });
