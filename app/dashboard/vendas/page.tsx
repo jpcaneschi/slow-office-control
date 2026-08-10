@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 import {
   calcularDescontoPix,
   calcularTotal,
@@ -127,17 +128,38 @@ export default function VendasPage() {
     carregarDados();
   }, []);
 
+  // Filtro global de período (mesmo do Financeiro/Dashboard).
+  const { period } = usePeriod();
+  const janela = useMemo(() => {
+    const startOfDay = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+    const ini = startOfDay(isoToDate(period.inicio)).getTime();
+    const fimData = startOfDay(isoToDate(period.fim));
+    fimData.setDate(fimData.getDate() + 1);
+    return { ini, fim: fimData.getTime() };
+  }, [period]);
+
+  const vendasNoPeriodo = useMemo(() => {
+    return vendas.filter((v) => {
+      const t = new Date(v.created_at).getTime();
+      return t >= janela.ini && t < janela.fim;
+    });
+  }, [vendas, janela]);
+
   const totalConcluido = useMemo(() => {
-    return vendas
+    return vendasNoPeriodo
       .filter((item) => item.status === "concluida")
       .reduce((acc, item) => acc + Number(item.total || 0), 0);
-  }, [vendas]);
+  }, [vendasNoPeriodo]);
 
   const totalPix = useMemo(() => {
-    return vendas
-      .filter((item) => item.forma_pagamento === "pix")
+    return vendasNoPeriodo
+      .filter((item) => item.forma_pagamento === "pix" && item.status === "concluida")
       .reduce((acc, item) => acc + Number(item.total || 0), 0);
-  }, [vendas]);
+  }, [vendasNoPeriodo]);
 
   const subtotalRascunho = useMemo(() => {
     return itensRascunho.reduce(
@@ -441,10 +463,10 @@ export default function VendasPage() {
   const porPaginaVendas = 5;
   const totalPaginasVendas = Math.max(
     1,
-    Math.ceil(vendas.length / porPaginaVendas)
+    Math.ceil(vendasNoPeriodo.length / porPaginaVendas)
   );
   const paginaAtual = Math.min(paginaVendas, totalPaginasVendas - 1);
-  const vendasPagina = vendas.slice(
+  const vendasPagina = vendasNoPeriodo.slice(
     paginaAtual * porPaginaVendas,
     paginaAtual * porPaginaVendas + porPaginaVendas
   );
@@ -467,7 +489,7 @@ export default function VendasPage() {
         <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-5">
           <p className="text-sm font-bold text-[#475569]">Vendas concluídas</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
-            {vendas.filter((item) => item.status === "concluida").length}
+            {vendasNoPeriodo.filter((item) => item.status === "concluida").length}
           </p>
         </div>
 
@@ -793,14 +815,18 @@ export default function VendasPage() {
             <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Vendas registradas{" "}
               <span className="text-sm font-semibold text-[#94a3b8]">
-                ({vendas.length})
+                ({vendasNoPeriodo.length})
               </span>
             </h2>
 
             {loading ? (
               <p className="mt-4 text-[#64748b]">Carregando vendas...</p>
-            ) : vendas.length === 0 ? (
-              <p className="mt-4 text-[#64748b]">Nenhuma venda cadastrada ainda.</p>
+            ) : vendasNoPeriodo.length === 0 ? (
+              <p className="mt-4 text-[#64748b]">
+                {vendas.length === 0
+                  ? "Nenhuma venda cadastrada ainda."
+                  : "Nenhuma venda no período selecionado."}
+              </p>
             ) : (
               <>
               <div className="mt-5 space-y-4">
