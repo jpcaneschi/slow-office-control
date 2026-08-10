@@ -489,7 +489,10 @@ export default function ProdutosPage() {
                   onChange={(e) => setCategoria(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
-                  {categoriaOptions.map((item) => (
+                  {(categoriaOptions.includes(categoria) || !categoria
+                    ? categoriaOptions
+                    : [categoria, ...categoriaOptions]
+                  ).map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>

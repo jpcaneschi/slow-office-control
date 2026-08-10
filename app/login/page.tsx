@@ -14,13 +14,27 @@ export default function LoginPage() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
+  const [sessaoEmail, setSessaoEmail] = useState<string | null>(null);
+  const [checandoSessao, setChecandoSessao] = useState(true);
 
-  // Se já estiver logado, vai direto pro dashboard.
+  // Se já houver sessão, NÃO redireciona automático — oferece a escolha
+  // (continuar na conta atual, ou sair para entrar/criar com outra).
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/dashboard");
+    supabase.auth.getUser().then(({ data }) => {
+      setSessaoEmail(data.user?.email ?? null);
+      setChecandoSessao(false);
     });
-  }, [router]);
+  }, []);
+
+  async function sairParaTrocar() {
+    await supabase.auth.signOut();
+    setSessaoEmail(null);
+    setEmail("");
+    setSenha("");
+    setNome("");
+    setErro("");
+    setAviso("");
+  }
 
   // Vindo da landing com "?novo=1" abre já no modo criar conta (e pré-preenche o e-mail).
   useEffect(() => {
@@ -91,6 +105,38 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {checandoSessao ? (
+          <div className="flex justify-center py-10 text-[#64748b]">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : sessaoEmail ? (
+          <div className="text-center">
+            <h1 className="text-xl font-black text-[#0f172a]">
+              Você já está conectado
+            </h1>
+            <p className="mt-2 text-sm text-[#64748b]">
+              Nesta conta:{" "}
+              <span className="font-semibold text-[#0f172a]">{sessaoEmail}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => router.replace("/dashboard")}
+              className="mt-6 w-full rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+            >
+              Continuar nesta conta
+            </button>
+            <button
+              type="button"
+              onClick={sairParaTrocar}
+              className="mt-3 w-full rounded-xl border border-[#e8ecf4] bg-white px-4 py-3 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"
+            >
+              {modo === "criar"
+                ? "Sair e criar uma nova empresa"
+                : "Entrar com outra conta"}
+            </button>
+          </div>
+        ) : (
+          <>
         <h1 className="text-center text-xl font-black text-[#0f172a]">
           {modo === "entrar" ? "Entrar na sua conta" : "Criar sua conta"}
         </h1>
@@ -168,6 +214,8 @@ export default function LoginPage() {
             {modo === "entrar" ? "Criar conta" : "Entrar"}
           </button>
         </p>
+          </>
+        )}
       </div>
     </main>
   );

@@ -207,7 +207,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-[#0f172a]">
       <ScrollReveal />
       {/* ─── Navegação ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-[#eef2f7] bg-white/85 backdrop-blur-xl">
+      <header className="border-b border-[#eef2f7] bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2">
             <span className="text-2xl font-black tracking-tight text-[#1e40af]">

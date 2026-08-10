@@ -249,8 +249,8 @@ export default function ConfiguracoesPage() {
       return;
     }
 
-    if (!Number.isFinite(tatuagemNumero) || tatuagemNumero < 0) {
-      setErro("Informe um percentual de tatuagem válido.");
+    if (!Number.isFinite(tatuagemNumero) || tatuagemNumero < 0 || tatuagemNumero > 100) {
+      setErro("O percentual de tatuagem deve ficar entre 0% e 100%.");
       return;
     }
 
@@ -494,6 +494,8 @@ export default function ConfiguracoesPage() {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100"
                   value={tatuagemPercentual}
                   onChange={(e) => setTatuagemPercentual(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"

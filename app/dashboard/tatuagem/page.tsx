@@ -188,6 +188,10 @@ export default function TatuagemPage() {
       setErro("Informe um valor válido.");
       return;
     }
+    if (percNum < 0 || percNum > 100) {
+      setErro("O percentual da loja deve ficar entre 0% e 100%.");
+      return;
+    }
 
     setSaving(true);
     setErro("");
@@ -351,6 +355,7 @@ export default function TatuagemPage() {
                 type="number"
                 step="0.01"
                 min="0"
+                max="100"
                 value={percentual}
                 onChange={(e) => setPercentual(e.target.value)}
                 className={inputClass}

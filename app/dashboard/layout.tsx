@@ -13,6 +13,7 @@ import {
   CircleDollarSign,
   PenTool,
   BarChart3,
+  CalendarDays,
   Settings,
   Menu,
   X,
@@ -54,6 +55,7 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
     titulo: "Gestão",
     itens: [
       { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
+      { href: "/dashboard/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/dashboard/tatuagem", label: "Tatuagem", icon: PenTool },
       { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
     ],
@@ -124,7 +126,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
 
   const currentLabel =
-    navItems.find((item) => isActive(item.href))?.label ?? "Dashboard";
+    navItems.find((item) => isActive(item.href))?.label ??
+    (pathname.startsWith("/dashboard/tarefas-alertas")
+      ? "Tarefas e alertas"
+      : "Dashboard");
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
