@@ -83,6 +83,9 @@ export default function VendasPage() {
   const [clienteId, setClienteId] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
+  const [funcionariosLista, setFuncionariosLista] = useState<
+    { id: string; nome: string }[]
+  >([]);
   const [paginaVendas, setPaginaVendas] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [pixDesconto, setPixDesconto] = useState(5);
@@ -140,6 +143,17 @@ export default function VendasPage() {
       .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
+    );
+
+    // Funcionários ativos (para vincular a comissão pelo responsável).
+    const { data: funcData } = await supabase
+      .from("funcionarios")
+      .select("id, nome, ativo")
+      .order("nome", { ascending: true });
+    setFuncionariosLista(
+      (funcData || [])
+        .filter((f) => f.ativo !== false)
+        .map((f) => ({ id: f.id as string, nome: f.nome as string }))
     );
 
     const cfg = await carregarConfigEmpresa();
@@ -385,12 +399,18 @@ export default function VendasPage() {
 
     setSalvando(true);
 
+    // Casa o responsável (texto) a um funcionário cadastrado → gera comissão.
+    const funcMatch = funcionariosLista.find(
+      (f) => f.nome.trim().toLowerCase() === responsavel.trim().toLowerCase()
+    );
+
     try {
       const { data: vendaCriada, error: vendaError } = await supabase
         .from("vendas")
         .insert({
           cliente_id: clienteId || null,
           responsavel,
+          funcionario_id: funcMatch ? funcMatch.id : null,
           forma_pagamento: formaPagamento,
           desconto_pix: descontoPixNumero,
           parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
@@ -600,7 +620,12 @@ export default function VendasPage() {
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
                 <datalist id="responsaveis-lista">
-                  {responsaveisConfig.map((r) => (
+                  {Array.from(
+                    new Set([
+                      ...funcionariosLista.map((f) => f.nome),
+                      ...responsaveisConfig,
+                    ])
+                  ).map((r) => (
                     <option key={r} value={r} />
                   ))}
                 </datalist>

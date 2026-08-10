@@ -15,6 +15,7 @@ import {
   BarChart3,
   CalendarDays,
   Settings,
+  UserCog,
   Menu,
   X,
   type LucideIcon,
@@ -58,6 +59,7 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
     titulo: "Gestão",
     itens: [
       { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
+      { href: "/dashboard/funcionarios", label: "Funcionários", icon: UserCog },
       { href: "/dashboard/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/dashboard/tatuagem", label: "Tatuagem", icon: PenTool },
       { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
