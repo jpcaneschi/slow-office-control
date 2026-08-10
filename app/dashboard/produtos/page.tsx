@@ -15,6 +15,19 @@ type Produto = {
   estoque: number | null;
   status: string | null;
   imagem_url: string | null;
+  tem_variacoes: boolean | null;
+};
+
+type Variacao = {
+  id: string;
+  produto_id?: string;
+  tamanho: string | null;
+  cor: string | null;
+  sku: string | null;
+  preco: number | null;
+  custo: number | null;
+  estoque: number | null;
+  status: string | null;
 };
 
 type Movimentacao = {
@@ -65,10 +78,21 @@ export default function ProdutosPage() {
   const [quantidadeMovimento, setQuantidadeMovimento] = useState("");
   const [observacaoMovimento, setObservacaoMovimento] = useState("");
 
+  // Variações (grade) do produto em edição
+  const [temVariacoes, setTemVariacoes] = useState(false);
+  const [variacoes, setVariacoes] = useState<Variacao[]>([]);
+  const [varTamanho, setVarTamanho] = useState("");
+  const [varCor, setVarCor] = useState("");
+  const [varEstoque, setVarEstoque] = useState("");
+  const [varPreco, setVarPreco] = useState("");
+  const [savingVar, setSavingVar] = useState(false);
+  // produto_id -> soma de estoque das variações (para exibir na lista)
+  const [somaVariacoes, setSomaVariacoes] = useState<Record<string, number>>({});
+
   async function carregarProdutos() {
     const { data, error } = await supabase
       .from("produtos")
-      .select("id, nome, categoria, preco, custo, estoque, status, imagem_url")
+      .select("id, nome, categoria, preco, custo, estoque, status, imagem_url, tem_variacoes")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -77,6 +101,93 @@ export default function ProdutosPage() {
     }
 
     setProdutos(data || []);
+
+    // Soma o estoque das variações por produto (só usado no display da lista).
+    const { data: vars } = await supabase
+      .from("produto_variacoes")
+      .select("produto_id, estoque");
+    const mapa: Record<string, number> = {};
+    for (const v of vars || []) {
+      const pid = v.produto_id as string;
+      mapa[pid] = (mapa[pid] || 0) + Number(v.estoque || 0);
+    }
+    setSomaVariacoes(mapa);
+  }
+
+  function estoqueEfetivo(produto: Produto) {
+    if (produto.tem_variacoes) return somaVariacoes[produto.id] || 0;
+    return Number(produto.estoque || 0);
+  }
+
+  async function carregarVariacoes(produtoId: string) {
+    const { data, error } = await supabase
+      .from("produto_variacoes")
+      .select("id, tamanho, cor, sku, preco, custo, estoque, status")
+      .eq("produto_id", produtoId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setVariacoes(data || []);
+  }
+
+  async function alternarTemVariacoes(valor: boolean) {
+    setTemVariacoes(valor);
+    // Em edição, persiste na hora para a grade poder ser adicionada.
+    if (editandoId) {
+      const { error } = await supabase
+        .from("produtos")
+        .update({ tem_variacoes: valor })
+        .eq("id", editandoId);
+      if (error) {
+        setErro(error.message);
+        return;
+      }
+      await carregarProdutos();
+    }
+  }
+
+  async function adicionarVariacao() {
+    if (!editandoId) return;
+    if (!varTamanho.trim() && !varCor.trim()) {
+      setErro("Informe ao menos tamanho ou cor da variação.");
+      return;
+    }
+    setSavingVar(true);
+    setErro("");
+    const { error } = await supabase.from("produto_variacoes").insert({
+      produto_id: editandoId,
+      tamanho: varTamanho.trim() || null,
+      cor: varCor.trim() || null,
+      estoque: Number(varEstoque || 0),
+      preco: varPreco ? Number(varPreco) : null,
+    });
+    if (error) {
+      setErro(error.message);
+      setSavingVar(false);
+      return;
+    }
+    setVarTamanho("");
+    setVarCor("");
+    setVarEstoque("");
+    setVarPreco("");
+    await carregarVariacoes(editandoId);
+    await carregarProdutos();
+    setSavingVar(false);
+  }
+
+  async function removerVariacao(id: string) {
+    const { error } = await supabase
+      .from("produto_variacoes")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    if (editandoId) await carregarVariacoes(editandoId);
+    await carregarProdutos();
   }
 
   async function carregarMovimentacoes() {
@@ -118,6 +229,12 @@ export default function ProdutosPage() {
     setStatus("ativo");
     setImagemUrl("");
     setEditandoId(null);
+    setTemVariacoes(false);
+    setVariacoes([]);
+    setVarTamanho("");
+    setVarCor("");
+    setVarEstoque("");
+    setVarPreco("");
   }
 
   function limparMovimentacao() {
@@ -136,6 +253,9 @@ export default function ProdutosPage() {
     setEstoque(produto.estoque?.toString() || "");
     setStatus(produto.status || "ativo");
     setImagemUrl(produto.imagem_url || "");
+    setTemVariacoes(!!produto.tem_variacoes);
+    setVariacoes([]);
+    if (produto.tem_variacoes) carregarVariacoes(produto.id);
     setErro("");
   }
 
@@ -167,7 +287,8 @@ export default function ProdutosPage() {
 
     const precoNumero = Number(preco);
     const custoNumero = Number(custo);
-    const estoqueNumero = Number(estoque);
+    // Com grade, o estoque vive nas variações; o campo do produto vira 0.
+    const estoqueNumero = temVariacoes ? 0 : Number(estoque);
 
     if (Number.isNaN(precoNumero) || preco === "") {
       setErro("Informe um preço válido.");
@@ -179,7 +300,7 @@ export default function ProdutosPage() {
       return;
     }
 
-    if (Number.isNaN(estoqueNumero) || estoque === "") {
+    if (!temVariacoes && (Number.isNaN(estoqueNumero) || estoque === "")) {
       setErro("Informe um estoque válido.");
       return;
     }
@@ -198,6 +319,7 @@ export default function ProdutosPage() {
           estoque: estoqueNumero,
           status,
           imagem_url: imagemUrl.trim() || null,
+          tem_variacoes: temVariacoes,
         })
         .eq("id", editandoId);
 
@@ -215,6 +337,7 @@ export default function ProdutosPage() {
         estoque: estoqueNumero,
         status,
         imagem_url: imagemUrl.trim() || null,
+        tem_variacoes: temVariacoes,
       });
 
       if (error) {
@@ -301,7 +424,7 @@ export default function ProdutosPage() {
       const statusMatch =
         filtroStatus === "todos" ? true : statusAtual === filtroStatus;
 
-      const estoqueAtual = Number(produto.estoque || 0);
+      const estoqueAtual = estoqueEfetivo(produto);
 
       const estoqueMatch =
         filtroEstoque === "todos"
@@ -316,7 +439,8 @@ export default function ProdutosPage() {
 
       return nomeMatch && statusMatch && estoqueMatch;
     });
-  }, [produtos, busca, filtroStatus, filtroEstoque]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtos, busca, filtroStatus, filtroEstoque, somaVariacoes]);
 
   const resumo = useMemo(() => {
     const totalProdutos = produtos.length;
@@ -327,15 +451,15 @@ export default function ProdutosPage() {
       (produto) => (produto.status || "ativo") === "inativo"
     ).length;
     const estoqueTotal = produtos.reduce(
-      (acc, produto) => acc + Number(produto.estoque || 0),
+      (acc, produto) => acc + estoqueEfetivo(produto),
       0
     );
     const estoqueBaixo = produtos.filter((produto) => {
-      const estoqueAtual = Number(produto.estoque || 0);
+      const estoqueAtual = estoqueEfetivo(produto);
       return estoqueAtual > 0 && estoqueAtual <= 3;
     }).length;
     const estoqueZerado = produtos.filter(
-      (produto) => Number(produto.estoque || 0) === 0
+      (produto) => estoqueEfetivo(produto) === 0
     ).length;
 
     return {
@@ -346,13 +470,15 @@ export default function ProdutosPage() {
       estoqueBaixo,
       estoqueZerado,
     };
-  }, [produtos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtos, somaVariacoes]);
 
   const produtosCriticos = useMemo(() => {
     return produtos
-      .filter((produto) => Number(produto.estoque || 0) <= 3)
-      .sort((a, b) => Number(a.estoque || 0) - Number(b.estoque || 0));
-  }, [produtos]);
+      .filter((produto) => estoqueEfetivo(produto) <= 3)
+      .sort((a, b) => estoqueEfetivo(a) - estoqueEfetivo(b));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtos, somaVariacoes]);
 
   function nomeProduto(produtoId: string) {
     const produto = produtos.find((item) => item.id === produtoId);
@@ -538,18 +664,113 @@ export default function ProdutosPage() {
                 />
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm text-[#475569]">
-                  Estoque inicial
-                </label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3">
                 <input
-                  type="number"
-                  value={estoque}
-                  onChange={(e) => setEstoque(e.target.value)}
-                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  placeholder="0"
+                  type="checkbox"
+                  checked={temVariacoes}
+                  onChange={(e) => alternarTemVariacoes(e.target.checked)}
+                  className="h-4 w-4 accent-[#2563eb]"
                 />
-              </div>
+                <span className="text-sm font-semibold text-[#334155]">
+                  Este produto usa grade (tamanho/cor)
+                </span>
+              </label>
+
+              {!temVariacoes && (
+                <div>
+                  <label className="mb-2 block text-sm text-[#475569]">
+                    Estoque inicial
+                  </label>
+                  <input
+                    type="number"
+                    value={estoque}
+                    onChange={(e) => setEstoque(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    placeholder="0"
+                  />
+                </div>
+              )}
+
+              {temVariacoes && (
+                <div className="rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4">
+                  <p className="text-sm font-bold text-[#1e3a8a]">Grade do produto</p>
+                  {!editandoId ? (
+                    <p className="mt-2 text-xs text-[#64748b]">
+                      Salve o produto primeiro; depois abra em “Editar” para
+                      montar a grade (tamanhos e cores).
+                    </p>
+                  ) : (
+                    <>
+                      {variacoes.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {variacoes.map((v) => (
+                            <div
+                              key={v.id}
+                              className="flex items-center justify-between gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2"
+                            >
+                              <span className="text-sm text-[#0f172a]">
+                                {[v.tamanho, v.cor].filter(Boolean).join(" · ") ||
+                                  "Variação"}
+                                <span className="ml-2 text-xs text-[#64748b]">
+                                  {Number(v.estoque || 0)} un
+                                  {v.preco
+                                    ? ` · R$ ${Number(v.preco).toFixed(2)}`
+                                    : ""}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removerVariacao(v.id)}
+                                className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <input
+                          value={varTamanho}
+                          onChange={(e) => setVarTamanho(e.target.value)}
+                          placeholder="Tamanho (P/M/G)"
+                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                        />
+                        <input
+                          value={varCor}
+                          onChange={(e) => setVarCor(e.target.value)}
+                          placeholder="Cor"
+                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                        />
+                        <input
+                          type="number"
+                          value={varEstoque}
+                          onChange={(e) => setVarEstoque(e.target.value)}
+                          placeholder="Estoque"
+                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={varPreco}
+                          onChange={(e) => setVarPreco(e.target.value)}
+                          placeholder="Preço (opcional)"
+                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={adicionarVariacao}
+                        disabled={savingVar}
+                        className="mt-2 w-full rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:opacity-60"
+                      >
+                        {savingVar ? "Adicionando..." : "+ Adicionar à grade"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Status</label>
@@ -622,12 +843,18 @@ export default function ProdutosPage() {
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 >
                   <option value="">Selecione um produto</option>
-                  {produtos.map((produto) => (
-                    <option key={produto.id} value={produto.id}>
-                      {produto.nome}
-                    </option>
-                  ))}
+                  {produtos
+                    .filter((produto) => !produto.tem_variacoes)
+                    .map((produto) => (
+                      <option key={produto.id} value={produto.id}>
+                        {produto.nome}
+                      </option>
+                    ))}
                 </select>
+                <p className="mt-1.5 text-xs text-[#94a3b8]">
+                  Produtos com grade têm o estoque ajustado na própria grade
+                  (aba de edição).
+                </p>
               </div>
 
               <div>
@@ -711,7 +938,7 @@ export default function ProdutosPage() {
                 </div>
               ) : (
                 produtosCriticos.slice(0, 5).map((produto) => {
-                  const estoqueAtual = Number(produto.estoque || 0);
+                  const estoqueAtual = estoqueEfetivo(produto);
 
                   return (
                     <div
@@ -811,7 +1038,7 @@ export default function ProdutosPage() {
             {!loading && produtosFiltrados.length > 0 && (
               <div className="mt-5 space-y-4">
                 {produtosFiltrados.map((produto) => {
-                  const estoqueAtual = Number(produto.estoque || 0);
+                  const estoqueAtual = estoqueEfetivo(produto);
 
                   return (
                     <div
@@ -864,6 +1091,12 @@ export default function ProdutosPage() {
                             >
                               {getEstoqueLabel(estoqueAtual)}
                             </span>
+
+                            {produto.tem_variacoes && (
+                              <span className="inline-flex rounded-full bg-[#eff6ff] px-3 py-1 text-xs font-bold text-[#1d4ed8]">
+                                grade
+                              </span>
+                            )}
                           </div>
 
                           <p className="mt-2 inline-flex rounded-full bg-[#2563eb]/10 px-3 py-1 text-xs font-bold text-[#2563eb]">

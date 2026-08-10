@@ -24,6 +24,18 @@ type Produto = {
   custo: number | null;
   estoque: number | null;
   status: string | null;
+  tem_variacoes: boolean | null;
+};
+
+type Variacao = {
+  id: string;
+  produto_id: string;
+  tamanho: string | null;
+  cor: string | null;
+  preco: number | null;
+  custo: number | null;
+  estoque: number | null;
+  status: string | null;
 };
 
 type Venda = {
@@ -44,6 +56,7 @@ type VendaItem = {
   id: string;
   venda_id: string;
   produto_id: string;
+  variacao_id: string | null;
   quantidade: number;
   preco_unitario: number;
   total_item: number;
@@ -51,9 +64,11 @@ type VendaItem = {
 
 type ItemRascunho = {
   produto_id: string;
+  variacao_id: string | null;
   nome: string;
   quantidade: number;
   preco_unitario: number;
+  custo_unitario: number;
 };
 
 export default function VendasPage() {
@@ -82,8 +97,10 @@ export default function VendasPage() {
   const [observacao, setObservacao] = useState("");
 
   const [produtoId, setProdutoId] = useState("");
+  const [variacaoId, setVariacaoId] = useState("");
   const [quantidade, setQuantidade] = useState("1");
   const [itensRascunho, setItensRascunho] = useState<ItemRascunho[]>([]);
+  const [variacoes, setVariacoes] = useState<Variacao[]>([]);
 
   async function carregarDados() {
     setLoading(true);
@@ -96,7 +113,7 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, custo, estoque, status")
+        .select("id, nome, preco, custo, estoque, status, tem_variacoes")
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
@@ -104,7 +121,7 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("venda_itens")
-        .select("id, venda_id, produto_id, quantidade, preco_unitario, total_item"),
+        .select("id, venda_id, produto_id, variacao_id, quantidade, preco_unitario, total_item"),
     ]);
 
     if (clientesRes.error) setErro(clientesRes.error.message);
@@ -116,6 +133,14 @@ export default function VendasPage() {
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
     setVendas(vendasRes.data || []);
     setItensVenda(itensRes.data || []);
+
+    // Variações ativas de todos os produtos (para a grade na venda).
+    const { data: varData } = await supabase
+      .from("produto_variacoes")
+      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+    setVariacoes(
+      (varData || []).filter((v) => (v.status || "ativo") === "ativo")
+    );
 
     const cfg = await carregarConfigEmpresa();
     setResponsaveisConfig(cfg.responsaveis);
@@ -212,6 +237,10 @@ export default function VendasPage() {
     return produto?.nome || "Produto não encontrado";
   }
 
+  // Variações do produto selecionado no formulário de item.
+  const variacoesDoProduto = variacoes.filter((v) => v.produto_id === produtoId);
+  const produtoSelecionado = produtos.find((p) => p.id === produtoId);
+
   function adicionarItem() {
     setErro("");
 
@@ -234,14 +263,42 @@ export default function VendasPage() {
       return;
     }
 
-    const estoqueAtual = Number(produto.estoque || 0);
+    // Produto com grade → exige variação; preço/custo/estoque vêm da variação.
+    let variacao: Variacao | null = null;
+    if (produto.tem_variacoes) {
+      if (!variacaoId) {
+        setErro("Selecione a variação (tamanho/cor).");
+        return;
+      }
+      variacao = variacoes.find((v) => v.id === variacaoId) || null;
+      if (!variacao) {
+        setErro("Variação não encontrada.");
+        return;
+      }
+    }
+
+    const estoqueAtual = variacao
+      ? Number(variacao.estoque || 0)
+      : Number(produto.estoque || 0);
+    const precoUnit = variacao
+      ? Number(variacao.preco ?? produto.preco ?? 0)
+      : Number(produto.preco || 0);
+    const custoUnit = variacao
+      ? Number(variacao.custo ?? produto.custo ?? 0)
+      : Number(produto.custo || 0);
+    const chave = variacao ? variacao.id : produto.id;
+    const rotulo = variacao
+      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
       setErro("A quantidade é maior que o estoque disponível.");
       return;
     }
 
-    const itemExistente = itensRascunho.find((item) => item.produto_id === produto.id);
+    const itemExistente = itensRascunho.find(
+      (item) => (item.variacao_id ?? item.produto_id) === chave
+    );
 
     if (itemExistente) {
       const novaQuantidade = itemExistente.quantidade + quantidadeNumero;
@@ -253,11 +310,8 @@ export default function VendasPage() {
 
       setItensRascunho((atual) =>
         atual.map((item) =>
-          item.produto_id === produto.id
-            ? {
-                ...item,
-                quantidade: novaQuantidade,
-              }
+          (item.variacao_id ?? item.produto_id) === chave
+            ? { ...item, quantidade: novaQuantidade }
             : item
         )
       );
@@ -266,20 +320,23 @@ export default function VendasPage() {
         ...atual,
         {
           produto_id: produto.id,
-          nome: produto.nome,
+          variacao_id: variacao ? variacao.id : null,
+          nome: rotulo,
           quantidade: quantidadeNumero,
-          preco_unitario: Number(produto.preco || 0),
+          preco_unitario: precoUnit,
+          custo_unitario: custoUnit,
         },
       ]);
     }
 
     setProdutoId("");
+    setVariacaoId("");
     setQuantidade("1");
   }
 
-  function removerItem(produtoIdRemover: string) {
+  function removerItem(chave: string) {
     setItensRascunho((atual) =>
-      atual.filter((item) => item.produto_id !== produtoIdRemover)
+      atual.filter((item) => (item.variacao_id ?? item.produto_id) !== chave)
     );
   }
 
@@ -296,6 +353,7 @@ export default function VendasPage() {
     setDescontoManual("0");
     setObservacao("");
     setProdutoId("");
+    setVariacaoId("");
     setQuantidade("1");
     setItensRascunho([]);
   }
@@ -358,17 +416,15 @@ export default function VendasPage() {
         throw new Error(vendaError.message);
       }
 
-      const itensParaInserir = itensRascunho.map((item) => {
-        const prod = produtos.find((p) => p.id === item.produto_id);
-        return {
-          venda_id: vendaCriada.id,
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-          preco_unitario: item.preco_unitario,
-          total_item: item.quantidade * item.preco_unitario,
-          custo_unitario: Number(prod?.custo || 0),
-        };
-      });
+      const itensParaInserir = itensRascunho.map((item) => ({
+        venda_id: vendaCriada.id,
+        produto_id: item.produto_id,
+        variacao_id: item.variacao_id,
+        quantidade: item.quantidade,
+        preco_unitario: item.preco_unitario,
+        total_item: item.quantidade * item.preco_unitario,
+        custo_unitario: item.custo_unitario,
+      }));
 
       const { error: itensError } = await supabase
         .from("venda_itens")
@@ -387,6 +443,7 @@ export default function VendasPage() {
             p_quantidade: item.quantidade,
             p_motivo: "Venda",
             p_referencia_id: vendaCriada.id,
+            p_variacao_id: item.variacao_id,
           }
         );
 
@@ -440,6 +497,7 @@ export default function VendasPage() {
         p_quantidade: it.quantidade,
         p_motivo: "Cancelamento de venda",
         p_referencia_id: id,
+        p_variacao_id: it.variacao_id,
       });
       if (movError) {
         setErro(movError.message);
@@ -723,11 +781,46 @@ export default function VendasPage() {
                   <option value="">Selecione um produto</option>
                   {produtos.map((produto) => (
                     <option key={produto.id} value={produto.id}>
-                      {produto.nome} — estoque {produto.estoque ?? 0}
+                      {produto.nome}
+                      {produto.tem_variacoes
+                        ? " — grade"
+                        : ` — estoque ${produto.estoque ?? 0}`}
                     </option>
                   ))}
                 </select>
               </div>
+
+              {produtoSelecionado?.tem_variacoes && (
+                <div>
+                  <label className="mb-2 block text-sm text-[#475569]">
+                    Variação (tamanho/cor)
+                  </label>
+                  <select
+                    value={variacaoId}
+                    onChange={(e) => setVariacaoId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                  >
+                    <option value="">Selecione a variação</option>
+                    {variacoesDoProduto.map((v) => (
+                      <option
+                        key={v.id}
+                        value={v.id}
+                        disabled={Number(v.estoque || 0) <= 0}
+                      >
+                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") ||
+                          "Variação"}{" "}
+                        — estoque {Number(v.estoque || 0)}
+                      </option>
+                    ))}
+                  </select>
+                  {variacoesDoProduto.length === 0 && (
+                    <p className="mt-1.5 text-xs text-[#b45309]">
+                      Este produto ainda não tem grade cadastrada (faça em
+                      Produtos).
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Quantidade</label>
@@ -757,7 +850,7 @@ export default function VendasPage() {
               ) : (
                 itensRascunho.map((item) => (
                   <div
-                    key={item.produto_id}
+                    key={item.variacao_id ?? item.produto_id}
                     className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -770,7 +863,9 @@ export default function VendasPage() {
 
                       <button
                         type="button"
-                        onClick={() => removerItem(item.produto_id)}
+                        onClick={() =>
+                          removerItem(item.variacao_id ?? item.produto_id)
+                        }
                         className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
                       >
                         Remover
