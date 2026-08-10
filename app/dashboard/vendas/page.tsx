@@ -294,13 +294,16 @@ export default function VendasPage() {
       }
 
       for (const item of itensRascunho) {
-        const produto = produtos.find((p) => p.id === item.produto_id);
-        const estoqueAtual = Number(produto?.estoque || 0);
-
-        const { error: estoqueError } = await supabase
-          .from("produtos")
-          .update({ estoque: estoqueAtual - item.quantidade })
-          .eq("id", item.produto_id);
+        const { error: estoqueError } = await supabase.rpc(
+          "registrar_movimentacao",
+          {
+            p_produto_id: item.produto_id,
+            p_tipo: "venda",
+            p_quantidade: item.quantidade,
+            p_motivo: "Venda",
+            p_referencia_id: vendaCriada.id,
+          }
+        );
 
         if (estoqueError) {
           throw new Error(estoqueError.message);
@@ -317,6 +320,26 @@ export default function VendasPage() {
   }
 
   async function cancelarVenda(id: string) {
+    setErro("");
+    const venda = vendas.find((v) => v.id === id);
+    if (!venda || venda.status !== "concluida") return; // evita cancelar 2x
+
+    // Devolve o estoque de cada item ao cancelar (via RPC, com histórico).
+    const itens = itensVenda.filter((it) => it.venda_id === id);
+    for (const it of itens) {
+      const { error: movError } = await supabase.rpc("registrar_movimentacao", {
+        p_produto_id: it.produto_id,
+        p_tipo: "cancelamento",
+        p_quantidade: it.quantidade,
+        p_motivo: "Cancelamento de venda",
+        p_referencia_id: id,
+      });
+      if (movError) {
+        setErro(movError.message);
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from("vendas")
       .update({ status: "cancelada" })

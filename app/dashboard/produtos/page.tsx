@@ -269,30 +269,19 @@ export default function ProdutosPage() {
     setSavingMovimento(true);
     setErro("");
 
-    const { error: errorMovimento } = await supabase
-      .from("estoque_movimentacoes")
-      .insert({
-        produto_id: produtoMovimentoId,
-        tipo: tipoMovimento,
-        quantidade: quantidadeNumero,
-        observacao: observacaoMovimento.trim() || null,
-      });
+    const { error: errorMovimento } = await supabase.rpc(
+      "registrar_movimentacao",
+      {
+        p_produto_id: produtoMovimentoId,
+        p_tipo: tipoMovimento,
+        p_quantidade: quantidadeNumero,
+        p_motivo: tipoMovimento === "entrada" ? "Entrada manual" : "Saída manual",
+        p_observacao: observacaoMovimento.trim() || null,
+      }
+    );
 
     if (errorMovimento) {
       setErro(errorMovimento.message);
-      setSavingMovimento(false);
-      return;
-    }
-
-    const { error: errorProduto } = await supabase
-      .from("produtos")
-      .update({
-        estoque: novoEstoque,
-      })
-      .eq("id", produtoMovimentoId);
-
-    if (errorProduto) {
-      setErro(errorProduto.message);
       setSavingMovimento(false);
       return;
     }
