@@ -74,6 +74,9 @@ export default function VendasPage() {
   const [valorRecebido, setValorRecebido] = useState("");
   const [parcelas, setParcelas] = useState("1");
   const [taxaCartao, setTaxaCartao] = useState("0");
+  const [mesesPromissoria, setMesesPromissoria] = useState("1");
+  const [venctoPromissoria, setVenctoPromissoria] = useState("");
+  const [entradaMisto, setEntradaMisto] = useState("");
   const [descontoManual, setDescontoManual] = useState("0");
   const [observacao, setObservacao] = useState("");
 
@@ -166,6 +169,16 @@ export default function VendasPage() {
       ? totalRascunho * (1 - taxaNum / 100)
       : totalRascunho;
 
+  // Fiado / promissória (venda inteira) e misto (entrada + restante no fiado).
+  const mesesNum = Math.max(1, parseInt(mesesPromissoria) || 1);
+  const entradaNum = Number(entradaMisto || 0);
+  const restanteMisto = Math.max(0, totalRascunho - entradaNum);
+  const valorPromissoria =
+    formaPagamento === "misto" ? restanteMisto : totalRascunho;
+  const parcelaMensalRascunho = valorPromissoria / mesesNum;
+  const geraPromissoria =
+    formaPagamento === "promissoria" || formaPagamento === "misto";
+
   function getClienteNome(id: string | null) {
     if (!id) return "Cliente avulso";
     const cliente = clientes.find((item) => item.id === id);
@@ -255,6 +268,9 @@ export default function VendasPage() {
     setValorRecebido("");
     setParcelas("1");
     setTaxaCartao("0");
+    setMesesPromissoria("1");
+    setVenctoPromissoria("");
+    setEntradaMisto("");
     setDescontoManual("0");
     setObservacao("");
     setProdutoId("");
@@ -275,6 +291,18 @@ export default function VendasPage() {
       return;
     }
 
+    if (geraPromissoria && !clienteId) {
+      setErro("Selecione um cliente para venda no fiado/promissória.");
+      return;
+    }
+
+    if (formaPagamento === "misto" && restanteMisto <= 0) {
+      setErro(
+        "No misto, o valor no fiado deve ser maior que zero. Se pagou tudo agora, use uma forma à vista."
+      );
+      return;
+    }
+
     setSalvando(true);
 
     try {
@@ -288,7 +316,12 @@ export default function VendasPage() {
           parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
           taxa: formaPagamento === "cartao" ? taxaNum : 0,
           valor_liquido: valorLiquidoRascunho,
-          valor_recebido: formaPagamento === "dinheiro" ? recebidoNum : null,
+          valor_recebido:
+            formaPagamento === "dinheiro"
+              ? recebidoNum
+              : formaPagamento === "misto"
+                ? entradaNum
+                : null,
           troco: formaPagamento === "dinheiro" ? trocoRascunho : null,
           subtotal: subtotalRascunho,
           desconto: descontoManualNumero,
@@ -337,6 +370,28 @@ export default function VendasPage() {
 
         if (estoqueError) {
           throw new Error(estoqueError.message);
+        }
+      }
+
+      // Venda no fiado / misto → gera a promissória ligada a esta venda.
+      if (geraPromissoria) {
+        const { error: promError } = await supabase
+          .from("promissorias")
+          .insert({
+            cliente_id: clienteId,
+            valor_total: valorPromissoria,
+            parcelas: mesesNum,
+            status: "em_aberto",
+            observacao:
+              formaPagamento === "misto"
+                ? `Restante da venda (entrada ${formatCurrency(entradaNum)})`
+                : "Venda no fiado",
+            data_vencimento: venctoPromissoria || null,
+            venda_id: vendaCriada.id,
+          });
+
+        if (promError) {
+          throw new Error(promError.message);
         }
       }
 
@@ -547,6 +602,62 @@ export default function VendasPage() {
                   </div>
                   <p className="col-span-2 text-xs font-semibold text-[#1d4ed8]">
                     Você recebe (líquido): {formatCurrency(valorLiquidoRascunho)}
+                  </p>
+                </div>
+              )}
+
+              {formaPagamento === "misto" && (
+                <div>
+                  <label className="mb-2 block text-sm text-[#475569]">
+                    Valor pago agora (entrada)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={entradaMisto}
+                    onChange={(e) => setEntradaMisto(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    placeholder="0,00"
+                  />
+                  <p className="mt-1.5 text-xs font-semibold text-[#b45309]">
+                    Restante no fiado: {formatCurrency(restanteMisto)}
+                  </p>
+                </div>
+              )}
+
+              {geraPromissoria && (
+                <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-2 block text-sm text-[#92400e]">
+                        Parcelas (meses)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxParcelasCfg}
+                        value={mesesPromissoria}
+                        onChange={(e) => setMesesPromissoria(e.target.value)}
+                        className="w-full rounded-2xl border border-[#fde68a] bg-white px-4 py-3 text-[#0f172a] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm text-[#92400e]">
+                        1º vencimento
+                      </label>
+                      <input
+                        type="date"
+                        value={venctoPromissoria}
+                        onChange={(e) => setVenctoPromissoria(e.target.value)}
+                        className="w-full rounded-2xl border border-[#fde68a] bg-white px-4 py-3 text-[#0f172a] outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs font-semibold text-[#92400e]">
+                    {clienteId
+                      ? `Gera promissória de ${formatCurrency(valorPromissoria)} · ${mesesNum}x de ${formatCurrency(parcelaMensalRascunho)}`
+                      : "Selecione um cliente — venda no fiado exige cliente identificado."}
                   </p>
                 </div>
               )}
