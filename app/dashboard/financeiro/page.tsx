@@ -76,6 +76,9 @@ export default function FinanceiroPage() {
   const [itensVenda, setItensVenda] = useState<VendaItem[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
+  const [atendServico, setAtendServico] = useState<
+    { valor: number; percentual_loja: number; data: string }[]
+  >([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -112,7 +115,7 @@ export default function FinanceiroPage() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, despesasRes, atendRes, recRes, itensRes] = await Promise.all([
+    const [vendasRes, despesasRes, atendRes, recRes, itensRes, servRes] = await Promise.all([
       supabase
         .from("vendas")
         .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id, status")
@@ -127,6 +130,7 @@ export default function FinanceiroPage() {
         .select("id, descricao, categoria, valor, dia_vencimento, ativo")
         .order("created_at", { ascending: true }),
       supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
+      supabase.from("atendimentos_servico").select("valor, percentual_loja, data"),
     ]);
 
     if (vendasRes.error) setErro(vendasRes.error.message);
@@ -139,6 +143,7 @@ export default function FinanceiroPage() {
     setItensVenda(itensRes.data || []);
     setDespesas(despesasRes.data || []);
     setAtendimentos(atendRes.data || []);
+    setAtendServico(servRes.data || []);
     setRecorrentes(recRes.data || []);
 
     const cfg = await carregarConfigEmpresa();
@@ -185,7 +190,22 @@ export default function FinanceiroPage() {
       );
   }, [atendimentos, janela]);
 
-  const receita = receitaVendas + receitaTatuagem;
+  const receitaServicos = useMemo(() => {
+    return atendServico
+      .filter((a) => {
+        if (!a.data) return false;
+        const t = isoToDate(a.data).getTime();
+        return t >= janela.ini && t < janela.fim;
+      })
+      .reduce(
+        (acc, a) =>
+          acc +
+          (Number(a.valor) || 0) * ((Number(a.percentual_loja) || 0) / 100),
+        0
+      );
+  }, [atendServico, janela]);
+
+  const receita = receitaVendas + receitaTatuagem + receitaServicos;
 
   // Custo dos produtos vendidos (COGS) — custo histórico dos itens concluídos.
   const custoProdutos = useMemo(() => {
@@ -377,7 +397,8 @@ export default function FinanceiroPage() {
           </p>
           <p className="mt-2 text-xs text-[#94a3b8]">
             Vendas {formatCurrency(receitaVendas)} · Tatuagem{" "}
-            {formatCurrency(receitaTatuagem)}
+            {formatCurrency(receitaTatuagem)} · Serviços{" "}
+            {formatCurrency(receitaServicos)}
           </p>
         </div>
 

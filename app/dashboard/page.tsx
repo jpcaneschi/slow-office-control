@@ -66,6 +66,26 @@ function somaRepasse(atends: AtendimentoTat[], inicio: Date, fimExclusivo: Date)
     );
 }
 
+/** Soma a receita da loja (valor × %loja/100) dos serviços em [inicio, fimExclusivo). */
+function somaServicos(
+  atends: { valor: number; percentual_loja: number; data: string }[],
+  inicio: Date,
+  fimExclusivo: Date
+) {
+  const ini = inicio.getTime();
+  const f = fimExclusivo.getTime();
+  return atends
+    .filter((a) => {
+      const t = isoToDate(a.data).getTime();
+      return t >= ini && t < f;
+    })
+    .reduce(
+      (acc, a) =>
+        acc + (Number(a.valor) || 0) * ((Number(a.percentual_loja) || 0) / 100),
+      0
+    );
+}
+
 function variacao(atual: number, anterior: number) {
   if (anterior <= 0) return atual > 0 ? 100 : 0;
   return ((atual - anterior) / anterior) * 100;
@@ -80,6 +100,9 @@ export default function DashboardPage() {
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
+  const [atendServico, setAtendServico] = useState<
+    { valor: number; percentual_loja: number; data: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -87,19 +110,24 @@ export default function DashboardPage() {
     setLoading(true);
     setErro("");
 
-    const [vendasRes, clientesRes, promissoriasRes, condicionaisRes, atendRes] =
-      await Promise.all([
-        supabase
-          .from("vendas")
-          .select("id, cliente_id, forma_pagamento, total, status, created_at")
-          .order("created_at", { ascending: false }),
-        supabase.from("clientes").select("id, nome"),
-        supabase.from("promissorias").select("valor_total, status"),
-        supabase.from("condicionais").select("id, status"),
-        supabase
-          .from("tatuagem_atendimentos")
-          .select("data, valor, percentual"),
-      ]);
+    const [
+      vendasRes,
+      clientesRes,
+      promissoriasRes,
+      condicionaisRes,
+      atendRes,
+      servRes,
+    ] = await Promise.all([
+      supabase
+        .from("vendas")
+        .select("id, cliente_id, forma_pagamento, total, status, created_at")
+        .order("created_at", { ascending: false }),
+      supabase.from("clientes").select("id, nome"),
+      supabase.from("promissorias").select("valor_total, status"),
+      supabase.from("condicionais").select("id, status"),
+      supabase.from("tatuagem_atendimentos").select("data, valor, percentual"),
+      supabase.from("atendimentos_servico").select("valor, percentual_loja, data"),
+    ]);
 
     const primeiroErro =
       vendasRes.error ||
@@ -114,6 +142,7 @@ export default function DashboardPage() {
     setPromissorias(promissoriasRes.data || []);
     setCondicionais(condicionaisRes.data || []);
     setAtendimentos(atendRes.data || []);
+    setAtendServico(servRes.data || []);
     setLoading(false);
   }, []);
 
@@ -161,10 +190,12 @@ export default function DashboardPage() {
 
     const faturamentoMes =
       somaConcluidas(vendas, inicioMes, inicioProxMes) +
-      somaRepasse(atendimentos, inicioMes, inicioProxMes);
+      somaRepasse(atendimentos, inicioMes, inicioProxMes) +
+      somaServicos(atendServico, inicioMes, inicioProxMes);
     const faturamentoMesAnterior =
       somaConcluidas(vendas, inicioMesAnterior, inicioMes) +
-      somaRepasse(atendimentos, inicioMesAnterior, inicioMes);
+      somaRepasse(atendimentos, inicioMesAnterior, inicioMes) +
+      somaServicos(atendServico, inicioMesAnterior, inicioMes);
 
     const contasReceber = promissorias
       .filter((p) => p.status === "em_aberto")
@@ -193,7 +224,7 @@ export default function DashboardPage() {
       condicionaisAbertas,
       spark,
     };
-  }, [vendas, promissorias, condicionais, atendimentos, janela]);
+  }, [vendas, promissorias, condicionais, atendimentos, atendServico, janela]);
 
   const ultimasVendas: VendaRow[] = useMemo(() => {
     return vendas
