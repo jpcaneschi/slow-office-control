@@ -457,18 +457,24 @@ export default function VendasPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
-                <select
+                <input
+                  list="responsaveis-lista"
                   value={responsavel}
                   onChange={(e) => setResponsavel(e.target.value)}
+                  placeholder="Nome do vendedor(a)"
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                >
-                  <option value="">Selecione…</option>
+                />
+                <datalist id="responsaveis-lista">
                   {responsaveisConfig.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
+                    <option key={r} value={r} />
                   ))}
-                </select>
+                </datalist>
+                {responsaveisConfig.length === 0 && (
+                  <p className="mt-1.5 text-xs text-[#64748b]">
+                    Dica: cadastre a equipe em Configurações para virar sugestão
+                    automática.
+                  </p>
+                )}
               </div>
 
               <div>
