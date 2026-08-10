@@ -10,6 +10,8 @@ import { MiniCalendar } from "@/components/dashboard/mini-calendar";
 import { RecentSales, type VendaRow } from "@/components/dashboard/recent-sales";
 import { TasksAlerts } from "@/components/dashboard/tasks-alerts";
 import { usePeriod, presetRange, isoToDate } from "@/components/dashboard/period-context";
+import { usePapel } from "@/components/dashboard/role-context";
+import { podeAcessar } from "@/lib/permissoes";
 
 type Venda = {
   id: string;
@@ -71,6 +73,8 @@ function variacao(atual: number, anterior: number) {
 
 export default function DashboardPage() {
   const { period } = usePeriod();
+  const { papel } = usePapel();
+  const podeVerFinanceiro = podeAcessar(papel, "/dashboard/financeiro");
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
@@ -250,17 +254,19 @@ export default function DashboardPage() {
           href="/dashboard/vendas"
           ariaLabel="Ver vendas"
         />
-        <MetricCard
-          icon={CircleDollarSign}
-          tint="#7c3aed"
-          title="Faturamento do mês"
-          value={loading ? "…" : formatCurrency(metricas.faturamentoMes)}
-          delta={loading ? undefined : metricas.deltaFaturamento}
-          deltaLabel="vs mês anterior"
-          spark={metricas.spark}
-          href="/dashboard/financeiro"
-          ariaLabel="Ver financeiro"
-        />
+        {podeVerFinanceiro && (
+          <MetricCard
+            icon={CircleDollarSign}
+            tint="#7c3aed"
+            title="Faturamento do mês"
+            value={loading ? "…" : formatCurrency(metricas.faturamentoMes)}
+            delta={loading ? undefined : metricas.deltaFaturamento}
+            deltaLabel="vs mês anterior"
+            spark={metricas.spark}
+            href="/dashboard/financeiro"
+            ariaLabel="Ver financeiro"
+          />
+        )}
         <MetricCard
           icon={Wallet}
           tint="#0891b2"
