@@ -45,6 +45,45 @@ function normalizar(data: Record<string, unknown> | null): EmpresaConfig {
   };
 }
 
+/**
+ * Garante que o usuário logado tenha uma empresa (organization) + unidade +
+ * membership "owner". Se já for membro de alguma, retorna a existente.
+ * Retorna o id da empresa (ou null se sem sessão).
+ */
+export async function garantirEmpresa(
+  nomeLoja: string
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: mem } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (mem?.organization_id) return mem.organization_id as string;
+
+  const { data: org, error } = await supabase
+    .from("organizations")
+    .insert({ nome: nomeLoja.trim() || "Minha empresa", owner_user_id: user.id })
+    .select("id")
+    .single();
+  if (error || !org) return null;
+
+  // Ordem importa: membership antes da unidade (RLS da store exige membership).
+  await supabase
+    .from("organization_members")
+    .insert({ organization_id: org.id, user_id: user.id, papel: "owner" });
+  await supabase
+    .from("stores")
+    .insert({ organization_id: org.id, nome: "Unidade principal" });
+
+  return org.id as string;
+}
+
 /** Carrega a configuração da empresa do usuário logado (com padrões). */
 export async function carregarConfigEmpresa(): Promise<EmpresaConfig> {
   const { data } = await supabase

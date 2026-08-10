@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { garantirEmpresa } from "@/lib/empresa-config";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -55,6 +56,9 @@ export default function OnboardingPage() {
       return;
     }
     setSalvando(true);
+
+    // Cria empresa + unidade + membership (se ainda não existir).
+    await garantirEmpresa(nomeLoja);
 
     const { error } = configId
       ? await supabase
