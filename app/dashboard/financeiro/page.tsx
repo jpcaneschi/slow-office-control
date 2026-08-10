@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 
 type Venda = {
   id: string;
@@ -34,7 +35,11 @@ type Despesa = {
   created_at: string;
 };
 
-type AtendimentoTat = { valor: number | null; percentual: number | null };
+type AtendimentoTat = {
+  valor: number | null;
+  percentual: number | null;
+  data: string | null;
+};
 
 type Recorrente = {
   id: string;
@@ -90,6 +95,19 @@ export default function FinanceiroPage() {
   const [rDia, setRDia] = useState("5");
   const [salvandoRec, setSalvandoRec] = useState(false);
 
+  const { period } = usePeriod();
+  const janela = useMemo(() => {
+    const startOfDay = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+    const ini = startOfDay(isoToDate(period.inicio)).getTime();
+    const fimData = startOfDay(isoToDate(period.fim));
+    fimData.setDate(fimData.getDate() + 1);
+    return { ini, fim: fimData.getTime() };
+  }, [period]);
+
   async function carregarDados() {
     setLoading(true);
     setErro("");
@@ -103,7 +121,7 @@ export default function FinanceiroPage() {
         .from("despesas")
         .select("id, descricao, categoria, valor, data, responsavel, observacao, created_at")
         .order("created_at", { ascending: false }),
-      supabase.from("tatuagem_atendimentos").select("valor, percentual"),
+      supabase.from("tatuagem_atendimentos").select("valor, percentual, data"),
       supabase
         .from("despesas_recorrentes")
         .select("id, descricao, categoria, valor, dia_vencimento, ativo")
@@ -136,9 +154,15 @@ export default function FinanceiroPage() {
   const idsConcluidas = useMemo(
     () =>
       new Set(
-        vendas.filter((v) => (v.status || "") === "concluida").map((v) => v.id)
+        vendas
+          .filter((v) => (v.status || "") === "concluida")
+          .filter((v) => {
+            const t = new Date(v.created_at).getTime();
+            return t >= janela.ini && t < janela.fim;
+          })
+          .map((v) => v.id)
       ),
-    [vendas]
+    [vendas, janela]
   );
 
   const receitaVendas = useMemo(() => {
@@ -148,12 +172,18 @@ export default function FinanceiroPage() {
   }, [vendas, idsConcluidas]);
 
   const receitaTatuagem = useMemo(() => {
-    return atendimentos.reduce(
-      (acc, a) =>
-        acc + ((Number(a.valor) || 0) * (Number(a.percentual) || 0)) / 100,
-      0
-    );
-  }, [atendimentos]);
+    return atendimentos
+      .filter((a) => {
+        if (!a.data) return false;
+        const t = new Date(a.data).getTime();
+        return t >= janela.ini && t < janela.fim;
+      })
+      .reduce(
+        (acc, a) =>
+          acc + ((Number(a.valor) || 0) * (Number(a.percentual) || 0)) / 100,
+        0
+      );
+  }, [atendimentos, janela]);
 
   const receita = receitaVendas + receitaTatuagem;
 
@@ -170,15 +200,27 @@ export default function FinanceiroPage() {
 
   const lucroBruto = receita - custoProdutos;
 
-  const despesasTotal = useMemo(() => {
-    return despesas.reduce((acc, despesa) => acc + Number(despesa.valor || 0), 0);
-  }, [despesas]);
+  const despesasPeriodo = useMemo(
+    () =>
+      despesas.filter((d) => {
+        const t = new Date(d.data).getTime();
+        return t >= janela.ini && t < janela.fim;
+      }),
+    [despesas, janela]
+  );
+
+  const despesasTotal = useMemo(
+    () => despesasPeriodo.reduce((acc, d) => acc + Number(d.valor || 0), 0),
+    [despesasPeriodo]
+  );
 
   const resultado = lucroBruto - despesasTotal;
 
   const vendasPix = useMemo(() => {
-    return vendas.filter((venda) => venda.forma_pagamento === "pix").length;
-  }, [vendas]);
+    return vendas.filter(
+      (v) => v.forma_pagamento === "pix" && idsConcluidas.has(v.id)
+    ).length;
+  }, [vendas, idsConcluidas]);
 
   const mesPrefix = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
@@ -586,13 +628,13 @@ export default function FinanceiroPage() {
 
             {loading ? (
               <p className="mt-4 text-[#64748b]">Carregando dados...</p>
-            ) : despesas.length === 0 ? (
+            ) : despesasPeriodo.length === 0 ? (
               <p className="mt-4 text-[#64748b]">
-                Nenhuma despesa cadastrada ainda.
+                Nenhuma despesa no período selecionado.
               </p>
             ) : (
               <div className="mt-5 space-y-3">
-                {despesas.map((despesa) => (
+                {despesasPeriodo.map((despesa) => (
                   <div
                     key={despesa.id}
                     className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
