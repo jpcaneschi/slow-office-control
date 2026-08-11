@@ -7,6 +7,7 @@ import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeCancelarVenda } from "@/lib/permissoes";
+import { validarPagamento } from "@/lib/pdv-regras";
 import {
   calcularDescontoPix,
   calcularTotal,
@@ -92,6 +93,14 @@ export default function VendasPage() {
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [pixDesconto, setPixDesconto] = useState(5);
   const [maxParcelasCfg, setMaxParcelasCfg] = useState(6);
+  const [parcelaMinimaCfg, setParcelaMinimaCfg] = useState(0);
+  const [promMaxCfg, setPromMaxCfg] = useState(4);
+  const [entradaFormaMisto, setEntradaFormaMisto] = useState("pix");
+  const [idempKey, setIdempKey] = useState<string>(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now())
+  );
   const [valorRecebido, setValorRecebido] = useState("");
   const [parcelas, setParcelas] = useState("1");
   const [taxaCartao, setTaxaCartao] = useState("0");
@@ -172,6 +181,8 @@ export default function VendasPage() {
     setResponsaveisConfig(cfg.responsaveis);
     setPixDesconto(cfg.pix_desconto);
     setMaxParcelasCfg(cfg.max_parcelas);
+    setParcelaMinimaCfg(cfg.parcela_minima);
+    setPromMaxCfg(cfg.promissoria_prazo_meses);
     setLoading(false);
   }
 
@@ -382,6 +393,12 @@ export default function VendasPage() {
     setMesesPromissoria("1");
     setVenctoPromissoria("");
     setEntradaMisto("");
+    setEntradaFormaMisto("pix");
+    setIdempKey(
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : String(Date.now())
+    );
     setDescontoManual("0");
     setObservacao("");
     setProdutoId("");
@@ -408,10 +425,22 @@ export default function VendasPage() {
       return;
     }
 
-    if (formaPagamento === "misto" && restanteMisto <= 0) {
-      setErro(
-        "No misto, o valor no fiado deve ser maior que zero. Se pagou tudo agora, use uma forma à vista."
-      );
+    // Validações locais (o backend valida de novo — aqui é só UX amigável).
+    const erroPagamento = validarPagamento({
+      forma: formaPagamento,
+      total: totalRascunho,
+      recebido: recebidoNum,
+      entradaMisto: entradaNum,
+      restanteMisto,
+      parcelasCartao: parcelasNum,
+      mesesFiado: mesesNum,
+      parcelaMinima: parcelaMinimaCfg,
+      promMax: promMaxCfg,
+      maxParcelasCartao: maxParcelasCfg,
+      temCliente: !!clienteId,
+    });
+    if (erroPagamento) {
+      setErro(erroPagamento);
       return;
     }
 
@@ -422,8 +451,6 @@ export default function VendasPage() {
       (f) => f.nome.trim().toLowerCase() === responsavel.trim().toLowerCase()
     );
 
-    // Venda ATÔMICA: um único RPC cria venda + itens + baixa de estoque +
-    // promissória numa transação (tudo ou nada). Sem estados parciais.
     const itensPayload = itensRascunho.map((item) => ({
       produto_id: item.produto_id,
       variacao_id: item.variacao_id,
@@ -433,29 +460,24 @@ export default function VendasPage() {
     }));
 
     try {
+      // Venda ATÔMICA + idempotente: o backend recalcula total/regras e a
+      // mesma chave impede venda duplicada em clique/retry.
       const { error: rpcError } = await supabase.rpc("criar_venda", {
         p_cliente_id: clienteId || null,
         p_responsavel: responsavel,
         p_funcionario_id: funcMatch ? funcMatch.id : null,
         p_forma_pagamento: formaPagamento,
-        p_desconto_pix: descontoPixNumero,
         p_parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
         p_taxa: formaPagamento === "cartao" ? taxaNum : 0,
-        p_valor_liquido: valorLiquidoRascunho,
         p_valor_recebido:
           formaPagamento === "dinheiro"
             ? recebidoNum
             : formaPagamento === "misto"
               ? entradaNum
               : null,
-        p_troco: formaPagamento === "dinheiro" ? trocoRascunho : null,
-        p_subtotal: subtotalRascunho,
         p_desconto: descontoManualNumero,
-        p_total: totalRascunho,
         p_observacao: observacao.trim() || null,
         p_itens: itensPayload,
-        p_gera_promissoria: geraPromissoria,
-        p_promissoria_valor: geraPromissoria ? valorPromissoria : null,
         p_promissoria_parcelas: geraPromissoria ? mesesNum : null,
         p_promissoria_vencimento: geraPromissoria ? venctoPromissoria || null : null,
         p_promissoria_obs: geraPromissoria
@@ -463,6 +485,8 @@ export default function VendasPage() {
             ? `Restante da venda (entrada ${formatCurrency(entradaNum)})`
             : "Venda no fiado"
           : null,
+        p_entrada_forma: formaPagamento === "misto" ? entradaFormaMisto : null,
+        p_idempotency_key: idempKey,
       });
 
       if (rpcError) {
@@ -714,20 +738,36 @@ export default function VendasPage() {
               )}
 
               {formaPagamento === "misto" && (
-                <div>
-                  <label className="mb-2 block text-sm text-[#475569]">
-                    Valor pago agora (entrada)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={entradaMisto}
-                    onChange={(e) => setEntradaMisto(e.target.value)}
-                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                    placeholder="0,00"
-                  />
-                  <p className="mt-1.5 text-xs font-semibold text-[#b45309]">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-2 block text-sm text-[#475569]">
+                      Valor pago agora (entrada)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={entradaMisto}
+                      onChange={(e) => setEntradaMisto(e.target.value)}
+                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm text-[#475569]">
+                      Forma da entrada
+                    </label>
+                    <select
+                      value={entradaFormaMisto}
+                      onChange={(e) => setEntradaFormaMisto(e.target.value)}
+                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    >
+                      <option value="pix">Pix</option>
+                      <option value="dinheiro">Dinheiro</option>
+                      <option value="cartao">Cartão</option>
+                    </select>
+                  </div>
+                  <p className="col-span-2 text-xs font-semibold text-[#b45309]">
                     Restante no fiado: {formatCurrency(restanteMisto)}
                   </p>
                 </div>
