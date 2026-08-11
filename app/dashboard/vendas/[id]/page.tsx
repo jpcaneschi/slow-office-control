@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
+import { formatDataHoraBR } from "@/lib/datas";
 
 type Venda = {
   id: string;
@@ -16,6 +17,13 @@ type Venda = {
   subtotal: number | null;
   desconto: number | null;
   total: number | null;
+  parcelas: number | null;
+  taxa: number | null;
+  valor_liquido: number | null;
+  valor_recebido: number | null;
+  troco: number | null;
+  entrada_forma: string | null;
+  motivo_cancelamento: string | null;
   observacao: string | null;
   status: string;
   created_at: string;
@@ -24,6 +32,7 @@ type Venda = {
 type Item = {
   id: string;
   produto_id: string;
+  variacao_id: string | null;
   quantidade: number;
   preco_unitario: number;
   total_item: number;
@@ -48,6 +57,7 @@ export default function VendaDetalhePage() {
   const [itens, setItens] = useState<Item[]>([]);
   const [clienteNome, setClienteNome] = useState<string>("");
   const [produtoNome, setProdutoNome] = useState<Map<string, string>>(new Map());
+  const [variacaoNome, setVariacaoNome] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [naoEncontrada, setNaoEncontrada] = useState(false);
 
@@ -58,7 +68,7 @@ export default function VendaDetalhePage() {
     const { data: v } = await supabase
       .from("vendas")
       .select(
-        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, observacao, status, created_at"
+        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, parcelas, taxa, valor_liquido, valor_recebido, troco, entrada_forma, motivo_cancelamento, observacao, status, created_at"
       )
       .eq("id", id)
       .maybeSingle();
@@ -73,7 +83,7 @@ export default function VendaDetalhePage() {
     const [itensRes, cliRes] = await Promise.all([
       supabase
         .from("venda_itens")
-        .select("id, produto_id, quantidade, preco_unitario, total_item")
+        .select("id, produto_id, variacao_id, quantidade, preco_unitario, total_item")
         .eq("venda_id", id),
       v.cliente_id
         ? supabase.from("clientes").select("nome").eq("id", v.cliente_id).maybeSingle()
@@ -97,6 +107,25 @@ export default function VendaDetalhePage() {
       setProdutoNome(map);
     }
 
+    const variacaoIds = [
+      ...new Set(itensData.map((i) => i.variacao_id).filter(Boolean)),
+    ] as string[];
+    if (variacaoIds.length) {
+      const { data: vars } = await supabase
+        .from("produto_variacoes")
+        .select("id, tamanho, cor")
+        .in("id", variacaoIds);
+      const vmap = new Map<string, string>();
+      (vars as { id: string; tamanho: string | null; cor: string | null }[] | null)?.forEach(
+        (v) =>
+          vmap.set(
+            v.id,
+            [v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"
+          )
+      );
+      setVariacaoNome(vmap);
+    }
+
     setLoading(false);
   }, [id]);
 
@@ -104,15 +133,7 @@ export default function VendaDetalhePage() {
     carregar();
   }, [carregar]);
 
-  const dataHora = venda
-    ? new Date(venda.created_at).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const dataHora = venda ? formatDataHoraBR(venda.created_at) : "";
 
   return (
     <div className="space-y-6">
@@ -175,6 +196,50 @@ export default function VendaDetalhePage() {
                 </span>
               </div>
             </div>
+            {/* Detalhes do pagamento (snapshot) */}
+            <div className="mt-4 grid gap-4 border-t border-[#eef2f7] pt-4 sm:grid-cols-2 lg:grid-cols-3">
+              {venda.forma_pagamento === "cartao" && (
+                <>
+                  <Campo rotulo="Parcelas" valor={`${venda.parcelas || 1}x`} />
+                  <Campo rotulo="Taxa" valor={`${Number(venda.taxa || 0)}%`} />
+                  <Campo
+                    rotulo="Valor líquido (após taxa)"
+                    valor={formatCurrency(Number(venda.valor_liquido || 0))}
+                  />
+                </>
+              )}
+              {venda.forma_pagamento === "dinheiro" && (
+                <>
+                  <Campo
+                    rotulo="Valor recebido"
+                    valor={formatCurrency(Number(venda.valor_recebido || 0))}
+                  />
+                  <Campo
+                    rotulo="Troco"
+                    valor={formatCurrency(Number(venda.troco || 0))}
+                  />
+                </>
+              )}
+              {venda.forma_pagamento === "misto" && (
+                <>
+                  <Campo
+                    rotulo="Entrada (paga agora)"
+                    valor={formatCurrency(Number(venda.valor_recebido || 0))}
+                  />
+                  <Campo
+                    rotulo="Forma da entrada"
+                    valor={PAGAMENTO[venda.entrada_forma || ""] || venda.entrada_forma || "—"}
+                  />
+                </>
+              )}
+            </div>
+
+            {venda.status === "cancelada" && venda.motivo_cancelamento && (
+              <div className="mt-4 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-3 text-sm text-[#b91c1c]">
+                <b>Motivo do cancelamento:</b> {venda.motivo_cancelamento}
+              </div>
+            )}
+
             {venda.observacao && (
               <div className="mt-4 border-t border-[#eef2f7] pt-4">
                 <p className="text-xs font-semibold text-[#94a3b8]">Observações</p>
@@ -204,6 +269,11 @@ export default function VendaDetalhePage() {
                       <tr key={it.id} className="border-t border-[#f1f5f9] text-sm">
                         <td className="px-2 py-2.5 font-semibold text-[#0f172a]">
                           {produtoNome.get(it.produto_id) || "Produto"}
+                          {it.variacao_id && variacaoNome.get(it.variacao_id) && (
+                            <span className="ml-2 rounded-full bg-[#eff6ff] px-2 py-0.5 text-xs font-semibold text-[#1d4ed8]">
+                              {variacaoNome.get(it.variacao_id)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 py-2.5 text-[#475569]">{it.quantidade}</td>
                         <td className="px-2 py-2.5 text-[#475569]">

@@ -529,6 +529,8 @@ export default function ConfiguracoesPage() {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100"
                   value={pixDesconto}
                   onChange={(e) => setPixDesconto(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"

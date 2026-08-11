@@ -275,6 +275,8 @@ export default function FuncionariosPage() {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="100"
                   value={comissao}
                   onChange={(e) => setComissao(e.target.value)}
                   className={inputCls}

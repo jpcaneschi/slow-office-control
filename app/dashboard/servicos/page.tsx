@@ -351,6 +351,8 @@ export default function ServicosPage() {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    max="100"
                     value={aPct}
                     onChange={(e) => setAPct(e.target.value)}
                     className={inputCls}
@@ -427,6 +429,8 @@ export default function ServicosPage() {
               <input
                 type="number"
                 step="0.01"
+                min="0"
+                max="100"
                 value={pct}
                 onChange={(e) => setPct(e.target.value)}
                 placeholder="% loja"

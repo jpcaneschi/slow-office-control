@@ -123,9 +123,16 @@ export default function PromissoriasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promissorias, pagoPorPromissoria]);
 
+  // "Total recebido" = soma de TODOS os pagamentos (inclui os parciais),
+  // não só as promissórias quitadas.
   const totalPago = useMemo(() => {
+    return pagamentos.reduce((acc, p) => acc + Number(p.valor || 0), 0);
+  }, [pagamentos]);
+
+  // Valor originalmente financiado (todas as promissórias não canceladas).
+  const totalFinanciado = useMemo(() => {
     return promissorias
-      .filter((item) => item.status === "pago")
+      .filter((item) => item.status !== "cancelado")
       .reduce((acc, item) => acc + Number(item.valor_total || 0), 0);
   }, [promissorias]);
 
@@ -249,23 +256,31 @@ export default function PromissoriasPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-5">
-          <p className="text-sm font-bold text-[#475569]">Promissórias em aberto</p>
+          <p className="text-sm font-bold text-[#475569]">Em aberto (qtd)</p>
           <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
-            {promissorias.filter((item) => item.status === "em_aberto").length}
+            {promissorias.filter((item) => item.status !== "pago" && item.status !== "cancelado").length}
+          </p>
+        </div>
+
+        <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-5">
+          <p className="text-sm font-bold text-[#475569]">Financiado</p>
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
+            {formatCurrency(totalFinanciado)}
           </p>
         </div>
 
         <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
-          <p className="text-sm font-bold text-[#15803d]">Total pago</p>
+          <p className="text-sm font-bold text-[#15803d]">Total recebido</p>
           <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(totalPago)}
           </p>
+          <p className="mt-1 text-xs text-[#94a3b8]">inclui pagamentos parciais</p>
         </div>
 
-        <div className="rounded-[28px] border border-[#bfdbfe] bg-[#eff6ff] p-5">
-          <p className="text-sm font-bold text-[#1d4ed8]">Total em aberto</p>
+        <div className="rounded-[28px] border border-[#fde68a] bg-[#fffbeb] p-5">
+          <p className="text-sm font-bold text-[#b45309]">Saldo em aberto</p>
           <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(totalAberto)}
           </p>

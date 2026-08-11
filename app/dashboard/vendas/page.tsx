@@ -720,6 +720,7 @@ export default function VendasPage() {
                       type="number"
                       step="0.01"
                       min="0"
+                      max="100"
                       value={taxaCartao}
                       onChange={(e) => setTaxaCartao(e.target.value)}
                       className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
