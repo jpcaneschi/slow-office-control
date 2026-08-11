@@ -4,6 +4,7 @@ import {
   podeAcessar,
   podeGerenciarEquipe,
   podeVerCusto,
+  podeCancelarVenda,
 } from "@/lib/permissoes";
 
 describe("normalizarPapel", () => {
@@ -54,5 +55,11 @@ describe("capacidades", () => {
     expect(podeVerCusto("owner")).toBe(true);
     expect(podeVerCusto("gerente")).toBe(true);
     expect(podeVerCusto("financeiro")).toBe(true);
+  });
+  it("só dono e gerente cancelam venda", () => {
+    expect(podeCancelarVenda("owner")).toBe(true);
+    expect(podeCancelarVenda("gerente")).toBe(true);
+    expect(podeCancelarVenda("caixa")).toBe(false);
+    expect(podeCancelarVenda("financeiro")).toBe(false);
   });
 });

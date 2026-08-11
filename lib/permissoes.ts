@@ -86,3 +86,8 @@ export function podeGerenciarEquipe(papel: Papel): boolean {
 export function podeVerCusto(papel: Papel): boolean {
   return papel === "owner" || papel === "gerente" || papel === "financeiro";
 }
+
+/** Cancelar venda é sensível (reverte estoque/financeiro) — só dono e gerente. */
+export function podeCancelarVenda(papel: Papel): boolean {
+  return papel === "owner" || papel === "gerente";
+}

@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
+import { usePapel } from "@/components/dashboard/role-context";
+import { podeCancelarVenda } from "@/lib/permissoes";
 import {
   calcularDescontoPix,
   calcularTotal,
@@ -104,6 +106,11 @@ export default function VendasPage() {
   const [qtdDevolucao, setQtdDevolucao] = useState<Record<string, string>>({});
   const [devolvendo, setDevolvendo] = useState(false);
 
+  // Cancelamento de venda (modal + motivo)
+  const [cancelandoVenda, setCancelandoVenda] = useState<Venda | null>(null);
+  const [motivoCancel, setMotivoCancel] = useState("");
+  const [cancelando, setCancelando] = useState(false);
+
   const [produtoId, setProdutoId] = useState("");
   const [variacaoId, setVariacaoId] = useState("");
   const [quantidade, setQuantidade] = useState("1");
@@ -174,6 +181,8 @@ export default function VendasPage() {
 
   // Filtro global de período (mesmo do Financeiro/Dashboard).
   const { period } = usePeriod();
+  const { papel } = usePapel();
+  const podeCancelar = podeCancelarVenda(papel);
   const janela = useMemo(() => {
     const startOfDay = (d: Date) => {
       const x = new Date(d);
@@ -469,45 +478,27 @@ export default function VendasPage() {
     setSalvando(false);
   }
 
-  async function cancelarVenda(id: string) {
+  // Cancelamento atômico via RPC (reverte estoque + promissórias + audita).
+  async function confirmarCancelamento() {
+    if (!cancelandoVenda) return;
     setErro("");
-    const venda = vendas.find((v) => v.id === id);
-    if (!venda || venda.status !== "concluida") return; // evita cancelar 2x
-
-    // Devolve o estoque de cada item ao cancelar (via RPC, com histórico).
-    const itens = itensVenda.filter((it) => it.venda_id === id);
-    for (const it of itens) {
-      const { error: movError } = await supabase.rpc("registrar_movimentacao", {
-        p_produto_id: it.produto_id,
-        p_tipo: "cancelamento",
-        p_quantidade: it.quantidade,
-        p_motivo: "Cancelamento de venda",
-        p_referencia_id: id,
-        p_variacao_id: it.variacao_id,
-      });
-      if (movError) {
-        setErro(movError.message);
-        return;
-      }
-    }
-
-    const { error } = await supabase
-      .from("vendas")
-      .update({ status: "cancelada" })
-      .eq("id", id);
-
-    if (error) {
-      setErro(error.message);
+    if (motivoCancel.trim().length < 3) {
+      setErro("Descreva o motivo do cancelamento (mínimo 3 caracteres).");
       return;
     }
-
-    await supabase.rpc("log_auditoria", {
-      p_acao: "venda_cancelada",
-      p_entidade: "vendas",
-      p_registro_id: id,
-      p_dados: { total: venda.total },
+    setCancelando(true);
+    const { error } = await supabase.rpc("cancelar_venda", {
+      p_venda_id: cancelandoVenda.id,
+      p_motivo: motivoCancel.trim(),
     });
-
+    if (error) {
+      setErro(error.message);
+      setCancelando(false);
+      return;
+    }
+    setCancelandoVenda(null);
+    setMotivoCancel("");
+    setCancelando(false);
     await carregarDados();
   }
 
@@ -1032,13 +1023,19 @@ export default function VendasPage() {
                             >
                               Devolver itens
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => cancelarVenda(venda.id)}
-                              className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
-                            >
-                              Cancelar venda
-                            </button>
+                            {podeCancelar && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setErro("");
+                                  setMotivoCancel("");
+                                  setCancelandoVenda(venda);
+                                }}
+                                className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
+                              >
+                                Cancelar venda
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1142,6 +1139,65 @@ export default function VendasPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de cancelamento (confirmação + motivo obrigatório) */}
+      {cancelandoVenda && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !cancelando && setCancelandoVenda(null)}
+          />
+          <div className="relative w-full max-w-md rounded-[24px] border border-[#e8ecf4] bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-black text-[#0f172a]">Cancelar venda</h3>
+            <div className="mt-3 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#7f1d1d]">
+              <p>
+                <b>Cliente:</b> {getClienteNome(cancelandoVenda.cliente_id)}
+              </p>
+              <p>
+                <b>Total:</b> {formatCurrency(Number(cancelandoVenda.total || 0))} ·{" "}
+                {cancelandoVenda.forma_pagamento}
+              </p>
+              <p className="mt-2 text-xs">
+                Impacto: o estoque dos itens volta, e a promissória vinculada
+                (se houver) será cancelada. A venda sai do faturamento. Ação
+                registrada na auditoria.
+              </p>
+            </div>
+            <label className="mt-4 block text-sm font-semibold text-[#475569]">
+              Motivo do cancelamento
+            </label>
+            <textarea
+              value={motivoCancel}
+              onChange={(e) => setMotivoCancel(e.target.value)}
+              autoFocus
+              className="mt-1.5 min-h-[80px] w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#b91c1c]"
+              placeholder="Ex: cliente desistiu da compra"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelandoVenda(null)}
+                disabled={cancelando}
+                className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2.5 text-sm font-bold text-[#475569] transition hover:bg-[#f4f6fb] disabled:opacity-60"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarCancelamento}
+                disabled={cancelando}
+                className="rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#991b1b] disabled:opacity-60"
+              >
+                {cancelando ? "Cancelando..." : "Confirmar cancelamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
