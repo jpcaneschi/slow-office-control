@@ -69,3 +69,9 @@ export function somarDiasISO(iso: string, dias: number): string {
 export function primeiroDiaMesISO(): string {
   return `${hojeISO().slice(0, 7)}-01`;
 }
+
+/** Um convite (ou qualquer prazo) já expirou? Sem prazo = nunca expira. */
+export function expirado(quando: string | null | undefined): boolean {
+  if (!quando) return false;
+  return new Date(quando).getTime() <= Date.now();
+}

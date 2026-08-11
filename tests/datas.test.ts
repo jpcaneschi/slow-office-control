@@ -5,6 +5,7 @@ import {
   somarDiasISO,
   toISOLocal,
   hojeISO,
+  expirado,
 } from "@/lib/datas";
 
 describe("formatDataBR", () => {
@@ -59,5 +60,18 @@ describe("toISOLocal", () => {
 describe("hojeISO", () => {
   it("retorna no formato YYYY-MM-DD", () => {
     expect(hojeISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("expirado (convites)", () => {
+  it("sem prazo = nunca expira", () => {
+    expect(expirado(null)).toBe(false);
+    expect(expirado(undefined)).toBe(false);
+  });
+  it("data no passado = expirado", () => {
+    expect(expirado(new Date(Date.now() - 1000).toISOString())).toBe(true);
+  });
+  it("data no futuro = válido", () => {
+    expect(expirado(new Date(Date.now() + 3600_000).toISOString())).toBe(false);
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { usePapel } from "@/components/dashboard/role-context";
+import { expirado, formatDataBR } from "@/lib/datas";
 import {
   PAPEIS,
   PAPEL_LABEL,
@@ -23,6 +24,7 @@ type Convite = {
   email: string;
   papel: string;
   status: string;
+  expires_at: string | null;
 };
 
 export function EquipeSection() {
@@ -60,7 +62,7 @@ export function EquipeSection() {
         .order("created_at", { ascending: true }),
       supabase
         .from("organization_invites")
-        .select("id, email, papel, status")
+        .select("id, email, papel, status, expires_at")
         .eq("status", "pendente")
         .order("created_at", { ascending: false }),
     ]);
@@ -248,6 +250,15 @@ export function EquipeSection() {
                   {c.email}
                   <span className="ml-2 text-xs font-semibold">
                     {PAPEL_LABEL[(c.papel as Papel) || "caixa"]}
+                  </span>
+                  <span className="ml-2 text-xs">
+                    {expirado(c.expires_at) ? (
+                      <span className="font-semibold text-[#b91c1c]">expirado</span>
+                    ) : c.expires_at ? (
+                      `expira em ${formatDataBR(c.expires_at)}`
+                    ) : (
+                      ""
+                    )}
                   </span>
                 </span>
                 <button

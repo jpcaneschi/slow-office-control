@@ -69,24 +69,33 @@ export async function garantirEmpresa(
   // Convite pendente para este e-mail? → entra na empresa do convite (não cria nova).
   const email = (user.email || "").toLowerCase();
   if (email) {
+    // A própria RLS já filtra convite pendente e não-expirado (0029), mas
+    // reforçamos aqui por clareza.
     const { data: convite } = await supabase
       .from("organization_invites")
-      .select("id, organization_id, papel")
+      .select("id, organization_id, papel, expires_at, status")
       .ilike("email", email)
       .eq("status", "pendente")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (convite?.organization_id) {
+    const naoExpirado =
+      !convite?.expires_at || new Date(convite.expires_at as string) > new Date();
+    if (convite?.organization_id && naoExpirado) {
       await supabase.from("organization_members").insert({
         organization_id: convite.organization_id,
         user_id: user.id,
         papel: (convite.papel as string) || "caixa",
         email: user.email || null,
       });
+      // Uso único: marca aceito + quem/quando.
       await supabase
         .from("organization_invites")
-        .update({ status: "aceito" })
+        .update({
+          status: "aceito",
+          used_at: new Date().toISOString(),
+          used_by: user.id,
+        })
         .eq("id", convite.id);
       return convite.organization_id as string;
     }
