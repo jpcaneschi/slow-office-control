@@ -38,11 +38,18 @@ export default function PromissoriasPage() {
   const [observacao, setObservacao] = useState("");
   const [dataVencimento, setDataVencimento] = useState("");
 
+  // Pagamentos (parciais)
+  const [pagamentos, setPagamentos] = useState<
+    { promissoria_id: string; valor: number }[]
+  >([]);
+  const [valorPagamento, setValorPagamento] = useState<Record<string, string>>({});
+  const [pagando, setPagando] = useState(false);
+
   async function carregarDados() {
     setLoading(true);
     setErro("");
 
-    const [clientesRes, promissoriasRes] = await Promise.all([
+    const [clientesRes, promissoriasRes, pagamentosRes] = await Promise.all([
       supabase
         .from("clientes")
         .select("id, nome")
@@ -51,6 +58,7 @@ export default function PromissoriasPage() {
         .from("promissorias")
         .select("id, cliente_id, valor_total, parcelas, status, observacao, created_at")
         .order("created_at", { ascending: false }),
+      supabase.from("promissoria_pagamentos").select("promissoria_id, valor"),
     ]);
 
     if (clientesRes.error) setErro(clientesRes.error.message);
@@ -58,7 +66,25 @@ export default function PromissoriasPage() {
 
     setClientes(clientesRes.data || []);
     setPromissorias(promissoriasRes.data || []);
+    setPagamentos(pagamentosRes.data || []);
     setLoading(false);
+  }
+
+  // Total pago e saldo por promissória.
+  const pagoPorPromissoria = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    for (const p of pagamentos) {
+      mapa[p.promissoria_id] =
+        (mapa[p.promissoria_id] || 0) + Number(p.valor || 0);
+    }
+    return mapa;
+  }, [pagamentos]);
+
+  function saldoDe(prom: Promissoria) {
+    return Math.max(
+      0,
+      Number(prom.valor_total || 0) - (pagoPorPromissoria[prom.id] || 0)
+    );
   }
 
   useEffect(() => {
@@ -92,9 +118,10 @@ export default function PromissoriasPage() {
 
   const totalAberto = useMemo(() => {
     return promissorias
-      .filter((item) => item.status === "em_aberto")
-      .reduce((acc, item) => acc + Number(item.valor_total || 0), 0);
-  }, [promissorias]);
+      .filter((item) => item.status !== "pago")
+      .reduce((acc, item) => acc + saldoDe(item), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promissorias, pagoPorPromissoria]);
 
   const totalPago = useMemo(() => {
     return promissorias
@@ -159,17 +186,38 @@ export default function PromissoriasPage() {
     setSalvando(false);
   }
 
-  async function marcarComoPago(id: string) {
-    const { error } = await supabase
-      .from("promissorias")
-      .update({ status: "pago" })
-      .eq("id", id);
+  async function registrarPagamento(prom: Promissoria) {
+    setErro("");
+    const saldo = saldoDe(prom);
+    const bruto = valorPagamento[prom.id];
+    // Se o campo estiver vazio, quita o saldo restante.
+    const valor = bruto === undefined || bruto === "" ? saldo : Number(bruto);
 
-    if (error) {
-      setErro(error.message);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setErro("Informe um valor de pagamento válido.");
+      return;
+    }
+    if (valor > saldo + 0.001) {
+      setErro(
+        `O pagamento (${formatCurrency(valor)}) é maior que o saldo (${formatCurrency(saldo)}).`
+      );
       return;
     }
 
+    setPagando(true);
+    const { error } = await supabase.rpc("registrar_pagamento_promissoria", {
+      p_promissoria_id: prom.id,
+      p_valor: valor,
+      p_forma: null,
+      p_obs: null,
+    });
+    if (error) {
+      setErro(error.message);
+      setPagando(false);
+      return;
+    }
+    setValorPagamento((atual) => ({ ...atual, [prom.id]: "" }));
+    setPagando(false);
     await carregarDados();
   }
 
@@ -398,27 +446,64 @@ export default function PromissoriasPage() {
                           Parcela mensal: {formatCurrency(parcelaMensal)}
                         </p>
 
+                        <p className="text-sm">
+                          <span className="text-[#15803d]">
+                            Pago: {formatCurrency(pagoPorPromissoria[item.id] || 0)}
+                          </span>{" "}
+                          ·{" "}
+                          <span className="font-bold text-[#b45309]">
+                            Saldo: {formatCurrency(saldoDe(item))}
+                          </span>
+                        </p>
+
                         <p className="text-sm text-[#94a3b8]">
                           {item.observacao || "Sem observação"}
                         </p>
                       </div>
 
-                      <div className="flex min-w-[190px] flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => marcarComoPago(item.id)}
-                          className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-sm font-bold text-[#15803d] transition hover:bg-[#dcfce7]"
-                        >
-                          Marcar como paga
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => marcarComoAtrasado(item.id)}
-                          className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
-                        >
-                          Marcar como atrasada
-                        </button>
+                      <div className="flex min-w-[210px] flex-col gap-2">
+                        {item.status === "pago" ? (
+                          <span className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-center text-sm font-bold text-[#15803d]">
+                            Quitada ✓
+                          </span>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="mb-1 block text-xs text-[#475569]">
+                                Registrar pagamento
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={valorPagamento[item.id] ?? ""}
+                                onChange={(e) =>
+                                  setValorPagamento((atual) => ({
+                                    ...atual,
+                                    [item.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`Saldo ${formatCurrency(saldoDe(item))}`}
+                                className="w-full rounded-2xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm text-[#0f172a] outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => registrarPagamento(item)}
+                              disabled={pagando}
+                              className="rounded-2xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+                            >
+                              {pagando ? "..." : "Receber"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => marcarComoAtrasado(item.id)}
+                              className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
+                            >
+                              Marcar como atrasada
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
