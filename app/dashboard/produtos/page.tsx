@@ -84,6 +84,8 @@ export default function ProdutosPage() {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroEstoque, setFiltroEstoque] = useState("todos");
+  const [ordenacao, setOrdenacao] = useState("recentes");
+  const [paginaProdutos, setPaginaProdutos] = useState(0);
 
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get("estoque");
@@ -603,6 +605,37 @@ export default function ProdutosPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtos, busca, filtroStatus, filtroEstoque, somaVariacoes]);
+
+  const produtosOrdenados = useMemo(() => {
+    const arr = [...produtosFiltrados];
+    if (ordenacao === "nome") {
+      arr.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    } else if (ordenacao === "estoque") {
+      arr.sort((a, b) => estoqueEfetivo(a) - estoqueEfetivo(b));
+    } else if (ordenacao === "preco") {
+      arr.sort((a, b) => Number(b.preco || 0) - Number(a.preco || 0));
+    }
+    // "recentes" mantém a ordem de carregamento (created_at desc)
+    return arr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtosFiltrados, ordenacao, somaVariacoes]);
+
+  // Paginação (12/página) — evita renderizar 155 produtos de uma vez.
+  const porPaginaProdutos = 12;
+  const totalPaginasProdutos = Math.max(
+    1,
+    Math.ceil(produtosOrdenados.length / porPaginaProdutos)
+  );
+  const paginaAtualProdutos = Math.min(paginaProdutos, totalPaginasProdutos - 1);
+  const produtosPagina = produtosOrdenados.slice(
+    paginaAtualProdutos * porPaginaProdutos,
+    paginaAtualProdutos * porPaginaProdutos + porPaginaProdutos
+  );
+
+  // Volta pra 1ª página quando muda filtro/busca/ordenação.
+  useEffect(() => {
+    setPaginaProdutos(0);
+  }, [busca, filtroStatus, filtroEstoque, ordenacao]);
 
   const resumo = useMemo(() => {
     const totalProdutos = produtos.length;
@@ -1241,17 +1274,36 @@ export default function ProdutosPage() {
               />
             </div>
 
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-[#64748b]">
+                {produtosOrdenados.length} produto(s)
+              </p>
+              <label className="flex items-center gap-2 text-sm text-[#475569]">
+                Ordenar:
+                <select
+                  value={ordenacao}
+                  onChange={(e) => setOrdenacao(e.target.value)}
+                  className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-1.5 text-sm outline-none"
+                >
+                  <option value="recentes">Mais recentes</option>
+                  <option value="nome">Nome (A–Z)</option>
+                  <option value="estoque">Menor estoque</option>
+                  <option value="preco">Maior preço</option>
+                </select>
+              </label>
+            </div>
+
             {loading && <p className="mt-4 text-[#64748b]">Carregando produtos...</p>}
 
-            {!loading && !erro && produtosFiltrados.length === 0 && (
+            {!loading && !erro && produtosOrdenados.length === 0 && (
               <p className="mt-4 text-[#64748b]">
                 Nenhum produto encontrado com os filtros atuais.
               </p>
             )}
 
-            {!loading && produtosFiltrados.length > 0 && (
+            {!loading && produtosOrdenados.length > 0 && (
               <div className="mt-5 space-y-4">
-                {produtosFiltrados.map((produto) => {
+                {produtosPagina.map((produto) => {
                   const estoqueAtual = estoqueEfetivo(produto);
 
                   return (
@@ -1340,6 +1392,34 @@ export default function ProdutosPage() {
                     </div>
                   );
                 })}
+
+                {totalPaginasProdutos > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaProdutos((p) => Math.max(0, p - 1))}
+                      disabled={paginaAtualProdutos === 0}
+                      className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb] disabled:opacity-40"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-sm text-[#64748b]">
+                      Página {paginaAtualProdutos + 1} de {totalPaginasProdutos}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPaginaProdutos((p) =>
+                          Math.min(totalPaginasProdutos - 1, p + 1)
+                        )
+                      }
+                      disabled={paginaAtualProdutos >= totalPaginasProdutos - 1}
+                      className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb] disabled:opacity-40"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
