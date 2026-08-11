@@ -31,6 +31,50 @@ const ACAO_COR: Record<string, string> = {
   produto_excluido: "#b45309",
 };
 
+// Entidades dos triggers genéricos (tabela -> nome amigável no singular).
+const ENTIDADE_LABEL: Record<string, string> = {
+  clientes: "cliente",
+  produtos: "produto",
+  produto_variacoes: "variação",
+  funcionarios: "funcionário",
+  vales: "vale",
+  servicos: "serviço",
+  atendimentos_servico: "atendimento",
+  tatuagem_atendimentos: "tatuagem",
+  despesas: "despesa",
+  despesas_recorrentes: "conta recorrente",
+  configuracoes: "configuração",
+};
+const OP_VERBO: Record<string, { verbo: string; cor: string }> = {
+  insert: { verbo: "Criou", cor: "#15803d" },
+  update: { verbo: "Editou", cor: "#1d4ed8" },
+  delete: { verbo: "Excluiu", cor: "#b91c1c" },
+};
+
+// Resolve rótulo + cor de uma ação (semântica antiga OU trigger genérico).
+function resolverAcao(acao: string): { label: string; cor: string } {
+  if (ACAO_LABEL[acao]) {
+    return { label: ACAO_LABEL[acao], cor: ACAO_COR[acao] || "#475569" };
+  }
+  const m = /^(insert|update|delete)_(.+)$/.exec(acao);
+  if (m) {
+    const op = OP_VERBO[m[1]];
+    const ent = ENTIDADE_LABEL[m[2]] || m[2];
+    if (op) return { label: `${op.verbo} ${ent}`, cor: op.cor };
+  }
+  return { label: acao, cor: "#475569" };
+}
+
+// Descreve um registro pelo campo mais representativo.
+function descreverRegistro(obj: unknown): string {
+  if (!obj || typeof obj !== "object") return "";
+  const o = obj as Record<string, unknown>;
+  for (const campo of ["nome", "descricao", "cliente_nome", "email"]) {
+    if (typeof o[campo] === "string" && o[campo]) return String(o[campo]);
+  }
+  return "";
+}
+
 export default function AuditoriaPage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [emailPorUser, setEmailPorUser] = useState<Record<string, string>>({});
@@ -61,17 +105,31 @@ export default function AuditoriaPage() {
 
   const linhas = useMemo(
     () =>
-      logs.map((l) => ({
-        ...l,
-        autor: (l.user_id && emailPorUser[l.user_id]) || "—",
-        label: ACAO_LABEL[l.acao] || l.acao,
-        cor: ACAO_COR[l.acao] || "#475569",
-        detalhe: l.dados
-          ? Object.entries(l.dados)
+      logs.map((l) => {
+        const { label, cor } = resolverAcao(l.acao);
+        const dados = l.dados as Record<string, unknown> | null;
+        let detalhe = "";
+        if (dados) {
+          if ("depois" in dados || "antes" in dados) {
+            // Trigger genérico: mostra o registro representado.
+            detalhe =
+              descreverRegistro(dados.depois) ||
+              descreverRegistro(dados.antes) ||
+              "";
+          } else {
+            detalhe = Object.entries(dados)
               .map(([k, v]) => `${k}: ${v}`)
-              .join(" · ")
-          : "",
-      })),
+              .join(" · ");
+          }
+        }
+        return {
+          ...l,
+          autor: (l.user_id && emailPorUser[l.user_id]) || "—",
+          label,
+          cor,
+          detalhe,
+        };
+      }),
     [logs, emailPorUser]
   );
 
