@@ -655,8 +655,13 @@ export default function ConfiguracoesPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[#475569]">
-                  Responsáveis / equipe
+                  Responsáveis / equipe (legado)
                 </label>
+                <p className="mb-2 text-xs text-[#94a3b8]">
+                  Os responsáveis das vendas agora vêm de{" "}
+                  <b>Funcionários</b> (que também têm comissão e salário). Esta
+                  lista é opcional e serve só para nomes avulsos.
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {responsaveis.map((r) => (
                     <span

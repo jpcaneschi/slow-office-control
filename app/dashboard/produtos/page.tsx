@@ -114,6 +114,7 @@ export default function ProdutosPage() {
   const [savingVar, setSavingVar] = useState(false);
   // produto_id -> soma de estoque das variações (para exibir na lista)
   const [somaVariacoes, setSomaVariacoes] = useState<Record<string, number>>({});
+  const [todasVariacoes, setTodasVariacoes] = useState<Variacao[]>([]);
 
   async function carregarProdutos() {
     const { data, error } = await supabase
@@ -128,10 +129,11 @@ export default function ProdutosPage() {
 
     setProdutos(data || []);
 
-    // Soma o estoque das variações por produto (só usado no display da lista).
+    // Variações completas (para soma na lista E para o CSV com grade).
     const { data: vars } = await supabase
       .from("produto_variacoes")
-      .select("produto_id, estoque");
+      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+    setTodasVariacoes((vars as Variacao[]) || []);
     const mapa: Record<string, number> = {};
     for (const v of vars || []) {
       const pid = v.produto_id as string;
@@ -143,6 +145,69 @@ export default function ProdutosPage() {
   function estoqueEfetivo(produto: Produto) {
     if (produto.tem_variacoes) return somaVariacoes[produto.id] || 0;
     return Number(produto.estoque || 0);
+  }
+
+  // Importa CSV agrupando linhas pelo NOME: linhas com tamanho/cor viram a grade.
+  async function importarProdutosCSV(
+    linhas: Record<string, string>[]
+  ): Promise<{ ok: number; erro?: string }> {
+    const grupos = new Map<
+      string,
+      { rows: Record<string, string>[]; nomeOriginal: string }
+    >();
+    for (const r of linhas) {
+      const nome = (r.nome || "").trim();
+      if (!nome) continue;
+      const key = nome.toLowerCase();
+      if (!grupos.has(key)) grupos.set(key, { rows: [], nomeOriginal: nome });
+      grupos.get(key)!.rows.push(r);
+    }
+    if (grupos.size === 0)
+      return { ok: 0, erro: "Nenhuma linha com nome válido." };
+
+    let count = 0;
+    for (const { rows, nomeOriginal } of grupos.values()) {
+      const temGrade = rows.some(
+        (r) => (r.tamanho || "").trim() || (r.cor || "").trim()
+      );
+      const primeiro = rows[0];
+      const { data: prod, error } = await supabase
+        .from("produtos")
+        .insert({
+          nome: nomeOriginal,
+          categoria: (primeiro.categoria || "").trim() || null,
+          preco: Number(primeiro.preco || 0),
+          custo: Number(primeiro.custo || 0),
+          estoque: temGrade ? 0 : Number(primeiro.estoque || 0),
+          status: (primeiro.status || "").trim() || "ativo",
+          tem_variacoes: temGrade,
+        })
+        .select("id")
+        .single();
+      if (error) return { ok: count, erro: error.message };
+
+      if (temGrade && prod) {
+        const variacoes = rows
+          .filter((r) => (r.tamanho || "").trim() || (r.cor || "").trim())
+          .map((r) => ({
+            produto_id: prod.id,
+            tamanho: (r.tamanho || "").trim() || null,
+            cor: (r.cor || "").trim() || null,
+            preco: r.preco ? Number(r.preco) : null,
+            custo: r.custo ? Number(r.custo) : null,
+            estoque: Number(r.estoque || 0),
+          }));
+        if (variacoes.length) {
+          const { error: verr } = await supabase
+            .from("produto_variacoes")
+            .insert(variacoes);
+          if (verr) return { ok: count, erro: verr.message };
+        }
+      }
+      count++;
+    }
+    await carregarDados();
+    return { ok: count };
   }
 
   async function carregarVariacoes(produtoId: string) {
@@ -1103,33 +1168,46 @@ export default function ProdutosPage() {
               </h2>
               <CsvTools
                 nomeArquivo="produtos"
-                headers={["nome", "categoria", "preco", "custo", "estoque", "status"]}
-                linhas={produtos.map((p) => [
-                  p.nome,
-                  p.categoria || "",
-                  Number(p.preco || 0),
-                  Number(p.custo || 0),
-                  estoqueEfetivo(p),
-                  p.status || "ativo",
-                ])}
-                ajuda="Colunas: nome, categoria, preco, custo, estoque, status."
-                onImportar={async (linhas) => {
-                  const novos = linhas
-                    .map((r) => ({
-                      nome: (r.nome || "").trim(),
-                      categoria: (r.categoria || "").trim() || null,
-                      preco: Number(r.preco || 0),
-                      custo: Number(r.custo || 0),
-                      estoque: Number(r.estoque || 0),
-                      status: (r.status || "").trim() || "ativo",
-                    }))
-                    .filter((p) => p.nome);
-                  if (novos.length === 0) return { ok: 0, erro: "Nenhuma linha com nome válido." };
-                  const { error } = await supabase.from("produtos").insert(novos);
-                  if (error) return { ok: 0, erro: error.message };
-                  await carregarDados();
-                  return { ok: novos.length };
-                }}
+                headers={[
+                  "nome",
+                  "categoria",
+                  "preco",
+                  "custo",
+                  "estoque",
+                  "status",
+                  "tamanho",
+                  "cor",
+                ]}
+                linhas={produtos.flatMap((p) => {
+                  const vs = todasVariacoes.filter((v) => v.produto_id === p.id);
+                  if (p.tem_variacoes && vs.length > 0) {
+                    // Uma linha por variação (grade preservada).
+                    return vs.map((v) => [
+                      p.nome,
+                      p.categoria || "",
+                      Number(v.preco ?? p.preco ?? 0),
+                      Number(v.custo ?? p.custo ?? 0),
+                      Number(v.estoque || 0),
+                      p.status || "ativo",
+                      v.tamanho || "",
+                      v.cor || "",
+                    ]);
+                  }
+                  return [
+                    [
+                      p.nome,
+                      p.categoria || "",
+                      Number(p.preco || 0),
+                      Number(p.custo || 0),
+                      Number(p.estoque || 0),
+                      p.status || "ativo",
+                      "",
+                      "",
+                    ],
+                  ];
+                })}
+                ajuda="Colunas: nome, categoria, preco, custo, estoque, status, tamanho, cor. Linhas com o mesmo nome + tamanho/cor viram a grade do produto."
+                onImportar={importarProdutosCSV}
               />
             </div>
 

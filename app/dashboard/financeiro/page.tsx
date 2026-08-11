@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 import { hojeISO, formatDataBR, dataLocalMs } from "@/lib/datas";
+import { carregarNomesResponsaveis } from "@/lib/responsaveis";
 
 type Venda = {
   id: string;
@@ -147,8 +147,7 @@ export default function FinanceiroPage() {
     setAtendServico(servRes.data || []);
     setRecorrentes(recRes.data || []);
 
-    const cfg = await carregarConfigEmpresa();
-    setResponsaveisConfig(cfg.responsaveis);
+    setResponsaveisConfig(await carregarNomesResponsaveis());
     setLoading(false);
   }
 

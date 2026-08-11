@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CondicionalPdfDocument } from "@/components/pdf/condicional-pdf-document";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import { carregarNomesResponsaveis } from "@/lib/responsaveis";
 import {
   hojeISO,
   somarDiasISO,
@@ -169,7 +170,7 @@ export default function CondicionalPage() {
 
     const cfg = await carregarConfigEmpresa();
     setNomeOperacao(cfg.nome_operacao || "Sua loja");
-    setResponsaveisConfig(cfg.responsaveis);
+    setResponsaveisConfig(await carregarNomesResponsaveis());
     setPixDescontoCfg(cfg.pix_desconto);
     setPrazoDias(cfg.condicional_prazo_dias);
     setDataLimite(somarDias(dataSaida, cfg.condicional_prazo_dias));

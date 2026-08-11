@@ -8,6 +8,7 @@ import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeCancelarVenda } from "@/lib/permissoes";
 import { validarPagamento } from "@/lib/pdv-regras";
+import { carregarFuncionariosResponsaveis } from "@/lib/responsaveis";
 import {
   calcularDescontoPix,
   calcularTotal,
@@ -166,16 +167,9 @@ export default function VendasPage() {
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
 
-    // Funcionários ativos (para vincular a comissão pelo responsável).
-    const { data: funcData } = await supabase
-      .from("funcionarios")
-      .select("id, nome, ativo")
-      .order("nome", { ascending: true });
-    setFuncionariosLista(
-      (funcData || [])
-        .filter((f) => f.ativo !== false)
-        .map((f) => ({ id: f.id as string, nome: f.nome as string }))
-    );
+    // Funcionários ativos (id+nome via RPC segura — funciona p/ qualquer papel,
+    // inclusive caixa, sem expor salário). Usado p/ vincular a comissão.
+    setFuncionariosLista(await carregarFuncionariosResponsaveis());
 
     const cfg = await carregarConfigEmpresa();
     setResponsaveisConfig(cfg.responsaveis);
