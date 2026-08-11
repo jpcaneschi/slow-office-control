@@ -75,3 +75,28 @@ export function expirado(quando: string | null | undefined): boolean {
   if (!quando) return false;
   return new Date(quando).getTime() <= Date.now();
 }
+
+/**
+ * Normaliza qualquer valor de data (date ou timestamp) para "YYYY-MM-DD",
+ * formato exigido por <input type="date"> (senão o campo reabre vazio).
+ */
+export function paraInputDate(v: string | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+/** Valida se "YYYY-MM-DD" é uma data real (rejeita 2026-02-30, 2026-13-01). */
+export function dataValida(iso: string | null | undefined): boolean {
+  if (!iso) return true; // vazio é permitido (campo opcional)
+  const s = String(iso).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  return (
+    dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
+  );
+}

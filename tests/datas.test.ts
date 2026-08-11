@@ -6,6 +6,8 @@ import {
   toISOLocal,
   hojeISO,
   expirado,
+  paraInputDate,
+  dataValida,
 } from "@/lib/datas";
 
 describe("formatDataBR", () => {
@@ -60,6 +62,34 @@ describe("toISOLocal", () => {
 describe("hojeISO", () => {
   it("retorna no formato YYYY-MM-DD", () => {
     expect(hojeISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("paraInputDate", () => {
+  it("mantém YYYY-MM-DD", () => {
+    expect(paraInputDate("1990-01-01")).toBe("1990-01-01");
+  });
+  it("corta timestamp para a data (corrige input que reabre vazio)", () => {
+    expect(paraInputDate("2000-02-29T00:00:00+00:00")).toBe("2000-02-29");
+  });
+  it("vazio/nulo vira string vazia", () => {
+    expect(paraInputDate(null)).toBe("");
+    expect(paraInputDate("")).toBe("");
+  });
+});
+
+describe("dataValida", () => {
+  it("aceita datas reais e vazio (opcional)", () => {
+    expect(dataValida("1990-01-01")).toBe(true);
+    expect(dataValida("2028-02-29")).toBe(true); // bissexto
+    expect(dataValida("")).toBe(true);
+    expect(dataValida(null)).toBe(true);
+  });
+  it("rejeita datas impossíveis", () => {
+    expect(dataValida("2026-02-30")).toBe(false);
+    expect(dataValida("2026-13-01")).toBe(false);
+    expect(dataValida("2026-02-29")).toBe(false); // não-bissexto
+    expect(dataValida("abc")).toBe(false);
   });
 });
 

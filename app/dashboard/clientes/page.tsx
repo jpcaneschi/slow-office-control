@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CsvTools } from "@/components/dashboard/csv-tools";
+import { paraInputDate, dataValida, hojeISO } from "@/lib/datas";
 
 type Cliente = {
   id: string;
@@ -73,7 +74,7 @@ export default function ClientesPage() {
     setTelefone(cliente.telefone || "");
     setCpf(cliente.cpf || "");
     setStatus(cliente.status || "ativo");
-    setDataNascimento(cliente.data_nascimento || "");
+    setDataNascimento(paraInputDate(cliente.data_nascimento));
     setErro("");
   }
 
@@ -100,6 +101,11 @@ export default function ClientesPage() {
 
     if (!nome.trim()) {
       setErro("O nome do cliente é obrigatório.");
+      return;
+    }
+
+    if (!dataValida(dataNascimento)) {
+      setErro("Data de nascimento inválida.");
       return;
     }
 
@@ -214,6 +220,7 @@ export default function ClientesPage() {
               <input
                 type="date"
                 value={dataNascimento}
+                max={hojeISO()}
                 onChange={(e) => setDataNascimento(e.target.value)}
                 className={inputClass}
               />
@@ -259,7 +266,7 @@ export default function ClientesPage() {
                 c.telefone || "",
                 c.cpf || "",
                 c.status || "ativo",
-                c.data_nascimento || "",
+                paraInputDate(c.data_nascimento),
               ])}
               ajuda="Colunas: nome, telefone, cpf, status, data_nascimento (AAAA-MM-DD)."
               onImportar={async (linhas) => {
