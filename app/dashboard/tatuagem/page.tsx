@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { hojeISO } from "@/lib/datas";
 
 type Atendimento = {
   id: string;
@@ -33,7 +34,7 @@ function brl(n: number) {
 }
 
 function hoje() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeISO();
 }
 
 function formatData(iso: string) {

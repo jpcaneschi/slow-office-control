@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, Receipt, Wallet, PenTool, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
 import {
   PromissoriaPdf,
   ValePdf,
@@ -36,11 +37,10 @@ function brl(n: number) {
   }).format(Number.isFinite(n) ? n : 0);
 }
 function hoje() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeISO();
 }
 function primeiroDiaMes() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return primeiroDiaMesISO();
 }
 function refMesAno() {
   const s = new Date().toLocaleDateString("pt-BR", {

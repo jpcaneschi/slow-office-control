@@ -26,7 +26,13 @@ function fmtData(iso: string) {
 }
 
 function hojeISO() {
-  return new Date().toISOString().slice(0, 10);
+  // Data de emissão no fuso de São Paulo (evita virar o dia à noite via UTC).
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 // Número de documento a partir da data + sufixo curto (ex.: PROM-20260803-482).

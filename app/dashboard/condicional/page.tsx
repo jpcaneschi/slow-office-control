@@ -6,6 +6,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CondicionalPdfDocument } from "@/components/pdf/condicional-pdf-document";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import {
+  hojeISO,
+  somarDiasISO,
+  parseDataLocal,
+  formatDataBR,
+} from "@/lib/datas";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -64,9 +70,7 @@ function formatCurrency(value: number) {
 }
 
 function somarDias(dataBase: string, dias: number) {
-  const data = new Date(dataBase);
-  data.setDate(data.getDate() + dias);
-  return data.toISOString().slice(0, 10);
+  return somarDiasISO(dataBase, dias);
 }
 
 export default function CondicionalPage() {
@@ -79,7 +83,7 @@ export default function CondicionalPage() {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeISO();
 
   const [clienteId, setClienteId] = useState("");
   const [responsavel, setResponsavel] = useState("");
@@ -174,7 +178,9 @@ export default function CondicionalPage() {
     if (filtroStatus === "todos") return condicionais;
     if (filtroStatus === "atrasado")
       return condicionais.filter(
-        (i) => i.status === "aberto" && new Date(i.data_limite) < new Date(hoje)
+        (i) =>
+          i.status === "aberto" &&
+          parseDataLocal(i.data_limite) < parseDataLocal(hoje)
       );
     return condicionais.filter((i) => i.status === filtroStatus);
   }, [condicionais, filtroStatus, hoje]);
@@ -184,11 +190,11 @@ export default function CondicionalPage() {
   }, [condicionais]);
 
   const condicionaisAtrasados = useMemo(() => {
-    const hojeDate = new Date(hoje);
+    const hojeDate = parseDataLocal(hoje);
 
     return condicionais.filter((item) => {
       if (item.status !== "aberto") return false;
-      return new Date(item.data_limite) < hojeDate;
+      return parseDataLocal(item.data_limite) < hojeDate;
     });
   }, [condicionais, hoje]);
 
@@ -392,7 +398,7 @@ export default function CondicionalPage() {
       .from("condicionais")
       .update({
         status: "recolhido",
-        data_retorno: new Date().toISOString().slice(0, 10),
+        data_retorno: hojeISO(),
       })
       .eq("id", condicionalId);
 
@@ -409,7 +415,7 @@ export default function CondicionalPage() {
       .from("condicionais")
       .update({
         status: "finalizado",
-        data_retorno: new Date().toISOString().slice(0, 10),
+        data_retorno: hojeISO(),
       })
       .eq("id", condicionalId);
 
@@ -739,7 +745,7 @@ export default function CondicionalPage() {
                   const itens = getItensDoCondicional(condicional.id);
                   const atrasado =
                     condicional.status === "aberto" &&
-                    new Date(condicional.data_limite) < new Date(hoje);
+                    parseDataLocal(condicional.data_limite) < parseDataLocal(hoje);
 
                   return (
                     <div
@@ -773,8 +779,8 @@ export default function CondicionalPage() {
                           </div>
 
                           <p className="text-sm text-[#64748b]">
-                            Saída: {new Date(condicional.data_saida).toLocaleDateString("pt-BR")} ·{" "}
-                            Limite: {new Date(condicional.data_limite).toLocaleDateString("pt-BR")}
+                            Saída: {formatDataBR(condicional.data_saida)} ·{" "}
+                            Limite: {formatDataBR(condicional.data_limite)}
                           </p>
 
                           <p className="text-sm text-[#64748b]">

@@ -5,6 +5,7 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
+import { formatDataBR } from "@/lib/datas";
 
 type PdfItem = {
   nome: string;
@@ -23,7 +24,7 @@ type CondicionalPdfDocumentProps = {
 };
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("pt-BR");
+  return formatDataBR(value);
 }
 
 function safeText(value: string | null | undefined) {

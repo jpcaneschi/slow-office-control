@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
+import { hojeISO, formatDataBR, dataLocalMs } from "@/lib/datas";
 
 type Venda = {
   id: string;
@@ -180,7 +181,7 @@ export default function FinanceiroPage() {
     return atendimentos
       .filter((a) => {
         if (!a.data) return false;
-        const t = new Date(a.data).getTime();
+        const t = dataLocalMs(a.data);
         return t >= janela.ini && t < janela.fim;
       })
       .reduce(
@@ -223,7 +224,7 @@ export default function FinanceiroPage() {
   const despesasPeriodo = useMemo(
     () =>
       despesas.filter((d) => {
-        const t = new Date(d.data).getTime();
+        const t = dataLocalMs(d.data);
         return t >= janela.ini && t < janela.fim;
       }),
     [despesas, janela]
@@ -242,7 +243,7 @@ export default function FinanceiroPage() {
     ).length;
   }, [vendas, idsConcluidas]);
 
-  const mesPrefix = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const mesPrefix = hojeISO().slice(0, 7); // "YYYY-MM" (fuso São Paulo)
 
   const totalFixoMensal = useMemo(
     () =>
@@ -353,7 +354,7 @@ export default function FinanceiroPage() {
       descricao: descricao.trim(),
       categoria,
       valor: valorNumero,
-      data: dataDespesa || new Date().toISOString().slice(0, 10),
+      data: dataDespesa || hojeISO(),
       responsavel: responsavel.trim() || null,
       observacao: observacao.trim() || null,
     });
@@ -664,7 +665,7 @@ export default function FinanceiroPage() {
                       <div>
                         <p className="text-sm font-bold text-[#0f172a]">{despesa.descricao}</p>
                         <p className="mt-1 text-sm text-[#64748b]">
-                          {despesa.categoria} · {new Date(despesa.data).toLocaleDateString("pt-BR")}
+                          {despesa.categoria} · {formatDataBR(despesa.data)}
                         </p>
                         <p className="text-sm text-[#64748b]">
                           Responsável: {despesa.responsavel || "-"}

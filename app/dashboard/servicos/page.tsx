@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
+import { formatDataBR } from "@/lib/datas";
 
 type Servico = {
   id: string;
@@ -523,7 +524,7 @@ export default function ServicosPage() {
                         "Atendimento"}
                     </p>
                     <p className="mt-1 text-xs text-[#64748b]">
-                      {new Date(isoToDate(a.data)).toLocaleDateString("pt-BR")} ·
+                      {formatDataBR(a.data)} ·
                       Cliente: {nomeCliente(a.cliente_id)} · Prof.:{" "}
                       {nomeFunc(a.funcionario_id)}
                     </p>
