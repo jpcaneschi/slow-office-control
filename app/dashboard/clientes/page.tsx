@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CsvTools } from "@/components/dashboard/csv-tools";
 
 type Cliente = {
   id: string;
@@ -248,6 +249,39 @@ export default function ClientesPage() {
         </div>
 
         <div className={cardClass}>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <h2 className="text-lg font-bold text-[#0f172a]">Clientes</h2>
+            <CsvTools
+              nomeArquivo="clientes"
+              headers={["nome", "telefone", "cpf", "status", "data_nascimento"]}
+              linhas={clientes.map((c) => [
+                c.nome,
+                c.telefone || "",
+                c.cpf || "",
+                c.status || "ativo",
+                c.data_nascimento || "",
+              ])}
+              ajuda="Colunas: nome, telefone, cpf, status, data_nascimento (AAAA-MM-DD)."
+              onImportar={async (linhas) => {
+                const novos = linhas
+                  .map((r) => ({
+                    nome: (r.nome || "").trim(),
+                    telefone: (r.telefone || "").trim() || null,
+                    cpf: (r.cpf || "").trim() || null,
+                    status: (r.status || "").trim() || "ativo",
+                    data_nascimento: (r.data_nascimento || "").trim() || null,
+                  }))
+                  .filter((c) => c.nome);
+                if (novos.length === 0)
+                  return { ok: 0, erro: "Nenhuma linha com nome válido." };
+                const { error } = await supabase.from("clientes").insert(novos);
+                if (error) return { ok: 0, erro: error.message };
+                await carregarClientes();
+                return { ok: novos.length };
+              }}
+            />
+          </div>
+
           {erro && (
             <div className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
               {erro}

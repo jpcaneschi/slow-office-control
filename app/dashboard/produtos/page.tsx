@@ -5,6 +5,7 @@ import { Package } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO, carregarConfigEmpresa } from "@/lib/empresa-config";
+import { CsvTools } from "@/components/dashboard/csv-tools";
 
 type Produto = {
   id: string;
@@ -1031,9 +1032,41 @@ export default function ProdutosPage() {
           </div>
 
           <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Produtos cadastrados
-            </h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+                Produtos cadastrados
+              </h2>
+              <CsvTools
+                nomeArquivo="produtos"
+                headers={["nome", "categoria", "preco", "custo", "estoque", "status"]}
+                linhas={produtos.map((p) => [
+                  p.nome,
+                  p.categoria || "",
+                  Number(p.preco || 0),
+                  Number(p.custo || 0),
+                  estoqueEfetivo(p),
+                  p.status || "ativo",
+                ])}
+                ajuda="Colunas: nome, categoria, preco, custo, estoque, status."
+                onImportar={async (linhas) => {
+                  const novos = linhas
+                    .map((r) => ({
+                      nome: (r.nome || "").trim(),
+                      categoria: (r.categoria || "").trim() || null,
+                      preco: Number(r.preco || 0),
+                      custo: Number(r.custo || 0),
+                      estoque: Number(r.estoque || 0),
+                      status: (r.status || "").trim() || "ativo",
+                    }))
+                    .filter((p) => p.nome);
+                  if (novos.length === 0) return { ok: 0, erro: "Nenhuma linha com nome válido." };
+                  const { error } = await supabase.from("produtos").insert(novos);
+                  if (error) return { ok: 0, erro: error.message };
+                  await carregarDados();
+                  return { ok: novos.length };
+                }}
+              />
+            </div>
 
             {loading && <p className="mt-4 text-[#64748b]">Carregando produtos...</p>}
 
