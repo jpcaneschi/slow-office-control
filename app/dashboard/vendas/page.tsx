@@ -184,6 +184,16 @@ export default function VendasPage() {
     carregarDados();
   }, []);
 
+  // Acessibilidade: fecha o modal de cancelamento com a tecla Esc.
+  useEffect(() => {
+    if (!cancelandoVenda) return;
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape" && !cancelando) setCancelandoVenda(null);
+    }
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [cancelandoVenda, cancelando]);
+
   // Filtro global de período (mesmo do Financeiro/Dashboard).
   const { period } = usePeriod();
   const { papel } = usePapel();
