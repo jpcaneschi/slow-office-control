@@ -46,6 +46,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const reqId = useRef(0);
 
   const termo = q.trim();
 
@@ -58,8 +59,11 @@ export function GlobalSearch() {
     }
     setLoading(true);
     setOpen(true);
+    const meuReq = ++reqId.current;
     const id = setTimeout(async () => {
       const r = await buscarGlobal(termo);
+      // Descarta resultado obsoleto: só aplica se ainda é a busca mais recente.
+      if (meuReq !== reqId.current) return;
       setResultados(r);
       setSel(0);
       setLoading(false);
@@ -77,6 +81,8 @@ export function GlobalSearch() {
 
   function abrir(r: ResultadoBusca) {
     setOpen(false);
+    setQ(""); // limpa a busca ao navegar para outro módulo
+    reqId.current++; // invalida qualquer busca em voo
     router.push(r.href);
   }
 

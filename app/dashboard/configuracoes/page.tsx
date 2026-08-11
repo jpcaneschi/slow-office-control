@@ -5,6 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 import { EquipeSection } from "@/components/dashboard/equipe-section";
+import {
+  MODULOS_OPCIONAIS,
+  MODULOS_PADRAO,
+  MODULO_LABEL,
+  MODULO_DESCRICAO,
+} from "@/lib/modulos";
 
 type Configuracao = {
   id: string;
@@ -53,6 +59,7 @@ export default function ConfiguracoesPage() {
   const [novaCategoria, setNovaCategoria] = useState("");
   const [responsaveis, setResponsaveis] = useState<string[]>([]);
   const [novoResponsavel, setNovoResponsavel] = useState("");
+  const [modulosAtivos, setModulosAtivos] = useState<string[]>([...MODULOS_PADRAO]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
@@ -88,7 +95,7 @@ export default function ConfiguracoesPage() {
       supabase
         .from("configuracoes")
         .select(
-          "id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, condicional_prazo_dias, parcela_minima, promissoria_prazo_meses, categorias_produto, responsaveis"
+          "id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, condicional_prazo_dias, parcela_minima, promissoria_prazo_meses, categorias_produto, responsaveis, modulos_ativos"
         )
         .order("created_at", { ascending: true })
         .limit(1)
@@ -131,6 +138,11 @@ export default function ConfiguracoesPage() {
           : CATEGORIAS_PADRAO
       );
       setResponsaveis(configuracaoData.responsaveis ?? []);
+      setModulosAtivos(
+        (configuracaoData.modulos_ativos as string[] | null)?.length
+          ? (configuracaoData.modulos_ativos as string[])
+          : [...MODULOS_PADRAO]
+      );
     } else {
       // Ainda sem configuração: já mostra os padrões pra facilitar o 1º salvamento.
       setCategorias(CATEGORIAS_PADRAO);
@@ -301,6 +313,7 @@ export default function ConfiguracoesPage() {
       promissoria_prazo_meses: Math.max(0, Math.round(Number(promissoriaPrazo) || 0)),
       categorias_produto: categorias,
       responsaveis,
+      modulos_ativos: modulosAtivos,
     };
 
     // Atualiza se já existe config; senão cria (nova empresa).
@@ -711,6 +724,52 @@ export default function ConfiguracoesPage() {
                 <p className="mt-1.5 text-xs text-[#94a3b8]">
                   Viram opção de &quot;responsável&quot; em Vendas, Condicional e
                   Financeiro.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#475569]">
+                  Módulos do negócio
+                </label>
+                <p className="mb-3 text-xs text-[#94a3b8]">
+                  Ative só o que a sua loja usa. O que estiver desligado some do
+                  menu (e é bloqueado no sistema).
+                </p>
+                <div className="space-y-2">
+                  {MODULOS_OPCIONAIS.map((m) => {
+                    const ativo = modulosAtivos.includes(m);
+                    return (
+                      <label
+                        key={m}
+                        className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={ativo}
+                          onChange={(e) =>
+                            setModulosAtivos((atual) =>
+                              e.target.checked
+                                ? [...new Set([...atual, m])]
+                                : atual.filter((x) => x !== m)
+                            )
+                          }
+                          className="mt-0.5 h-4 w-4 accent-[#2563eb]"
+                        />
+                        <span>
+                          <span className="text-sm font-semibold text-[#334155]">
+                            {MODULO_LABEL[m]}
+                          </span>
+                          <span className="block text-xs text-[#94a3b8]">
+                            {MODULO_DESCRICAO[m]}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-[#94a3b8]">
+                  Vendas, produtos, clientes, financeiro e promissórias são o
+                  núcleo e ficam sempre ativos.
                 </p>
               </div>
             </div>

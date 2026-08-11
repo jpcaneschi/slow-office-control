@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { MODULOS_PADRAO } from "@/lib/modulos";
 
 // Categorias e demais padrões usados quando a empresa ainda não configurou.
 export const CATEGORIAS_PADRAO = [
@@ -24,13 +25,15 @@ export type EmpresaConfig = {
   promissoria_prazo_meses: number;
   categorias_produto: string[];
   responsaveis: string[];
+  modulos_ativos: string[];
 };
 
 const CAMPOS =
-  "id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, condicional_prazo_dias, parcela_minima, promissoria_prazo_meses, categorias_produto, responsaveis";
+  "id, nome_operacao, pix_desconto, tatuagem_percentual, max_parcelas, condicional_prazo_dias, parcela_minima, promissoria_prazo_meses, categorias_produto, responsaveis, modulos_ativos";
 
 function normalizar(data: Record<string, unknown> | null): EmpresaConfig {
   const cats = (data?.categorias_produto as string[]) ?? [];
+  const mods = (data?.modulos_ativos as string[]) ?? null;
   return {
     id: (data?.id as string) ?? null,
     nome_operacao: (data?.nome_operacao as string) || "",
@@ -42,6 +45,7 @@ function normalizar(data: Record<string, unknown> | null): EmpresaConfig {
     promissoria_prazo_meses: Number(data?.promissoria_prazo_meses ?? 4),
     categorias_produto: cats.length ? cats : CATEGORIAS_PADRAO,
     responsaveis: (data?.responsaveis as string[]) ?? [],
+    modulos_ativos: mods && mods.length ? mods : [...MODULOS_PADRAO],
   };
 }
 

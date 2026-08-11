@@ -4,23 +4,26 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeAcessar } from "@/lib/permissoes";
+import { rotaBloqueadaPorModulo } from "@/lib/modulos";
 
 /**
  * Redireciona para /dashboard quando o papel atual não pode acessar a rota.
  * Só age depois que o papel foi carregado (evita redirecionar no flash inicial).
  */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { papel, carregando } = usePapel();
+  const { papel, carregando, modulos } = usePapel();
   const pathname = usePathname();
   const router = useRouter();
 
-  const permitido = carregando || podeAcessar(papel, pathname);
+  const bloqueado =
+    !podeAcessar(papel, pathname) || rotaBloqueadaPorModulo(pathname, modulos);
+  const permitido = carregando || !bloqueado;
 
   useEffect(() => {
-    if (!carregando && !podeAcessar(papel, pathname)) {
+    if (!carregando && bloqueado) {
       router.replace("/dashboard");
     }
-  }, [carregando, papel, pathname, router]);
+  }, [carregando, bloqueado, router]);
 
   if (!permitido) {
     return (

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
+import { formatDataBR } from "@/lib/datas";
 
 export type ResultadoBusca = {
   id: string;
@@ -11,10 +12,7 @@ export type ResultadoBusca = {
 };
 
 function dataBR(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(
-    d.getMonth() + 1
-  ).padStart(2, "0")}/${d.getFullYear()}`;
+  return formatDataBR(iso);
 }
 
 /**

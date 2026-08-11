@@ -32,6 +32,7 @@ import { GlobalSearch } from "@/components/dashboard/global-search";
 import { RoleProvider, usePapel } from "@/components/dashboard/role-context";
 import { RouteGuard } from "@/components/dashboard/route-guard";
 import { podeAcessar } from "@/lib/permissoes";
+import { rotaBloqueadaPorModulo } from "@/lib/modulos";
 
 type NavItem = {
   href: string;
@@ -96,11 +97,15 @@ function NavSections({
   isActive: (href: string) => boolean;
   onNavigate?: () => void;
 }) {
-  const { papel } = usePapel();
+  const { papel, modulos } = usePapel();
   const gruposVisiveis = navGroups
     .map((grupo) => ({
       ...grupo,
-      itens: grupo.itens.filter((item) => podeAcessar(papel, item.href)),
+      itens: grupo.itens.filter(
+        (item) =>
+          podeAcessar(papel, item.href) &&
+          !rotaBloqueadaPorModulo(item.href, modulos)
+      ),
     }))
     .filter((grupo) => grupo.itens.length > 0);
 
@@ -143,8 +148,12 @@ function MobileBottomNav({
 }: {
   isActive: (href: string) => boolean;
 }) {
-  const { papel } = usePapel();
-  const itens = mobileNavItems.filter((item) => podeAcessar(papel, item.href));
+  const { papel, modulos } = usePapel();
+  const itens = mobileNavItems.filter(
+    (item) =>
+      podeAcessar(papel, item.href) &&
+      !rotaBloqueadaPorModulo(item.href, modulos)
+  );
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
       <div
