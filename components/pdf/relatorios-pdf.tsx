@@ -208,7 +208,7 @@ function Header({
   return (
     <View style={styles.header}>
       <View>
-        <Text style={styles.loja}>{loja || "Loja"}</Text>
+        <Text style={styles.loja}>{loja || "Sua Empresa"}</Text>
         <Text style={styles.lojaSub}>Documento oficial da loja</Text>
       </View>
       <View style={styles.headRight}>
@@ -272,7 +272,7 @@ function Rodape({ loja }: { loja: string }) {
       style={styles.footer}
       fixed
       render={({ pageNumber, totalPages }) =>
-        `${loja || "Loja"}  ·  Documento gerado pelo sistema  ·  Página ${pageNumber}/${totalPages}`
+        `${loja || "Sua Empresa"}  ·  Documento gerado pelo sistema  ·  Página ${pageNumber}/${totalPages}`
       }
     />
   );
@@ -312,7 +312,7 @@ export function PromissoriaPdf({
 
         <Text style={styles.paragraph}>
           No dia {fmtData(vencimento)}, pagarei por esta única via de NOTA
-          PROMISSÓRIA a {loja || "credor"}, ou à sua ordem, a quantia de{" "}
+          PROMISSÓRIA a {loja || "Sua Empresa"}, ou à sua ordem, a quantia de{" "}
           {brl(valor)} em moeda corrente deste país, pagável em{" "}
           {cidade || "praça do credor"}.
           {referencia ? ` Referente a: ${referencia}.` : ""}
@@ -375,7 +375,7 @@ export function ValePdf({
         </View>
 
         <Text style={styles.paragraph}>
-          Recebi de {loja || "empresa"} a quantia de {brl(valor)} a título de
+          Recebi de {loja || "Sua Empresa"} a quantia de {brl(valor)} a título de
           vale/adiantamento
           {motivo ? `, referente a ${motivo}` : ""}.
           {descontarEmFolha
@@ -501,7 +501,7 @@ export function FolhaSalarialPdf({
         </View>
 
         <Text style={styles.paragraph}>
-          Recebi de {loja || "empresa"} a importância líquida de {brl(liquido)},
+          Recebi de {loja || "Sua Empresa"} a importância líquida de {brl(liquido)},
           referente ao pagamento acima descrito ({referencia}), dando plena e
           geral quitação.
         </Text>

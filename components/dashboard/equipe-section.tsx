@@ -111,6 +111,8 @@ export function EquipeSection() {
   }
 
   async function revogarConvite(id: string) {
+    if (!window.confirm("Revogar este convite? A pessoa não poderá mais entrar com ele."))
+      return;
     const { error } = await supabase
       .from("organization_invites")
       .delete()

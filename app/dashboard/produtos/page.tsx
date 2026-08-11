@@ -279,6 +279,7 @@ export default function ProdutosPage() {
   }
 
   async function removerVariacao(id: string) {
+    if (!window.confirm("Remover esta variação da grade?")) return;
     const { error } = await supabase
       .from("produto_variacoes")
       .delete()
@@ -381,6 +382,35 @@ export default function ProdutosPage() {
   }
 
   async function excluirProduto(id: string) {
+    setErro("");
+    // Não excluir fisicamente produto com histórico — preferir inativar
+    // (preserva vendas/movimentações e não quebra relatórios).
+    const { count: cItens } = await supabase
+      .from("venda_itens")
+      .select("id", { count: "exact", head: true })
+      .eq("produto_id", id);
+    const { count: cMov } = await supabase
+      .from("estoque_movimentacoes")
+      .select("id", { count: "exact", head: true })
+      .eq("produto_id", id);
+    if ((cItens || 0) > 0 || (cMov || 0) > 0) {
+      const inativar = window.confirm(
+        "Este produto tem histórico (vendas/movimentações) e não pode ser excluído sem perder esse histórico.\n\nDeseja INATIVAR o produto? (ele some das listagens de venda, mas o histórico é preservado)"
+      );
+      if (!inativar) return;
+      const { error: eInat } = await supabase
+        .from("produtos")
+        .update({ status: "inativo" })
+        .eq("id", id);
+      if (eInat) {
+        setErro(eInat.message);
+        return;
+      }
+      if (editandoId === id) limparFormulario();
+      await carregarDados();
+      return;
+    }
+
     const confirmar = window.confirm("Tem certeza que deseja excluir este produto?");
     if (!confirmar) return;
 
