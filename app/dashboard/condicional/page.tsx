@@ -23,6 +23,7 @@ type Produto = {
   id: string;
   nome: string;
   preco: number | null;
+  custo: number | null;
   estoque: number | null;
   status: string | null;
 };
@@ -92,6 +93,12 @@ export default function CondicionalPage() {
   const [quantidade, setQuantidade] = useState("1");
   const [itensRascunho, setItensRascunho] = useState<ItemRascunho[]>([]);
 
+  // Conversão condicional → venda
+  const [convertendoId, setConvertendoId] = useState<string | null>(null);
+  const [itensVendidos, setItensVendidos] = useState<Set<string>>(new Set());
+  const [formaConversao, setFormaConversao] = useState("pix");
+  const [convertendo, setConvertendo] = useState(false);
+
   async function carregarDados() {
     setLoading(true);
     setErro("");
@@ -100,7 +107,7 @@ export default function CondicionalPage() {
       supabase.from("clientes").select("id, nome").order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, estoque, status")
+        .select("id, nome, preco, custo, estoque, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("condicionais")
@@ -335,14 +342,16 @@ export default function CondicionalPage() {
       }
 
       for (const item of itensRascunho) {
-        const produto = produtos.find((p) => p.id === item.produto_id);
-        const estoqueAtual = Number(produto?.estoque || 0);
-        const novoEstoque = estoqueAtual - item.quantidade;
-
-        const { error: estoqueError } = await supabase
-          .from("produtos")
-          .update({ estoque: novoEstoque })
-          .eq("id", item.produto_id);
+        const { error: estoqueError } = await supabase.rpc(
+          "registrar_movimentacao",
+          {
+            p_produto_id: item.produto_id,
+            p_tipo: "condicional",
+            p_quantidade: item.quantidade,
+            p_motivo: "Saída em condicional",
+            p_referencia_id: condicionalCriado.id,
+          }
+        );
 
         if (estoqueError) {
           throw new Error(estoqueError.message);
@@ -362,13 +371,16 @@ export default function CondicionalPage() {
     const itens = getItensDoCondicional(condicionalId);
 
     for (const item of itens) {
-      const produto = produtos.find((p) => p.id === item.produto_id);
-      const estoqueAtual = Number(produto?.estoque || 0);
-
-      const { error: estoqueError } = await supabase
-        .from("produtos")
-        .update({ estoque: estoqueAtual + item.quantidade })
-        .eq("id", item.produto_id);
+      const { error: estoqueError } = await supabase.rpc(
+        "registrar_movimentacao",
+        {
+          p_produto_id: item.produto_id,
+          p_tipo: "retorno_condicional",
+          p_quantidade: item.quantidade,
+          p_motivo: "Recolhimento de condicional",
+          p_referencia_id: condicionalId,
+        }
+      );
 
       if (estoqueError) {
         setErro(estoqueError.message);
@@ -406,6 +418,63 @@ export default function CondicionalPage() {
       return;
     }
 
+    await carregarDados();
+  }
+
+  function abrirConversao(condicionalId: string) {
+    setErro("");
+    setConvertendoId((atual) => (atual === condicionalId ? null : condicionalId));
+    const itens = getItensDoCondicional(condicionalId);
+    // Por padrão, todos os itens marcados como "vendidos".
+    setItensVendidos(new Set(itens.map((i) => i.id)));
+    setFormaConversao("pix");
+  }
+
+  function alternarItemVendido(itemId: string) {
+    setItensVendidos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(itemId)) novo.delete(itemId);
+      else novo.add(itemId);
+      return novo;
+    });
+  }
+
+  async function converterEmVenda(condicionalId: string) {
+    setErro("");
+    const itens = getItensDoCondicional(condicionalId);
+    const vendidos = itens
+      .filter((i) => itensVendidos.has(i.id))
+      .map((i) => {
+        const prod = produtos.find((p) => p.id === i.produto_id);
+        return {
+          condicional_item_id: i.id,
+          produto_id: i.produto_id,
+          quantidade: i.quantidade,
+          preco_unitario: Number(i.preco_unitario || 0),
+          custo_unitario: Number(prod?.custo || 0),
+        };
+      });
+
+    if (vendidos.length === 0) {
+      setErro(
+        "Selecione ao menos um item para vender (ou use 'Marcar recolhido' se o cliente devolveu tudo)."
+      );
+      return;
+    }
+
+    setConvertendo(true);
+    const { error } = await supabase.rpc("converter_condicional_venda", {
+      p_condicional_id: condicionalId,
+      p_forma_pagamento: formaConversao,
+      p_itens_vendidos: vendidos,
+    });
+    if (error) {
+      setErro(error.message);
+      setConvertendo(false);
+      return;
+    }
+    setConvertendoId(null);
+    setConvertendo(false);
     await carregarDados();
   }
 
@@ -768,10 +837,18 @@ export default function CondicionalPage() {
                             <>
                               <button
                                 type="button"
-                                onClick={() => marcarComoRecolhido(condicional.id)}
+                                onClick={() => abrirConversao(condicional.id)}
                                 className="rounded-2xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
                               >
-                                Marcar recolhido
+                                Converter em venda
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => marcarComoRecolhido(condicional.id)}
+                                className="rounded-2xl border border-[#e8ecf4] bg-white px-4 py-2 text-sm font-bold text-[#334155] transition hover:bg-[#f4f6fb]"
+                              >
+                                Recolher tudo
                               </button>
 
                               <button
@@ -785,6 +862,97 @@ export default function CondicionalPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Painel de conversão em venda */}
+                      {convertendoId === condicional.id && (
+                        <div className="mt-4 rounded-[20px] border border-[#bfdbfe] bg-[#eff6ff] p-4">
+                          <p className="text-sm font-black text-[#0f172a]">
+                            Converter em venda
+                          </p>
+                          <p className="mt-1 text-xs text-[#64748b]">
+                            Marque o que o cliente ficou. O que não for marcado
+                            volta ao estoque.
+                          </p>
+
+                          <div className="mt-3 space-y-2">
+                            {itens.map((item) => {
+                              const marcado = itensVendidos.has(item.id);
+                              return (
+                                <label
+                                  key={item.id}
+                                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={marcado}
+                                    onChange={() => alternarItemVendido(item.id)}
+                                    className="h-4 w-4 accent-[#2563eb]"
+                                  />
+                                  <span className="flex-1 text-[#0f172a]">
+                                    {getProdutoNome(item.produto_id)} ·{" "}
+                                    {item.quantidade}x{" "}
+                                    {formatCurrency(Number(item.preco_unitario || 0))}
+                                  </span>
+                                  <span className="text-xs font-semibold text-[#64748b]">
+                                    {marcado ? "vende" : "devolve"}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs text-[#475569]">
+                                Pagamento
+                              </label>
+                              <select
+                                value={formaConversao}
+                                onChange={(e) => setFormaConversao(e.target.value)}
+                                className="rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm outline-none"
+                              >
+                                <option value="pix">Pix</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="cartao">Cartão</option>
+                              </select>
+                            </div>
+                            <div className="ml-auto text-right">
+                              <p className="text-xs text-[#64748b]">Total a vender</p>
+                              <p className="text-lg font-black text-[#1d4ed8]">
+                                {formatCurrency(
+                                  itens
+                                    .filter((i) => itensVendidos.has(i.id))
+                                    .reduce(
+                                      (s, i) =>
+                                        s +
+                                        i.quantidade *
+                                          Number(i.preco_unitario || 0),
+                                      0
+                                    )
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => converterEmVenda(condicional.id)}
+                              disabled={convertendo}
+                              className="rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+                            >
+                              {convertendo ? "Convertendo..." : "Confirmar venda"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConvertendoId(null)}
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2.5 text-sm font-bold text-[#475569] transition hover:bg-[#f4f6fb]"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
