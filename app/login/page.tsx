@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [senha2, setSenha2] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
@@ -31,6 +32,7 @@ export default function LoginPage() {
     setSessaoEmail(null);
     setEmail("");
     setSenha("");
+    setSenha2("");
     setNome("");
     setErro("");
     setAviso("");
@@ -53,9 +55,19 @@ export default function LoginPage() {
       setErro("Informe e-mail e senha.");
       return;
     }
-    if (modo === "criar" && senha.length < 6) {
-      setErro("A senha deve ter pelo menos 6 caracteres.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErro("Informe um e-mail válido.");
       return;
+    }
+    if (modo === "criar") {
+      if (senha.length < 6) {
+        setErro("A senha deve ter pelo menos 6 caracteres.");
+        return;
+      }
+      if (senha !== senha2) {
+        setErro("As senhas não conferem.");
+        return;
+      }
     }
 
     setCarregando(true);
@@ -164,6 +176,7 @@ export default function LoginPage() {
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Nome da empresa / seu nome"
+                required
                 className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
               />
             </Campo>
@@ -176,6 +189,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
               autoComplete="email"
+              required
               className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
             />
           </Campo>
@@ -187,9 +201,46 @@ export default function LoginPage() {
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Senha"
               autoComplete={modo === "entrar" ? "current-password" : "new-password"}
+              required
+              minLength={6}
               className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
             />
           </Campo>
+
+          {modo === "criar" && (
+            <>
+              {senha.length > 0 && (
+                <p
+                  className={`-mt-1 px-1 text-xs font-semibold ${
+                    senha.length >= 8 && /\d/.test(senha) && /[a-zA-Z]/.test(senha)
+                      ? "text-[#15803d]"
+                      : senha.length >= 6
+                        ? "text-[#b45309]"
+                        : "text-[#b91c1c]"
+                  }`}
+                >
+                  Força da senha:{" "}
+                  {senha.length >= 8 && /\d/.test(senha) && /[a-zA-Z]/.test(senha)
+                    ? "forte"
+                    : senha.length >= 6
+                      ? "média (use letras + números)"
+                      : "fraca (mínimo 6)"}
+                </p>
+              )}
+              <Campo icon={Lock}>
+                <input
+                  type="password"
+                  value={senha2}
+                  onChange={(e) => setSenha2(e.target.value)}
+                  placeholder="Confirmar senha"
+                  autoComplete="new-password"
+                  required
+                  minLength={6}
+                  className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
+                />
+              </Campo>
+            </>
+          )}
 
           <button
             type="submit"

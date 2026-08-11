@@ -111,6 +111,11 @@ const destaques = [
   },
 ];
 
+// Contatos reais vêm de variáveis de ambiente. Sem eles, os botões apontam
+// para o cadastro (nunca para um número/e-mail fictício).
+const WHATSAPP = (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "");
+const CONTATO_EMAIL = process.env.NEXT_PUBLIC_CONTATO_EMAIL || "";
+
 const depoimentos = [
   {
     nome: "Rafael Souza",
@@ -513,7 +518,12 @@ export default function LandingPage() {
               Quem usa, recomenda
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
-              Lojistas que trocaram a papelada pela organização do Nexo.
+              Cenários ilustrativos de como o Nexo organiza o dia a dia da loja.
+              <br />
+              <span className="text-xs text-[#94a3b8]">
+                * Exemplos ilustrativos — serão substituídos por histórias reais
+                de clientes.
+              </span>
             </p>
           </div>
           <div className="reveal mt-12 grid gap-6 md:grid-cols-3">
@@ -660,7 +670,13 @@ export default function LandingPage() {
               Criar conta grátis <ArrowRight className="h-4 w-4" />
             </Link>
             <a
-              href="mailto:contato@nexo.com.br"
+              href={
+                CONTATO_EMAIL
+                  ? `mailto:${CONTATO_EMAIL}`
+                  : WHATSAPP
+                    ? `https://wa.me/${WHATSAPP}`
+                    : "/login?novo=1"
+              }
               className="inline-flex items-center gap-2 rounded-full border border-white/30 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-white/10"
             >
               Falar com a gente
@@ -686,17 +702,19 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* WhatsApp flutuante (híbrido: quem prefere ajuda humana) */}
-      <a
-        href="https://wa.me/5500000000000?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20Nexo."
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Falar no WhatsApp"
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#25d366] px-4 py-3.5 font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] transition hover:brightness-105"
-      >
-        <MessageCircle className="h-5 w-5" />
-        <span className="hidden sm:inline">Fale no WhatsApp</span>
-      </a>
+      {/* WhatsApp flutuante — só aparece se houver um número real configurado. */}
+      {WHATSAPP && (
+        <a
+          href={`https://wa.me/${WHATSAPP}?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20Nexo.`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Falar no WhatsApp"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#25d366] px-4 py-3.5 font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] transition hover:brightness-105"
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="hidden sm:inline">Fale no WhatsApp</span>
+        </a>
+      )}
     </div>
   );
 }
