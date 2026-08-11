@@ -263,12 +263,20 @@ export default function ProdutosPage() {
     const confirmar = window.confirm("Tem certeza que deseja excluir este produto?");
     if (!confirmar) return;
 
+    const produtoAlvo = produtos.find((p) => p.id === id);
     const { error } = await supabase.from("produtos").delete().eq("id", id);
 
     if (error) {
       setErro(error.message);
       return;
     }
+
+    await supabase.rpc("log_auditoria", {
+      p_acao: "produto_excluido",
+      p_entidade: "produtos",
+      p_registro_id: id,
+      p_dados: { nome: produtoAlvo?.nome ?? null },
+    });
 
     if (editandoId === id) {
       limparFormulario();

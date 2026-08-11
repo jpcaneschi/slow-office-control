@@ -130,6 +130,12 @@ export function EquipeSection() {
       setErro(error.message);
       return;
     }
+    await supabase.rpc("log_auditoria", {
+      p_acao: "papel_alterado",
+      p_entidade: "organization_members",
+      p_registro_id: membro.id,
+      p_dados: { email: membro.email, de: membro.papel, para: valor },
+    });
     await carregar();
   }
 
@@ -144,6 +150,12 @@ export function EquipeSection() {
       setErro(error.message);
       return;
     }
+    await supabase.rpc("log_auditoria", {
+      p_acao: "membro_removido",
+      p_entidade: "organization_members",
+      p_registro_id: membro.id,
+      p_dados: { email: membro.email, papel: membro.papel },
+    });
     await carregar();
   }
 

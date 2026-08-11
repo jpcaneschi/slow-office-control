@@ -18,6 +18,7 @@ import {
   UserCog,
   Sparkles,
   CreditCard,
+  ShieldCheck,
   Menu,
   X,
   type LucideIcon,
@@ -72,6 +73,7 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
     titulo: "Sistema",
     itens: [
       { href: "/dashboard/assinatura", label: "Assinatura", icon: CreditCard },
+      { href: "/dashboard/auditoria", label: "Auditoria", icon: ShieldCheck },
       { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
     ],
   },

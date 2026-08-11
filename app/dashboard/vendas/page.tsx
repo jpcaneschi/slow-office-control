@@ -404,94 +404,51 @@ export default function VendasPage() {
       (f) => f.nome.trim().toLowerCase() === responsavel.trim().toLowerCase()
     );
 
+    // Venda ATÔMICA: um único RPC cria venda + itens + baixa de estoque +
+    // promissória numa transação (tudo ou nada). Sem estados parciais.
+    const itensPayload = itensRascunho.map((item) => ({
+      produto_id: item.produto_id,
+      variacao_id: item.variacao_id,
+      quantidade: item.quantidade,
+      preco_unitario: item.preco_unitario,
+      custo_unitario: item.custo_unitario,
+    }));
+
     try {
-      const { data: vendaCriada, error: vendaError } = await supabase
-        .from("vendas")
-        .insert({
-          cliente_id: clienteId || null,
-          responsavel,
-          funcionario_id: funcMatch ? funcMatch.id : null,
-          forma_pagamento: formaPagamento,
-          desconto_pix: descontoPixNumero,
-          parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
-          taxa: formaPagamento === "cartao" ? taxaNum : 0,
-          valor_liquido: valorLiquidoRascunho,
-          valor_recebido:
-            formaPagamento === "dinheiro"
-              ? recebidoNum
-              : formaPagamento === "misto"
-                ? entradaNum
-                : null,
-          troco: formaPagamento === "dinheiro" ? trocoRascunho : null,
-          subtotal: subtotalRascunho,
-          desconto: descontoManualNumero,
-          total: totalRascunho,
-          observacao: observacao.trim() || null,
-          status: "concluida",
-        })
-        .select("id")
-        .single();
+      const { error: rpcError } = await supabase.rpc("criar_venda", {
+        p_cliente_id: clienteId || null,
+        p_responsavel: responsavel,
+        p_funcionario_id: funcMatch ? funcMatch.id : null,
+        p_forma_pagamento: formaPagamento,
+        p_desconto_pix: descontoPixNumero,
+        p_parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
+        p_taxa: formaPagamento === "cartao" ? taxaNum : 0,
+        p_valor_liquido: valorLiquidoRascunho,
+        p_valor_recebido:
+          formaPagamento === "dinheiro"
+            ? recebidoNum
+            : formaPagamento === "misto"
+              ? entradaNum
+              : null,
+        p_troco: formaPagamento === "dinheiro" ? trocoRascunho : null,
+        p_subtotal: subtotalRascunho,
+        p_desconto: descontoManualNumero,
+        p_total: totalRascunho,
+        p_observacao: observacao.trim() || null,
+        p_itens: itensPayload,
+        p_gera_promissoria: geraPromissoria,
+        p_promissoria_valor: geraPromissoria ? valorPromissoria : null,
+        p_promissoria_parcelas: geraPromissoria ? mesesNum : null,
+        p_promissoria_vencimento: geraPromissoria ? venctoPromissoria || null : null,
+        p_promissoria_obs: geraPromissoria
+          ? formaPagamento === "misto"
+            ? `Restante da venda (entrada ${formatCurrency(entradaNum)})`
+            : "Venda no fiado"
+          : null,
+      });
 
-      if (vendaError) {
-        throw new Error(vendaError.message);
-      }
-
-      const itensParaInserir = itensRascunho.map((item) => ({
-        venda_id: vendaCriada.id,
-        produto_id: item.produto_id,
-        variacao_id: item.variacao_id,
-        quantidade: item.quantidade,
-        preco_unitario: item.preco_unitario,
-        total_item: item.quantidade * item.preco_unitario,
-        custo_unitario: item.custo_unitario,
-      }));
-
-      const { error: itensError } = await supabase
-        .from("venda_itens")
-        .insert(itensParaInserir);
-
-      if (itensError) {
-        throw new Error(itensError.message);
-      }
-
-      for (const item of itensRascunho) {
-        const { error: estoqueError } = await supabase.rpc(
-          "registrar_movimentacao",
-          {
-            p_produto_id: item.produto_id,
-            p_tipo: "venda",
-            p_quantidade: item.quantidade,
-            p_motivo: "Venda",
-            p_referencia_id: vendaCriada.id,
-            p_variacao_id: item.variacao_id,
-          }
-        );
-
-        if (estoqueError) {
-          throw new Error(estoqueError.message);
-        }
-      }
-
-      // Venda no fiado / misto → gera a promissória ligada a esta venda.
-      if (geraPromissoria) {
-        const { error: promError } = await supabase
-          .from("promissorias")
-          .insert({
-            cliente_id: clienteId,
-            valor_total: valorPromissoria,
-            parcelas: mesesNum,
-            status: "em_aberto",
-            observacao:
-              formaPagamento === "misto"
-                ? `Restante da venda (entrada ${formatCurrency(entradaNum)})`
-                : "Venda no fiado",
-            data_vencimento: venctoPromissoria || null,
-            venda_id: vendaCriada.id,
-          });
-
-        if (promError) {
-          throw new Error(promError.message);
-        }
+      if (rpcError) {
+        throw new Error(rpcError.message);
       }
 
       limparFormulario();
@@ -534,6 +491,13 @@ export default function VendasPage() {
       setErro(error.message);
       return;
     }
+
+    await supabase.rpc("log_auditoria", {
+      p_acao: "venda_cancelada",
+      p_entidade: "vendas",
+      p_registro_id: id,
+      p_dados: { total: venda.total },
+    });
 
     await carregarDados();
   }
