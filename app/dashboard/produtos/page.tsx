@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO, carregarConfigEmpresa } from "@/lib/empresa-config";
 import { CsvTools } from "@/components/dashboard/csv-tools";
+import { formatDataHoraBR } from "@/lib/datas";
 
 type Produto = {
   id: string;
@@ -34,11 +35,33 @@ type Variacao = {
 type Movimentacao = {
   id: string;
   produto_id: string;
+  variacao_id: string | null;
   tipo: string;
   quantidade: number;
+  quantidade_anterior: number | null;
+  quantidade_posterior: number | null;
+  motivo: string | null;
   observacao: string | null;
+  user_id: string | null;
   created_at?: string;
 };
+
+// Rótulos amigáveis + se o tipo SOMA (entrada) ou subtrai (saída) do estoque.
+const TIPO_MOV: Record<string, { label: string; entrada: boolean }> = {
+  entrada: { label: "Entrada", entrada: true },
+  venda: { label: "Venda", entrada: false },
+  cancelamento: { label: "Cancelamento", entrada: true },
+  devolucao: { label: "Devolução", entrada: true },
+  condicional: { label: "Condicional enviado", entrada: false },
+  retorno_condicional: { label: "Retorno de condicional", entrada: true },
+  estoque_inicial: { label: "Estoque inicial", entrada: true },
+  importacao: { label: "Importação", entrada: true },
+  ajuste_positivo: { label: "Ajuste (+)", entrada: true },
+  saida: { label: "Saída", entrada: false },
+};
+function tipoInfo(t: string) {
+  return TIPO_MOV[t] || { label: t, entrada: false };
+}
 
 const statusOptions = ["ativo", "inativo"];
 
@@ -48,6 +71,8 @@ const MARKUP = 2.2;
 export default function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([]);
+  const [variacaoLabel, setVariacaoLabel] = useState<Record<string, string>>({});
+  const [movUserEmail, setMovUserEmail] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingMovimento, setSavingMovimento] = useState(false);
@@ -155,14 +180,24 @@ export default function ProdutosPage() {
       setErro("Informe ao menos tamanho ou cor da variação.");
       return;
     }
+    const estoqueNum = Number(varEstoque || 0);
+    const precoNum = varPreco ? Number(varPreco) : null;
+    if (!Number.isFinite(estoqueNum) || estoqueNum < 0) {
+      setErro("Estoque da variação não pode ser negativo.");
+      return;
+    }
+    if (precoNum !== null && (!Number.isFinite(precoNum) || precoNum < 0)) {
+      setErro("Preço da variação não pode ser negativo.");
+      return;
+    }
     setSavingVar(true);
     setErro("");
     const { error } = await supabase.from("produto_variacoes").insert({
       produto_id: editandoId,
       tamanho: varTamanho.trim() || null,
       cor: varCor.trim() || null,
-      estoque: Number(varEstoque || 0),
-      preco: varPreco ? Number(varPreco) : null,
+      estoque: estoqueNum,
+      preco: precoNum,
     });
     if (error) {
       setErro(error.message);
@@ -194,8 +229,11 @@ export default function ProdutosPage() {
   async function carregarMovimentacoes() {
     const { data, error } = await supabase
       .from("estoque_movimentacoes")
-      .select("id, produto_id, tipo, quantidade, observacao, created_at")
-      .order("created_at", { ascending: false });
+      .select(
+        "id, produto_id, variacao_id, tipo, quantidade, quantidade_anterior, quantidade_posterior, motivo, observacao, user_id, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error) {
       setErro(error.message);
@@ -203,6 +241,23 @@ export default function ProdutosPage() {
     }
 
     setMovimentacoes(data || []);
+
+    // Mapa de variação (id -> "tamanho · cor") e de usuário (id -> e-mail).
+    const [varsRes, membrosRes] = await Promise.all([
+      supabase.from("produto_variacoes").select("id, tamanho, cor"),
+      supabase.from("organization_members").select("user_id, email"),
+    ]);
+    const vmap: Record<string, string> = {};
+    for (const v of varsRes.data || []) {
+      vmap[v.id as string] =
+        [v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação";
+    }
+    setVariacaoLabel(vmap);
+    const emap: Record<string, string> = {};
+    for (const m of membrosRes.data || []) {
+      if (m.user_id) emap[m.user_id as string] = (m.email as string) || "";
+    }
+    setMovUserEmail(emap);
   }
 
   async function carregarDados() {
@@ -299,18 +354,21 @@ export default function ProdutosPage() {
     // Com grade, o estoque vive nas variações; o campo do produto vira 0.
     const estoqueNumero = temVariacoes ? 0 : Number(estoque);
 
-    if (Number.isNaN(precoNumero) || preco === "") {
-      setErro("Informe um preço válido.");
+    if (Number.isNaN(precoNumero) || preco === "" || precoNumero < 0) {
+      setErro("Informe um preço válido (não negativo).");
       return;
     }
 
-    if (Number.isNaN(custoNumero) || custo === "") {
-      setErro("Informe um custo válido.");
+    if (Number.isNaN(custoNumero) || custo === "" || custoNumero < 0) {
+      setErro("Informe um custo válido (não negativo).");
       return;
     }
 
-    if (!temVariacoes && (Number.isNaN(estoqueNumero) || estoque === "")) {
-      setErro("Informe um estoque válido.");
+    if (
+      !temVariacoes &&
+      (Number.isNaN(estoqueNumero) || estoque === "" || estoqueNumero < 0)
+    ) {
+      setErro("Informe um estoque válido (não negativo).");
       return;
     }
 
@@ -626,6 +684,7 @@ export default function ProdutosPage() {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={preco}
                   onChange={(e) => setPreco(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
@@ -658,6 +717,7 @@ export default function ProdutosPage() {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={custo}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -692,6 +752,8 @@ export default function ProdutosPage() {
                   </label>
                   <input
                     type="number"
+                    min="0"
+                    step="1"
                     value={estoque}
                     onChange={(e) => setEstoque(e.target.value)}
                     className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
@@ -754,6 +816,8 @@ export default function ProdutosPage() {
                         />
                         <input
                           type="number"
+                          min="0"
+                          step="1"
                           value={varEstoque}
                           onChange={(e) => setVarEstoque(e.target.value)}
                           placeholder="Estoque"
@@ -762,6 +826,7 @@ export default function ProdutosPage() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
                           value={varPreco}
                           onChange={(e) => setVarPreco(e.target.value)}
                           placeholder="Preço (opcional)"
@@ -1182,37 +1247,62 @@ export default function ProdutosPage() {
               </p>
             ) : (
               <div className="mt-5 space-y-3">
-                {movimentacoes.slice(0, 8).map((movimento) => (
+                {movimentacoes.slice(0, 12).map((movimento) => {
+                  const info = tipoInfo(movimento.tipo);
+                  const variacao = movimento.variacao_id
+                    ? variacaoLabel[movimento.variacao_id]
+                    : null;
+                  const autor = movimento.user_id
+                    ? movUserEmail[movimento.user_id]
+                    : null;
+                  return (
                   <div
                     key={movimento.id}
                     className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                   >
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div>
                         <p className="text-sm font-bold text-[#0f172a]">
                           {nomeProduto(movimento.produto_id)}
+                          {variacao && (
+                            <span className="ml-2 rounded-full bg-[#eff6ff] px-2 py-0.5 text-xs font-semibold text-[#1d4ed8]">
+                              {variacao}
+                            </span>
+                          )}
                         </p>
                         <p className="mt-1 text-sm text-[#64748b]">
-                          {movimento.tipo === "entrada" ? "Entrada" : "Saída"} ·
-                          Quantidade: {movimento.quantidade}
+                          {info.entrada ? "+" : "−"}
+                          {movimento.quantidade}
+                          {movimento.quantidade_anterior != null &&
+                            movimento.quantidade_posterior != null && (
+                              <span className="ml-1 text-[#94a3b8]">
+                                (saldo {Number(movimento.quantidade_anterior)} →{" "}
+                                {Number(movimento.quantidade_posterior)})
+                              </span>
+                            )}
                         </p>
-                        <p className="text-sm text-[#94a3b8]">
-                          {movimento.observacao || "Sem observação"}
+                        <p className="text-xs text-[#94a3b8]">
+                          {movimento.motivo || movimento.observacao || "—"}
+                          {autor ? ` · por ${autor}` : ""}
+                          {movimento.created_at
+                            ? ` · ${formatDataHoraBR(movimento.created_at)}`
+                            : ""}
                         </p>
                       </div>
 
                       <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                          movimento.tipo === "entrada"
+                        className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
+                          info.entrada
                             ? "bg-[#f0fdf4] text-[#15803d]"
                             : "bg-[#fef2f2] text-[#b91c1c]"
                         }`}
                       >
-                        {movimento.tipo === "entrada" ? "Entrada" : "Saída"}
+                        {info.label}
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

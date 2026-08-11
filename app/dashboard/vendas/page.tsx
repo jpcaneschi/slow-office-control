@@ -270,8 +270,12 @@ export default function VendasPage() {
 
     const quantidadeNumero = Number(quantidade);
 
-    if (!Number.isFinite(quantidadeNumero) || quantidadeNumero <= 0) {
-      setErro("Informe uma quantidade válida.");
+    if (
+      !Number.isFinite(quantidadeNumero) ||
+      quantidadeNumero <= 0 ||
+      !Number.isInteger(quantidadeNumero)
+    ) {
+      setErro("Informe uma quantidade válida (inteira e positiva).");
       return;
     }
 
