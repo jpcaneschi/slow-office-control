@@ -32,6 +32,18 @@ type Produto = {
   custo: number | null;
   estoque: number | null;
   status: string | null;
+  tem_variacoes: boolean | null;
+};
+
+type Variacao = {
+  id: string;
+  produto_id: string;
+  tamanho: string | null;
+  cor: string | null;
+  preco: number | null;
+  custo: number | null;
+  estoque: number | null;
+  status: string | null;
 };
 
 type Condicional = {
@@ -50,6 +62,7 @@ type CondicionalItem = {
   id: string;
   condicional_id: string;
   produto_id: string;
+  variacao_id: string | null;
   quantidade: number;
   preco_unitario: number;
   status: string;
@@ -57,9 +70,11 @@ type CondicionalItem = {
 
 type ItemRascunho = {
   produto_id: string;
+  variacao_id: string | null;
   nome: string;
   quantidade: number;
   preco_unitario: number;
+  custo_unitario: number;
 };
 
 function formatCurrency(value: number) {
@@ -94,12 +109,14 @@ export default function CondicionalPage() {
   const [observacao, setObservacao] = useState("");
 
   const [produtoId, setProdutoId] = useState("");
+  const [variacaoId, setVariacaoId] = useState("");
   const [quantidade, setQuantidade] = useState("1");
   const [itensRascunho, setItensRascunho] = useState<ItemRascunho[]>([]);
+  const [variacoes, setVariacoes] = useState<Variacao[]>([]);
 
-  // Conversão condicional → venda
+  // Conversão condicional → venda (quantidade vendida por item)
   const [convertendoId, setConvertendoId] = useState<string | null>(null);
-  const [itensVendidos, setItensVendidos] = useState<Set<string>>(new Set());
+  const [qtdVendida, setQtdVendida] = useState<Record<string, string>>({});
   const [formaConversao, setFormaConversao] = useState("pix");
   const [convertendo, setConvertendo] = useState(false);
 
@@ -111,7 +128,7 @@ export default function CondicionalPage() {
       supabase.from("clientes").select("id, nome").order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, custo, estoque, status")
+        .select("id, nome, preco, custo, estoque, status, tem_variacoes")
         .order("created_at", { ascending: false }),
       supabase
         .from("condicionais")
@@ -121,7 +138,7 @@ export default function CondicionalPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("condicional_itens")
-        .select("id, condicional_id, produto_id, quantidade, preco_unitario, status")
+        .select("id, condicional_id, produto_id, variacao_id, quantidade, preco_unitario, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("configuracoes")
@@ -141,6 +158,13 @@ export default function CondicionalPage() {
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
     setCondicionais(condicionaisRes.data || []);
     setCondicionalItens(itensRes.data || []);
+
+    const { data: varData } = await supabase
+      .from("produto_variacoes")
+      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+    setVariacoes(
+      (varData || []).filter((v) => (v.status || "ativo") === "ativo")
+    );
 
     const cfg = await carregarConfigEmpresa();
     setNomeOperacao(cfg.nome_operacao || "Sua loja");
@@ -216,6 +240,9 @@ export default function CondicionalPage() {
     return condicionalItens.filter((item) => item.condicional_id === condicionalId);
   }
 
+  const variacoesDoProduto = variacoes.filter((v) => v.produto_id === produtoId);
+  const produtoSelecionado = produtos.find((p) => p.id === produtoId);
+
   function adicionarItem() {
     setErro("");
 
@@ -226,42 +253,67 @@ export default function CondicionalPage() {
 
     const quantidadeNumero = Number(quantidade);
 
-    if (!Number.isFinite(quantidadeNumero) || quantidadeNumero <= 0) {
-      setErro("Informe uma quantidade válida.");
+    if (
+      !Number.isFinite(quantidadeNumero) ||
+      quantidadeNumero <= 0 ||
+      !Number.isInteger(quantidadeNumero)
+    ) {
+      setErro("Informe uma quantidade válida (inteira e positiva).");
       return;
     }
 
     const produto = produtos.find((item) => item.id === produtoId);
-
     if (!produto) {
       setErro("Produto não encontrado.");
       return;
     }
 
-    const estoqueAtual = Number(produto.estoque || 0);
+    let variacao: Variacao | null = null;
+    if (produto.tem_variacoes) {
+      if (!variacaoId) {
+        setErro("Selecione a variação (tamanho/cor).");
+        return;
+      }
+      variacao = variacoes.find((v) => v.id === variacaoId) || null;
+      if (!variacao) {
+        setErro("Variação não encontrada.");
+        return;
+      }
+    }
+
+    const estoqueAtual = variacao
+      ? Number(variacao.estoque || 0)
+      : Number(produto.estoque || 0);
+    const precoUnit = variacao
+      ? Number(variacao.preco ?? produto.preco ?? 0)
+      : Number(produto.preco || 0);
+    const custoUnit = variacao
+      ? Number(variacao.custo ?? produto.custo ?? 0)
+      : Number(produto.custo || 0);
+    const chave = variacao ? variacao.id : produto.id;
+    const rotulo = variacao
+      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
       setErro("A quantidade é maior que o estoque disponível.");
       return;
     }
 
-    const itemExistente = itensRascunho.find((item) => item.produto_id === produto.id);
+    const itemExistente = itensRascunho.find(
+      (item) => (item.variacao_id ?? item.produto_id) === chave
+    );
 
     if (itemExistente) {
       const novaQuantidade = itemExistente.quantidade + quantidadeNumero;
-
       if (novaQuantidade > estoqueAtual) {
         setErro("A soma das quantidades ultrapassa o estoque disponível.");
         return;
       }
-
       setItensRascunho((atual) =>
         atual.map((item) =>
-          item.produto_id === produto.id
-            ? {
-                ...item,
-                quantidade: novaQuantidade,
-              }
+          (item.variacao_id ?? item.produto_id) === chave
+            ? { ...item, quantidade: novaQuantidade }
             : item
         )
       );
@@ -270,20 +322,23 @@ export default function CondicionalPage() {
         ...atual,
         {
           produto_id: produto.id,
-          nome: produto.nome,
+          variacao_id: variacao ? variacao.id : null,
+          nome: rotulo,
           quantidade: quantidadeNumero,
-          preco_unitario: Number(produto.preco || 0),
+          preco_unitario: precoUnit,
+          custo_unitario: custoUnit,
         },
       ]);
     }
 
     setProdutoId("");
+    setVariacaoId("");
     setQuantidade("1");
   }
 
-  function removerItem(produtoIdRemover: string) {
+  function removerItem(chave: string) {
     setItensRascunho((atual) =>
-      atual.filter((item) => item.produto_id !== produtoIdRemover)
+      atual.filter((item) => (item.variacao_id ?? item.produto_id) !== chave)
     );
   }
 
@@ -294,6 +349,7 @@ export default function CondicionalPage() {
     setDataLimite(somarDias(hoje, 2));
     setObservacao("");
     setProdutoId("");
+    setVariacaoId("");
     setQuantidade("1");
     setItensRascunho([]);
   }
@@ -334,6 +390,7 @@ export default function CondicionalPage() {
       const itensParaInserir = itensRascunho.map((item) => ({
         condicional_id: condicionalCriado.id,
         produto_id: item.produto_id,
+        variacao_id: item.variacao_id,
         quantidade: item.quantidade,
         preco_unitario: item.preco_unitario,
         status: "em_aberto",
@@ -356,6 +413,7 @@ export default function CondicionalPage() {
             p_quantidade: item.quantidade,
             p_motivo: "Saída em condicional",
             p_referencia_id: condicionalCriado.id,
+            p_variacao_id: item.variacao_id,
           }
         );
 
@@ -385,6 +443,7 @@ export default function CondicionalPage() {
           p_quantidade: item.quantidade,
           p_motivo: "Recolhimento de condicional",
           p_referencia_id: condicionalId,
+          p_variacao_id: item.variacao_id,
         }
       );
 
@@ -431,39 +490,41 @@ export default function CondicionalPage() {
     setErro("");
     setConvertendoId((atual) => (atual === condicionalId ? null : condicionalId));
     const itens = getItensDoCondicional(condicionalId);
-    // Por padrão, todos os itens marcados como "vendidos".
-    setItensVendidos(new Set(itens.map((i) => i.id)));
+    // Por padrão, vende a quantidade inteira de cada item.
+    const inicial: Record<string, string> = {};
+    for (const i of itens) inicial[i.id] = String(i.quantidade);
+    setQtdVendida(inicial);
     setFormaConversao("pix");
   }
 
-  function alternarItemVendido(itemId: string) {
-    setItensVendidos((atual) => {
-      const novo = new Set(atual);
-      if (novo.has(itemId)) novo.delete(itemId);
-      else novo.add(itemId);
-      return novo;
-    });
+  function setVendidaItem(itemId: string, valor: string, max: number) {
+    let n = Number(valor);
+    if (!Number.isFinite(n)) n = 0;
+    n = Math.max(0, Math.min(max, Math.floor(n)));
+    setQtdVendida((atual) => ({ ...atual, [itemId]: String(n) }));
   }
 
   async function converterEmVenda(condicionalId: string) {
     setErro("");
     const itens = getItensDoCondicional(condicionalId);
-    const vendidos = itens
-      .filter((i) => itensVendidos.has(i.id))
-      .map((i) => {
-        const prod = produtos.find((p) => p.id === i.produto_id);
-        return {
-          condicional_item_id: i.id,
-          produto_id: i.produto_id,
-          quantidade: i.quantidade,
-          preco_unitario: Number(i.preco_unitario || 0),
-          custo_unitario: Number(prod?.custo || 0),
-        };
-      });
+    const payload = itens.map((i) => {
+      const prod = produtos.find((p) => p.id === i.produto_id);
+      const qv = Math.max(
+        0,
+        Math.min(i.quantidade, Math.floor(Number(qtdVendida[i.id] ?? i.quantidade)))
+      );
+      return {
+        condicional_item_id: i.id,
+        preco_unitario: Number(i.preco_unitario || 0),
+        custo_unitario: Number(prod?.custo || 0),
+        quantidade_vendida: qv,
+        quantidade_devolvida: i.quantidade - qv,
+      };
+    });
 
-    if (vendidos.length === 0) {
+    if (payload.every((p) => p.quantidade_vendida === 0)) {
       setErro(
-        "Selecione ao menos um item para vender (ou use 'Marcar recolhido' se o cliente devolveu tudo)."
+        "Nada foi marcado como vendido. Use 'Recolher tudo' se o cliente devolveu tudo."
       );
       return;
     }
@@ -472,7 +533,7 @@ export default function CondicionalPage() {
     const { error } = await supabase.rpc("converter_condicional_venda", {
       p_condicional_id: condicionalId,
       p_forma_pagamento: formaConversao,
-      p_itens_vendidos: vendidos,
+      p_itens: payload,
     });
     if (error) {
       setErro(error.message);
@@ -619,16 +680,52 @@ export default function CondicionalPage() {
                   <option value="">Selecione um produto</option>
                   {produtos.map((produto) => (
                     <option key={produto.id} value={produto.id}>
-                      {produto.nome} — estoque {produto.estoque ?? 0}
+                      {produto.nome}
+                      {produto.tem_variacoes
+                        ? " — grade"
+                        : ` — estoque ${produto.estoque ?? 0}`}
                     </option>
                   ))}
                 </select>
               </div>
 
+              {produtoSelecionado?.tem_variacoes && (
+                <div>
+                  <label className="mb-2 block text-sm text-[#475569]">
+                    Variação (tamanho/cor)
+                  </label>
+                  <select
+                    value={variacaoId}
+                    onChange={(e) => setVariacaoId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                  >
+                    <option value="">Selecione a variação</option>
+                    {variacoesDoProduto.map((v) => (
+                      <option
+                        key={v.id}
+                        value={v.id}
+                        disabled={Number(v.estoque || 0) <= 0}
+                      >
+                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"}{" "}
+                        — estoque {Number(v.estoque || 0)}
+                      </option>
+                    ))}
+                  </select>
+                  {variacoesDoProduto.length === 0 && (
+                    <p className="mt-1.5 text-xs text-[#b45309]">
+                      Este produto ainda não tem grade cadastrada (faça em
+                      Produtos).
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Quantidade</label>
                 <input
                   type="number"
+                  min="1"
+                  step="1"
                   value={quantidade}
                   onChange={(e) => setQuantidade(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
@@ -653,7 +750,7 @@ export default function CondicionalPage() {
               ) : (
                 itensRascunho.map((item) => (
                   <div
-                    key={item.produto_id}
+                    key={item.variacao_id ?? item.produto_id}
                     className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -666,7 +763,9 @@ export default function CondicionalPage() {
 
                       <button
                         type="button"
-                        onClick={() => removerItem(item.produto_id)}
+                        onClick={() =>
+                          removerItem(item.variacao_id ?? item.produto_id)
+                        }
                         className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
                       >
                         Remover
@@ -797,15 +896,23 @@ export default function CondicionalPage() {
                             </p>
 
                             <div className="mt-2 space-y-2">
-                              {itens.map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="rounded-2xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm text-[#475569]"
-                                >
-                                  {getProdutoNome(item.produto_id)} · Quantidade: {item.quantidade} ·{" "}
-                                  {formatCurrency(Number(item.preco_unitario || 0))}
-                                </div>
-                              ))}
+                              {itens.map((item) => {
+                                const v = item.variacao_id
+                                  ? variacoes.find((x) => x.id === item.variacao_id)
+                                  : null;
+                                const nome = v
+                                  ? `${getProdutoNome(item.produto_id)} (${[v.tamanho, v.cor].filter(Boolean).join(" · ")})`
+                                  : getProdutoNome(item.produto_id);
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className="rounded-2xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm text-[#475569]"
+                                  >
+                                    {nome} · Quantidade: {item.quantidade} ·{" "}
+                                    {formatCurrency(Number(item.preco_unitario || 0))}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
@@ -876,33 +983,61 @@ export default function CondicionalPage() {
                             Converter em venda
                           </p>
                           <p className="mt-1 text-xs text-[#64748b]">
-                            Marque o que o cliente ficou. O que não for marcado
-                            volta ao estoque.
+                            Informe quanto de cada item o cliente ficou. O
+                            restante volta ao estoque.
                           </p>
 
                           <div className="mt-3 space-y-2">
                             {itens.map((item) => {
-                              const marcado = itensVendidos.has(item.id);
+                              const vLabel = item.variacao_id
+                                ? variacoes.find((v) => v.id === item.variacao_id)
+                                : null;
+                              const nomeItem = vLabel
+                                ? `${getProdutoNome(item.produto_id)} (${[vLabel.tamanho, vLabel.cor].filter(Boolean).join(" · ")})`
+                                : getProdutoNome(item.produto_id);
+                              const qv = Math.max(
+                                0,
+                                Math.min(
+                                  item.quantidade,
+                                  Math.floor(
+                                    Number(qtdVendida[item.id] ?? item.quantidade)
+                                  )
+                                )
+                              );
                               return (
-                                <label
+                                <div
                                   key={item.id}
-                                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm"
+                                  className="flex items-center gap-3 rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-sm"
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={marcado}
-                                    onChange={() => alternarItemVendido(item.id)}
-                                    className="h-4 w-4 accent-[#2563eb]"
-                                  />
                                   <span className="flex-1 text-[#0f172a]">
-                                    {getProdutoNome(item.produto_id)} ·{" "}
-                                    {item.quantidade}x{" "}
-                                    {formatCurrency(Number(item.preco_unitario || 0))}
+                                    {nomeItem} ·{" "}
+                                    {formatCurrency(Number(item.preco_unitario || 0))}{" "}
+                                    <span className="text-xs text-[#64748b]">
+                                      (levou {item.quantidade})
+                                    </span>
                                   </span>
-                                  <span className="text-xs font-semibold text-[#64748b]">
-                                    {marcado ? "vende" : "devolve"}
+                                  <label className="text-xs text-[#64748b]">
+                                    vende
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={item.quantidade}
+                                    step="1"
+                                    value={qtdVendida[item.id] ?? ""}
+                                    onChange={(e) =>
+                                      setVendidaItem(
+                                        item.id,
+                                        e.target.value,
+                                        item.quantidade
+                                      )
+                                    }
+                                    className="w-16 rounded-lg border border-[#dbeafe] bg-white px-2 py-1.5 text-sm outline-none"
+                                  />
+                                  <span className="text-xs font-semibold text-[#b45309]">
+                                    devolve {item.quantidade - qv}
                                   </span>
-                                </label>
+                                </div>
                               );
                             })}
                           </div>
@@ -926,15 +1061,18 @@ export default function CondicionalPage() {
                               <p className="text-xs text-[#64748b]">Total a vender</p>
                               <p className="text-lg font-black text-[#1d4ed8]">
                                 {formatCurrency(
-                                  itens
-                                    .filter((i) => itensVendidos.has(i.id))
-                                    .reduce(
-                                      (s, i) =>
-                                        s +
-                                        i.quantidade *
-                                          Number(i.preco_unitario || 0),
-                                      0
-                                    )
+                                  itens.reduce((s, i) => {
+                                    const qv = Math.max(
+                                      0,
+                                      Math.min(
+                                        i.quantidade,
+                                        Math.floor(
+                                          Number(qtdVendida[i.id] ?? i.quantidade)
+                                        )
+                                      )
+                                    );
+                                    return s + qv * Number(i.preco_unitario || 0);
+                                  }, 0)
                                 )}
                               </p>
                             </div>
