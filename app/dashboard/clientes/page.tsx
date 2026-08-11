@@ -284,6 +284,13 @@ export default function ClientesPage() {
                     </div>
 
                     <div className="flex gap-2">
+                      <Link
+                        href={`/dashboard/clientes/${cliente.id}`}
+                        className="rounded-lg border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-[#2563eb]/20"
+                      >
+                        Ver histórico
+                      </Link>
+
                       <button
                         type="button"
                         onClick={() => editarCliente(cliente)}
