@@ -119,6 +119,7 @@ export default function CondicionalPage() {
   const [qtdVendida, setQtdVendida] = useState<Record<string, string>>({});
   const [formaConversao, setFormaConversao] = useState("pix");
   const [convertendo, setConvertendo] = useState(false);
+  const [pixDescontoCfg, setPixDescontoCfg] = useState(5);
 
   async function carregarDados() {
     setLoading(true);
@@ -169,6 +170,7 @@ export default function CondicionalPage() {
     const cfg = await carregarConfigEmpresa();
     setNomeOperacao(cfg.nome_operacao || "Sua loja");
     setResponsaveisConfig(cfg.responsaveis);
+    setPixDescontoCfg(cfg.pix_desconto);
     setPrazoDias(cfg.condicional_prazo_dias);
     setDataLimite(somarDias(dataSaida, cfg.condicional_prazo_dias));
     setLoading(false);
@@ -1059,22 +1061,36 @@ export default function CondicionalPage() {
                             </div>
                             <div className="ml-auto text-right">
                               <p className="text-xs text-[#64748b]">Total a vender</p>
-                              <p className="text-lg font-black text-[#1d4ed8]">
-                                {formatCurrency(
-                                  itens.reduce((s, i) => {
-                                    const qv = Math.max(
-                                      0,
-                                      Math.min(
-                                        i.quantidade,
-                                        Math.floor(
-                                          Number(qtdVendida[i.id] ?? i.quantidade)
-                                        )
+                              {(() => {
+                                const bruto = itens.reduce((s, i) => {
+                                  const qv = Math.max(
+                                    0,
+                                    Math.min(
+                                      i.quantidade,
+                                      Math.floor(
+                                        Number(qtdVendida[i.id] ?? i.quantidade)
                                       )
-                                    );
-                                    return s + qv * Number(i.preco_unitario || 0);
-                                  }, 0)
-                                )}
-                              </p>
+                                    )
+                                  );
+                                  return s + qv * Number(i.preco_unitario || 0);
+                                }, 0);
+                                const desc =
+                                  formaConversao === "pix"
+                                    ? (bruto * pixDescontoCfg) / 100
+                                    : 0;
+                                return (
+                                  <>
+                                    <p className="text-lg font-black text-[#1d4ed8]">
+                                      {formatCurrency(bruto - desc)}
+                                    </p>
+                                    {desc > 0 && (
+                                      <p className="text-xs text-[#15803d]">
+                                        Pix −{formatCurrency(desc)}
+                                      </p>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 

@@ -40,10 +40,12 @@ export default function ConfiguracoesPage() {
   const [novoEmail, setNovoEmail] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
 
+  // Defaults visíveis = os mesmos usados pelo sistema (carregarConfigEmpresa),
+  // para a tela nunca mostrar vazio enquanto o backend aplica um padrão.
   const [nomeOperacao, setNomeOperacao] = useState("");
-  const [pixDesconto, setPixDesconto] = useState("");
-  const [tatuagemPercentual, setTatuagemPercentual] = useState("");
-  const [maxParcelas, setMaxParcelas] = useState("");
+  const [pixDesconto, setPixDesconto] = useState("5");
+  const [tatuagemPercentual, setTatuagemPercentual] = useState("10");
+  const [maxParcelas, setMaxParcelas] = useState("6");
   const [condicionalPrazo, setCondicionalPrazo] = useState("2");
   const [parcelaMinima, setParcelaMinima] = useState("0");
   const [promissoriaPrazo, setPromissoriaPrazo] = useState("4");
