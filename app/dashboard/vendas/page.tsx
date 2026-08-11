@@ -99,6 +99,11 @@ export default function VendasPage() {
   const [descontoManual, setDescontoManual] = useState("0");
   const [observacao, setObservacao] = useState("");
 
+  // Devolução parcial de venda
+  const [devolvendoId, setDevolvendoId] = useState<string | null>(null);
+  const [qtdDevolucao, setQtdDevolucao] = useState<Record<string, string>>({});
+  const [devolvendo, setDevolvendo] = useState(false);
+
   const [produtoId, setProdutoId] = useState("");
   const [variacaoId, setVariacaoId] = useState("");
   const [quantidade, setQuantidade] = useState("1");
@@ -499,6 +504,44 @@ export default function VendasPage() {
       p_dados: { total: venda.total },
     });
 
+    await carregarDados();
+  }
+
+  function abrirDevolucao(vendaId: string) {
+    setErro("");
+    setDevolvendoId((atual) => (atual === vendaId ? null : vendaId));
+    setQtdDevolucao({});
+  }
+
+  async function confirmarDevolucao(vendaId: string) {
+    setErro("");
+    const itens = itensVenda.filter((it) => it.venda_id === vendaId);
+    const devolver = itens
+      .map((it) => ({
+        venda_item_id: it.id,
+        quantidade: Number(qtdDevolucao[it.id] || 0),
+      }))
+      .filter((d) => d.quantidade > 0);
+
+    if (devolver.length === 0) {
+      setErro("Informe a quantidade a devolver em ao menos um item.");
+      return;
+    }
+
+    setDevolvendo(true);
+    const { error } = await supabase.rpc("devolver_itens_venda", {
+      p_venda_id: vendaId,
+      p_itens: devolver,
+      p_motivo: null,
+    });
+    if (error) {
+      setErro(error.message);
+      setDevolvendo(false);
+      return;
+    }
+    setDevolvendoId(null);
+    setQtdDevolucao({});
+    setDevolvendo(false);
     await carregarDados();
   }
 
@@ -976,16 +1019,88 @@ export default function VendasPage() {
                           </div>
                         </div>
 
-                        <div className="flex min-w-[190px] flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => cancelarVenda(venda.id)}
-                            className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
-                          >
-                            Cancelar venda
-                          </button>
-                        </div>
+                        {venda.status === "concluida" && (
+                          <div className="flex min-w-[190px] flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => abrirDevolucao(venda.id)}
+                              className="rounded-2xl border border-[#fed7aa] bg-[#fff7ed] px-4 py-2 text-sm font-bold text-[#c2410c] transition hover:bg-[#ffedd5]"
+                            >
+                              Devolver itens
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cancelarVenda(venda.id)}
+                              className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-2 text-sm font-bold text-[#b91c1c] transition hover:bg-[#fee2e2]"
+                            >
+                              Cancelar venda
+                            </button>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Painel de devolução parcial */}
+                      {devolvendoId === venda.id && (
+                        <div className="mt-4 rounded-[20px] border border-[#fed7aa] bg-[#fff7ed] p-4">
+                          <p className="text-sm font-black text-[#0f172a]">
+                            Devolver itens
+                          </p>
+                          <p className="mt-1 text-xs text-[#9a3412]">
+                            Informe quanto devolver de cada item. O estoque volta e
+                            o total da venda é reduzido.
+                          </p>
+
+                          <div className="mt-3 space-y-2">
+                            {itensDaVenda
+                              .filter((it) => Number(it.quantidade || 0) > 0)
+                              .map((it) => (
+                                <div
+                                  key={it.id}
+                                  className="flex items-center justify-between gap-3 rounded-xl border border-[#fed7aa] bg-white px-3 py-2 text-sm"
+                                >
+                                  <span className="flex-1 text-[#0f172a]">
+                                    {getProdutoNome(it.produto_id)}{" "}
+                                    <span className="text-xs text-[#64748b]">
+                                      (vendido {it.quantidade})
+                                    </span>
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={it.quantidade}
+                                    value={qtdDevolucao[it.id] ?? ""}
+                                    onChange={(e) =>
+                                      setQtdDevolucao((atual) => ({
+                                        ...atual,
+                                        [it.id]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="0"
+                                    className="w-20 rounded-lg border border-[#fed7aa] bg-white px-2 py-1.5 text-sm outline-none"
+                                  />
+                                </div>
+                              ))}
+                          </div>
+
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => confirmarDevolucao(venda.id)}
+                              disabled={devolvendo}
+                              className="rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#9a3412] disabled:opacity-60"
+                            >
+                              {devolvendo ? "Devolvendo..." : "Confirmar devolução"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDevolvendoId(null)}
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-4 py-2.5 text-sm font-bold text-[#475569] transition hover:bg-[#f4f6fb]"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
