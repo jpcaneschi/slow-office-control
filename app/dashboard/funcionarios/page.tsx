@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
+import { calcularAcerto } from "@/lib/comissao-utils";
 
 type Funcionario = {
   id: string;
@@ -184,52 +185,31 @@ export default function FuncionariosPage() {
     setSalvandoVale(false);
   }
 
-  // Acerto do período por funcionário
+  // Acerto do período por funcionário (fonte única em lib/comissao-utils).
   const acerto = useMemo(() => {
+    const vendaNoPeriodo = (v: { created_at: string }) => {
+      const t = new Date(v.created_at).getTime();
+      return t >= janela.ini && t < janela.fim;
+    };
+    const dataNoPeriodo = (d: string) => {
+      const t = isoToDate(d).getTime();
+      return t >= janela.ini && t < janela.fim;
+    };
     return funcionarios.map((f) => {
-      const vendasFunc = vendas.filter((v) => {
-        const t = new Date(v.created_at).getTime();
-        return (
-          v.funcionario_id === f.id &&
-          v.status === "concluida" &&
-          t >= janela.ini &&
-          t < janela.fim
-        );
-      });
-      const vendido = vendasFunc.reduce((a, v) => a + Number(v.total || 0), 0);
-      const comissaoValor = vendido * (Number(f.comissao_percentual || 0) / 100);
-      // Repasse de serviços: parte do valor que NÃO é da loja (100% − % loja).
-      const repasseServicos = atendServico
-        .filter((a) => {
-          const t = isoToDate(a.data).getTime();
-          return (
-            a.funcionario_id === f.id && t >= janela.ini && t < janela.fim
-          );
-        })
-        .reduce(
-          (s, a) =>
-            s +
-            Number(a.valor || 0) * (1 - Number(a.percentual_loja || 0) / 100),
-          0
-        );
-      const valesPeriodo = vales
-        .filter((vl) => {
-          const t = isoToDate(vl.data).getTime();
-          return vl.funcionario_id === f.id && t >= janela.ini && t < janela.fim;
-        })
-        .reduce((a, vl) => a + Number(vl.valor || 0), 0);
-      const salarioFixo = Number(f.salario_fixo || 0);
-      const aPagar =
-        salarioFixo + comissaoValor + repasseServicos - valesPeriodo;
+      const a = calcularAcerto(
+        f,
+        { vendas, servicos: atendServico, vales },
+        { vendaNoPeriodo, dataNoPeriodo }
+      );
       return {
         funcionario: f,
-        qtdVendas: vendasFunc.length,
-        vendido,
-        comissaoValor,
-        repasseServicos,
-        valesPeriodo,
-        salarioFixo,
-        aPagar,
+        qtdVendas: a.qtdVendas,
+        vendido: a.vendido,
+        comissaoValor: a.comissao,
+        repasseServicos: a.repasse,
+        valesPeriodo: a.vales,
+        salarioFixo: a.salario,
+        aPagar: a.aPagar,
       };
     });
   }, [funcionarios, vendas, vales, atendServico, janela]);

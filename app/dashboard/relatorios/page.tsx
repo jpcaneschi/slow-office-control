@@ -6,6 +6,7 @@ import { FileText, Receipt, Wallet, PenTool, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
+import { calcularAcerto } from "@/lib/comissao-utils";
 import {
   PromissoriaPdf,
   ValePdf,
@@ -202,31 +203,22 @@ export default function RelatoriosPage() {
     if (!f) return null;
     const noPeriodo = (d: string) =>
       (!fInicio || d >= fInicio) && (!fFim || d <= fFim);
-    const comissaoVendas = vendasFolha
-      .filter(
-        (v) =>
-          v.funcionario_id === f.id &&
-          v.status === "concluida" &&
-          noPeriodo((v.created_at || "").slice(0, 10))
-      )
-      .reduce((s, v) => s + Number(v.total || 0) * (f.comissao_percentual / 100), 0);
-    const repasseServicos = servFolha
-      .filter((a) => a.funcionario_id === f.id && noPeriodo(a.data))
-      .reduce(
-        (s, a) =>
-          s + Number(a.valor || 0) * (1 - Number(a.percentual_loja || 0) / 100),
-        0
-      );
-    const valesTotal = valesReais
-      .filter((vl) => vl.funcionario_id === f.id && noPeriodo(vl.data))
-      .reduce((s, vl) => s + Number(vl.valor || 0), 0);
+    // Fonte única (mesma fórmula/exclusões da tela de Funcionários e do PDF).
+    const a = calcularAcerto(
+      f,
+      { vendas: vendasFolha, servicos: servFolha, vales: valesReais },
+      {
+        vendaNoPeriodo: (v) => noPeriodo((v.created_at || "").slice(0, 10)),
+        dataNoPeriodo: (d) => noPeriodo(d),
+      }
+    );
     return {
       nome: f.nome,
       salario: f.salario_fixo,
-      comissaoVendas,
-      repasseServicos,
-      bonus: comissaoVendas + repasseServicos,
-      vales: valesTotal,
+      comissaoVendas: a.comissao,
+      repasseServicos: a.repasse,
+      bonus: a.comissao + a.repasse,
+      vales: a.vales,
     };
   }, [funcionarios, fFuncId, fInicio, fFim, vendasFolha, servFolha, valesReais]);
 
