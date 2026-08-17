@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 import { EquipeSection } from "@/components/dashboard/equipe-section";
+import { TaxasCartaoSection } from "@/components/dashboard/taxas-cartao-section";
 import { usePapel } from "@/components/dashboard/role-context";
 import {
   MODULOS_OPCIONAIS,
@@ -788,6 +789,8 @@ export default function ConfiguracoesPage() {
               {salvandoSistema ? "Salvando..." : "Salvar negócio"}
             </button>
           </div>
+
+          <TaxasCartaoSection />
         </div>
       )}
     </section>
