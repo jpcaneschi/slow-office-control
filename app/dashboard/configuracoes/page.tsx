@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 import { EquipeSection } from "@/components/dashboard/equipe-section";
+import { usePapel } from "@/components/dashboard/role-context";
 import {
   MODULOS_OPCIONAIS,
   MODULOS_PADRAO,
@@ -32,6 +33,7 @@ type Profile = {
 };
 
 export default function ConfiguracoesPage() {
+  const { recarregar: recarregarPapel } = usePapel();
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -329,6 +331,9 @@ export default function ConfiguracoesPage() {
 
     setSucesso("Configurações do sistema salvas com sucesso.");
     await carregarDados();
+    // Revalida papel + módulos no contexto → o menu reflete o toggle na hora,
+    // sem exigir novo login / recarregar a página.
+    await recarregarPapel();
     setSalvandoSistema(false);
   }
 
