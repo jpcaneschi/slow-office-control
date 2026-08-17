@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CsvTools } from "@/components/dashboard/csv-tools";
-import { paraInputDate, dataValida, hojeISO } from "@/lib/datas";
+import {
+  paraInputDate,
+  dataValida,
+  hojeISO,
+  normalizarDataEntrada,
+} from "@/lib/datas";
 
 type Cliente = {
   id: string;
@@ -268,19 +273,40 @@ export default function ClientesPage() {
                 c.status || "ativo",
                 paraInputDate(c.data_nascimento),
               ])}
-              ajuda="Colunas: nome, telefone, cpf, status, data_nascimento (AAAA-MM-DD)."
+              ajuda="Colunas: nome, telefone, cpf, status, data_nascimento (AAAA-MM-DD ou DD/MM/AAAA)."
               onImportar={async (linhas) => {
-                const novos = linhas
-                  .map((r) => ({
-                    nome: (r.nome || "").trim(),
-                    telefone: (r.telefone || "").trim() || null,
-                    cpf: (r.cpf || "").trim() || null,
-                    status: (r.status || "").trim() || "ativo",
-                    data_nascimento: (r.data_nascimento || "").trim() || null,
-                  }))
-                  .filter((c) => c.nome);
-                if (novos.length === 0)
+                // Normaliza a data de cada linha (aceita AAAA-MM-DD ou DD/MM/AAAA).
+                // data === null → formato/valor de data inválido naquela linha.
+                const preparadas = linhas.map((r, i) => ({
+                  linha: i + 2, // +1 cabeçalho, +1 base-1 → nº da linha no arquivo
+                  nome: (r.nome || "").trim(),
+                  telefone: (r.telefone || "").trim() || null,
+                  cpf: (r.cpf || "").trim() || null,
+                  status: (r.status || "").trim() || "ativo",
+                  data: normalizarDataEntrada(r.data_nascimento),
+                }));
+
+                const comNome = preparadas.filter((c) => c.nome);
+                if (comNome.length === 0)
                   return { ok: 0, erro: "Nenhuma linha com nome válido." };
+
+                // Bloqueia importação se houver data inválida — nada entra em silêncio.
+                const invalidas = comNome.filter((c) => c.data === null);
+                if (invalidas.length > 0) {
+                  const nums = invalidas.map((c) => c.linha).join(", ");
+                  return {
+                    ok: 0,
+                    erro: `Data de nascimento inválida na(s) linha(s): ${nums}. Use AAAA-MM-DD ou DD/MM/AAAA.`,
+                  };
+                }
+
+                const novos = comNome.map((c) => ({
+                  nome: c.nome,
+                  telefone: c.telefone,
+                  cpf: c.cpf,
+                  status: c.status,
+                  data_nascimento: c.data || null, // "" → null
+                }));
                 const { error } = await supabase.from("clientes").insert(novos);
                 if (error) return { ok: 0, erro: error.message };
                 await carregarClientes();

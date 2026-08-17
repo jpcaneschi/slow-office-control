@@ -8,6 +8,7 @@ import {
   expirado,
   paraInputDate,
   dataValida,
+  normalizarDataEntrada,
 } from "@/lib/datas";
 
 describe("formatDataBR", () => {
@@ -90,6 +91,40 @@ describe("dataValida", () => {
     expect(dataValida("2026-13-01")).toBe(false);
     expect(dataValida("2026-02-29")).toBe(false); // não-bissexto
     expect(dataValida("abc")).toBe(false);
+  });
+});
+
+describe("normalizarDataEntrada (CSV / edição — round-trip da data)", () => {
+  it("data comum ISO passa igual", () => {
+    expect(normalizarDataEntrada("2001-03-10")).toBe("2001-03-10");
+  });
+  it("formato BR DD/MM/AAAA vira ISO", () => {
+    expect(normalizarDataEntrada("10/03/2001")).toBe("2001-03-10");
+    expect(normalizarDataEntrada("1/3/2001")).toBe("2001-03-01"); // sem zero à esquerda
+  });
+  it("aceita separadores . e - no formato BR", () => {
+    expect(normalizarDataEntrada("10.03.2001")).toBe("2001-03-10");
+    expect(normalizarDataEntrada("10-03-2001")).toBe("2001-03-10");
+  });
+  it("ano bissexto: 29/02/2000 é válido", () => {
+    expect(normalizarDataEntrada("29/02/2000")).toBe("2000-02-29");
+    expect(normalizarDataEntrada("2000-02-29")).toBe("2000-02-29");
+  });
+  it("data impossível vira null (não entra em silêncio)", () => {
+    expect(normalizarDataEntrada("2026-02-29")).toBeNull(); // não-bissexto
+    expect(normalizarDataEntrada("30/02/2026")).toBeNull();
+    expect(normalizarDataEntrada("2026-13-01")).toBeNull();
+    expect(normalizarDataEntrada("banana")).toBeNull();
+  });
+  it("campo vazio vira string vazia (opcional)", () => {
+    expect(normalizarDataEntrada("")).toBe("");
+    expect(normalizarDataEntrada("   ")).toBe("");
+    expect(normalizarDataEntrada(null)).toBe("");
+    expect(normalizarDataEntrada(undefined)).toBe("");
+  });
+  it("não desloca fuso — 29/02/2000 não vira 28/02", () => {
+    // regressão do bug: BR → ISO puramente textual, sem new Date(UTC)
+    expect(normalizarDataEntrada("29/02/2000")).toBe("2000-02-29");
   });
 });
 
