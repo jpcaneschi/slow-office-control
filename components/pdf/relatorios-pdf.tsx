@@ -4,13 +4,25 @@ import {
   Text,
   View,
   StyleSheet,
+  Font,
 } from "@react-pdf/renderer";
+import { montarFolha } from "@/lib/folha-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modelos de PDF em PRETO & BRANCO (para impressão em folha branca).
 // Fundo branco, texto preto, bordas pretas. Layout de documento oficial:
 // cabeçalho, caixas de informação, tabelas, cláusulas e assinaturas.
+//
+// Tipografia (Área #11): usamos as fontes-padrão do PDF (Helvetica/-Bold), que
+// são embutidas e confiáveis. O que quebrava o recibo da folha ("letras
+// sobrepostas / espaçamento irregular") era o `letterSpacing` combinado com a
+// fonte-padrão no @react-pdf v4 — por isso ele foi removido. A hifenização
+// automática também é desligada para não cortar palavras no meio.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Não hifenizar: retorna a palavra inteira (evita quebras estranhas como "sa-
+// lário"). Precisa rodar só uma vez no carregamento do módulo.
+Font.registerHyphenationCallback((word) => [word]);
 
 function brl(n: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -65,13 +77,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   loja: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
-  lojaSub: { fontSize: 8, color: "#555555", marginTop: 3, letterSpacing: 0.5 },
+  lojaSub: { fontSize: 8, color: "#555555", marginTop: 3 },
   headRight: { alignItems: "flex-end" },
   docTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    letterSpacing: 1,
     color: "#000000",
   },
   docMeta: { fontSize: 8.5, color: "#555555", marginTop: 4 },
@@ -79,7 +90,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    letterSpacing: 0.9,
     color: "#000000",
     marginTop: 18,
     marginBottom: 8,
@@ -106,7 +116,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: "#555555",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
   valorForte: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
   // Grade de informações (caixas)
@@ -126,7 +135,6 @@ const styles = StyleSheet.create({
     fontSize: 7.5,
     color: "#666666",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
     marginBottom: 4,
   },
   infoValue: { fontSize: 11, color: "#000000", fontFamily: "Helvetica-Bold" },
@@ -156,7 +164,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   totalValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
   // Cláusulas
@@ -407,16 +414,24 @@ export function ValePdf({
 }
 
 // ── 3) Recibo de pagamento (folha salarial) ──────────────────────────────────
+// Itemizado (Área #11): salário, comissão de vendas, repasse de serviços e
+// descontos vêm da FONTE ÚNICA de comissão (#3), batendo com a tela e o relatório.
 export type FolhaProps = {
   loja: string;
   funcionario: string;
   cargo?: string;
   referencia: string;
+  periodoInicio?: string;
+  periodoFim?: string;
   salarioBase: number;
-  bonus: number;
-  bonusLabel?: string;
-  descontos: number;
-  descontosLabel?: string;
+  comissao: number;
+  qtdVendas: number;
+  totalVendido: number;
+  comissaoPct: number;
+  repasseServicos: number;
+  vales: number;
+  outrosDescontos?: number;
+  outrosDescontosLabel?: string;
 };
 
 export function FolhaSalarialPdf({
@@ -424,32 +439,32 @@ export function FolhaSalarialPdf({
   funcionario,
   cargo,
   referencia,
+  periodoInicio,
+  periodoFim,
   salarioBase,
-  bonus,
-  bonusLabel,
-  descontos,
-  descontosLabel,
+  comissao,
+  qtdVendas,
+  totalVendido,
+  comissaoPct,
+  repasseServicos,
+  vales,
+  outrosDescontos,
+  outrosDescontosLabel,
 }: FolhaProps) {
-  const proventos = (salarioBase || 0) + (bonus || 0);
-  const liquido = proventos - (descontos || 0);
+  const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({
+    salarioBase,
+    comissao,
+    qtdVendas,
+    repasseServicos,
+    vales,
+    outrosDescontos,
+    outrosDescontosLabel,
+  });
 
-  const linhas: { tipo: string; desc: string; valor: string }[] = [
-    { tipo: "Provento", desc: "Salário base", valor: brl(salarioBase || 0) },
-  ];
-  if (bonus > 0) {
-    linhas.push({
-      tipo: "Provento",
-      desc: bonusLabel?.trim() || "Bônus / adicional",
-      valor: brl(bonus),
-    });
-  }
-  if (descontos > 0) {
-    linhas.push({
-      tipo: "Desconto",
-      desc: descontosLabel?.trim() || "Descontos",
-      valor: `- ${brl(descontos)}`,
-    });
-  }
+  const periodo =
+    periodoInicio && periodoFim
+      ? `${fmtData(periodoInicio)} a ${fmtData(periodoFim)}`
+      : referencia;
 
   return (
     <Document>
@@ -462,6 +477,16 @@ export function FolhaSalarialPdf({
             { label: "Nome", value: funcionario },
             { label: "Cargo", value: cargo || "—" },
             { label: "Referência", value: referencia },
+            { label: "Período apurado", value: periodo },
+          ]}
+        />
+
+        <Text style={styles.sectionTitle}>Base de comissão no período</Text>
+        <InfoGrid
+          itens={[
+            { label: "Vendas concluídas", value: String(qtdVendas) },
+            { label: "Total vendido", value: brl(totalVendido) },
+            { label: "Percentual de comissão", value: `${comissaoPct}%` },
             { label: "Emissão", value: fmtData(hojeISO()) },
           ]}
         />
@@ -480,7 +505,7 @@ export function FolhaSalarialPdf({
               <Text style={[styles.tCell, { width: 84 }]}>{l.tipo}</Text>
               <Text style={[styles.tCell, { flex: 1 }]}>{l.desc}</Text>
               <Text style={[styles.tCell, { width: 120, textAlign: "right" }]}>
-                {l.valor}
+                {l.tipo === "Desconto" ? `- ${brl(l.valor)}` : brl(l.valor)}
               </Text>
             </View>
           ))}
@@ -489,8 +514,8 @@ export function FolhaSalarialPdf({
         <View style={{ marginTop: 12 }}>
           <InfoGrid
             itens={[
-              { label: "Total de proventos", value: brl(proventos) },
-              { label: "Total de descontos", value: brl(descontos || 0) },
+              { label: "Total de proventos", value: brl(totalProventos) },
+              { label: "Total de descontos", value: brl(totalDescontos) },
             ]}
           />
         </View>
