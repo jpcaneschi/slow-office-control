@@ -587,10 +587,17 @@ export default function VendasPage() {
     }
 
     setDevolvendo(true);
+    // Chave de idempotência: um retry/duplo-envio desta MESMA requisição não
+    // estorna o estoque duas vezes (o backend vira no-op).
+    const idempotencyKey =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `devol-${vendaId}-${Date.now()}`;
     const { error } = await supabase.rpc("devolver_itens_venda", {
       p_venda_id: vendaId,
       p_itens: devolver,
       p_motivo: null,
+      p_idempotency_key: idempotencyKey,
     });
     if (error) {
       setErro(error.message);

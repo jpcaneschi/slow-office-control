@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { formatDataBR } from "@/lib/datas";
+import { agregarEstoqueVariacoes, estoqueEfetivo } from "@/lib/estoque-utils";
 
 export type ResultadoBusca = {
   id: string;
@@ -26,7 +27,7 @@ export async function buscarGlobal(termo: string): Promise<ResultadoBusca[]> {
     supabase.from("clientes").select("id, nome, telefone").ilike("nome", t).limit(6),
     supabase
       .from("produtos")
-      .select("id, nome, preco, estoque")
+      .select("id, nome, preco, estoque, tem_variacoes")
       .ilike("nome", t)
       .limit(6),
     supabase
@@ -44,10 +45,27 @@ export async function buscarGlobal(termo: string): Promise<ResultadoBusca[]> {
       nome: string;
       preco: number | null;
       estoque: number | null;
+      tem_variacoes: boolean | null;
     }[]) || [];
   const eventos =
     (evRes.data as { id: string; titulo: string; tipo: string; data: string }[]) ||
     [];
+
+  // Estoque agregado das variações (produtos de grade guardam o estoque nas
+  // variações; produtos.estoque fica 0). Sem isso a busca mostrava "0 em estoque".
+  const produtoGradeIds = produtos
+    .filter((p) => p.tem_variacoes)
+    .map((p) => p.id);
+  let somaVariacoes: Record<string, number> = {};
+  if (produtoGradeIds.length > 0) {
+    const { data: vars } = await supabase
+      .from("produto_variacoes")
+      .select("produto_id, estoque")
+      .in("produto_id", produtoGradeIds);
+    somaVariacoes = agregarEstoqueVariacoes(
+      (vars as { produto_id: string; estoque: number | null }[]) || []
+    );
+  }
 
   const clienteIds = clientes.map((c) => c.id);
   const nomePorId = new Map(clientes.map((c) => [c.id, c.nome]));
@@ -105,7 +123,10 @@ export async function buscarGlobal(termo: string): Promise<ResultadoBusca[]> {
       tipo: "produto",
       categoria: "Produtos",
       titulo: p.nome,
-      subtitulo: `${formatCurrency(Number(p.preco || 0))} · ${p.estoque ?? 0} em estoque`,
+      subtitulo: `${formatCurrency(Number(p.preco || 0))} · ${estoqueEfetivo(
+        p,
+        somaVariacoes
+      )} em estoque`,
       href: "/dashboard/produtos",
     });
   }

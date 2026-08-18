@@ -25,6 +25,10 @@ import {
   planejarImportacao,
   type ProdutoImport,
 } from "@/lib/csv-importador";
+import {
+  agregarEstoqueVariacoes,
+  estoqueEfetivo as estoqueEfetivoUtil,
+} from "@/lib/estoque-utils";
 
 type Produto = {
   id: string;
@@ -171,17 +175,15 @@ export default function ProdutosPage() {
       .from("produto_variacoes")
       .select("id, produto_id, atributos, tamanho, cor, sku, codigo_barras, preco, custo, estoque, status");
     setTodasVariacoes((vars as Variacao[]) || []);
-    const mapa: Record<string, number> = {};
-    for (const v of vars || []) {
-      const pid = v.produto_id as string;
-      mapa[pid] = (mapa[pid] || 0) + Number(v.estoque || 0);
-    }
-    setSomaVariacoes(mapa);
+    setSomaVariacoes(
+      agregarEstoqueVariacoes(
+        (vars as { produto_id: string; estoque: number | null }[]) || []
+      )
+    );
   }
 
   function estoqueEfetivo(produto: Produto) {
-    if (produto.tem_variacoes) return somaVariacoes[produto.id] || 0;
-    return Number(produto.estoque || 0);
+    return estoqueEfetivoUtil(produto, somaVariacoes);
   }
 
   // Persiste os produtos já estruturados pelo assistente de importação (#6).
