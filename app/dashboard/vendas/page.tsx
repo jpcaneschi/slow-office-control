@@ -16,6 +16,7 @@ import {
   obterCorFormaPagamento,
 } from "@/lib/vendas-utils";
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
 type Cliente = {
   id: string;
@@ -35,6 +36,7 @@ type Produto = {
 type Variacao = {
   id: string;
   produto_id: string;
+  atributos: Atributos | null;
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
@@ -164,7 +166,7 @@ export default function VendasPage() {
     // Variações ativas de todos os produtos (para a grade na venda).
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -368,7 +370,7 @@ export default function VendasPage() {
       : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
-      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
       : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
@@ -912,7 +914,7 @@ export default function VendasPage() {
               {produtoSelecionado?.tem_variacoes && (
                 <div>
                   <label className="mb-2 block text-sm text-[#475569]">
-                    Variação (tamanho/cor)
+                    Variação
                   </label>
                   <select
                     value={variacaoId}
@@ -926,8 +928,10 @@ export default function VendasPage() {
                         value={v.id}
                         disabled={Number(v.estoque || 0) <= 0}
                       >
-                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") ||
-                          "Variação"}{" "}
+                        {rotuloVariacao(v.atributos, {
+                          tamanho: v.tamanho,
+                          cor: v.cor,
+                        })}{" "}
                         — estoque {Number(v.estoque || 0)}
                       </option>
                     ))}

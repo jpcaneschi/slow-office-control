@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { formatDataHoraBR } from "@/lib/datas";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
 type Venda = {
   id: string;
@@ -117,15 +118,23 @@ export default function VendaDetalhePage() {
     if (variacaoIds.length) {
       const { data: vars } = await supabase
         .from("produto_variacoes")
-        .select("id, tamanho, cor")
+        .select("id, atributos, tamanho, cor")
         .in("id", variacaoIds);
       const vmap = new Map<string, string>();
-      (vars as { id: string; tamanho: string | null; cor: string | null }[] | null)?.forEach(
-        (v) =>
-          vmap.set(
-            v.id,
-            [v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"
-          )
+      (
+        vars as
+          | {
+              id: string;
+              atributos: Atributos | null;
+              tamanho: string | null;
+              cor: string | null;
+            }[]
+          | null
+      )?.forEach((v) =>
+        vmap.set(
+          v.id,
+          rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })
+        )
       );
       setVariacaoNome(vmap);
     }

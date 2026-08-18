@@ -13,6 +13,7 @@ import {
   parseDataLocal,
   formatDataBR,
 } from "@/lib/datas";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -39,6 +40,7 @@ type Produto = {
 type Variacao = {
   id: string;
   produto_id: string;
+  atributos: Atributos | null;
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
@@ -163,7 +165,7 @@ export default function CondicionalPage() {
 
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -295,7 +297,7 @@ export default function CondicionalPage() {
       : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
-      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
       : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
@@ -709,7 +711,7 @@ export default function CondicionalPage() {
                         value={v.id}
                         disabled={Number(v.estoque || 0) <= 0}
                       >
-                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"}{" "}
+                        {rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })}{" "}
                         — estoque {Number(v.estoque || 0)}
                       </option>
                     ))}
@@ -904,7 +906,7 @@ export default function CondicionalPage() {
                                   ? variacoes.find((x) => x.id === item.variacao_id)
                                   : null;
                                 const nome = v
-                                  ? `${getProdutoNome(item.produto_id)} (${[v.tamanho, v.cor].filter(Boolean).join(" · ")})`
+                                  ? `${getProdutoNome(item.produto_id)} (${rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })})`
                                   : getProdutoNome(item.produto_id);
                                 return (
                                   <div
@@ -996,7 +998,7 @@ export default function CondicionalPage() {
                                 ? variacoes.find((v) => v.id === item.variacao_id)
                                 : null;
                               const nomeItem = vLabel
-                                ? `${getProdutoNome(item.produto_id)} (${[vLabel.tamanho, vLabel.cor].filter(Boolean).join(" · ")})`
+                                ? `${getProdutoNome(item.produto_id)} (${rotuloVariacao(vLabel.atributos, { tamanho: vLabel.tamanho, cor: vLabel.cor })})`
                                 : getProdutoNome(item.produto_id);
                               const qv = Math.max(
                                 0,
