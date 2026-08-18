@@ -16,7 +16,9 @@ export function CsvTools({
   nomeArquivo: string;
   headers: string[];
   linhas: Celula[][];
-  onImportar: (linhas: Record<string, string>[]) => Promise<{
+  // Import é opcional: quando ausente, a ferramenta só exporta (ex.: produtos,
+  // que usam o assistente de importação em vez do import simples).
+  onImportar?: (linhas: Record<string, string>[]) => Promise<{
     ok: number;
     erro?: string;
   }>;
@@ -28,7 +30,7 @@ export function CsvTools({
 
   async function aoEscolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
-    if (!arquivo) return;
+    if (!arquivo || !onImportar) return;
     setStatus("");
     setImportando(true);
     try {
@@ -61,22 +63,26 @@ export function CsvTools({
         >
           <Download className="h-4 w-4" /> Exportar CSV
         </button>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={importando}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-[#2563eb]/20 disabled:opacity-60"
-        >
-          <Upload className="h-4 w-4" />
-          {importando ? "Importando..." : "Importar CSV"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".csv,text/csv"
-          onChange={aoEscolherArquivo}
-          className="hidden"
-        />
+        {onImportar && (
+          <>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={importando}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-[#2563eb]/20 disabled:opacity-60"
+            >
+              <Upload className="h-4 w-4" />
+              {importando ? "Importando..." : "Importar CSV"}
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={aoEscolherArquivo}
+              className="hidden"
+            />
+          </>
+        )}
       </div>
       {ajuda && <p className="text-xs text-[#94a3b8]">{ajuda}</p>}
       {status && (

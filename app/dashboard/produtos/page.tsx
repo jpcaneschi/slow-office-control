@@ -6,6 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO, carregarConfigEmpresa } from "@/lib/empresa-config";
 import { CsvTools } from "@/components/dashboard/csv-tools";
+import {
+  ProdutoImportWizard,
+  type RelatorioImport,
+} from "@/components/dashboard/produto-import-wizard";
 import { formatDataHoraBR } from "@/lib/datas";
 import {
   rotuloVariacao,
@@ -17,6 +21,10 @@ import {
   type OpcaoTipo,
   type Atributos,
 } from "@/lib/variacoes-utils";
+import {
+  planejarImportacao,
+  type ProdutoImport,
+} from "@/lib/csv-importador";
 
 type Produto = {
   id: string;
@@ -79,51 +87,6 @@ function tipoInfo(t: string) {
 }
 
 const statusOptions = ["ativo", "inativo"];
-
-// A partir de linhas de CSV com tamanho/cor, monta as definições de opção
-// ("Tamanho"/"Cor") com os valores presentes — para o produto usar o modelo novo.
-function definicoesOpcoesLegado(
-  rows: Record<string, string>[],
-  produtoId: string
-) {
-  const defs: {
-    produto_id: string;
-    nome: string;
-    tipo: OpcaoTipo;
-    obrigatorio: boolean;
-    ordem: number;
-    valores_permitidos: string[];
-  }[] = [];
-  const coletar = (campo: "tamanho" | "cor") => {
-    const valores = Array.from(
-      new Set(rows.map((r) => (r[campo] || "").trim()).filter(Boolean))
-    );
-    return valores;
-  };
-  const tamanhos = coletar("tamanho");
-  if (tamanhos.length) {
-    defs.push({
-      produto_id: produtoId,
-      nome: "Tamanho",
-      tipo: "lista",
-      obrigatorio: rows.every((r) => (r.tamanho || "").trim()),
-      ordem: 0,
-      valores_permitidos: tamanhos,
-    });
-  }
-  const cores = coletar("cor");
-  if (cores.length) {
-    defs.push({
-      produto_id: produtoId,
-      nome: "Cor",
-      tipo: "lista",
-      obrigatorio: rows.every((r) => (r.cor || "").trim()),
-      ordem: 1,
-      valores_permitidos: cores,
-    });
-  }
-  return defs;
-}
 
 // Markup padrão sugerido no cadastro: preço de venda = custo × MARKUP.
 const MARKUP = 2.2;
@@ -221,83 +184,86 @@ export default function ProdutosPage() {
     return Number(produto.estoque || 0);
   }
 
-  // Importa CSV agrupando linhas pelo NOME: linhas com tamanho/cor viram a grade.
-  async function importarProdutosCSV(
-    linhas: Record<string, string>[]
-  ): Promise<{ ok: number; erro?: string }> {
-    const grupos = new Map<
-      string,
-      { rows: Record<string, string>[]; nomeOriginal: string }
-    >();
-    for (const r of linhas) {
-      const nome = (r.nome || "").trim();
-      if (!nome) continue;
-      const key = nome.toLowerCase();
-      if (!grupos.has(key)) grupos.set(key, { rows: [], nomeOriginal: nome });
-      grupos.get(key)!.rows.push(r);
-    }
-    if (grupos.size === 0)
-      return { ok: 0, erro: "Nenhuma linha com nome válido." };
+  // Persiste os produtos já estruturados pelo assistente de importação (#6).
+  // Idempotente: produto com nome já existente é ignorado (não duplica).
+  async function persistirImportacao(
+    produtosImport: ProdutoImport[]
+  ): Promise<RelatorioImport> {
+    const plano = planejarImportacao(
+      produtosImport,
+      produtos.map((p) => p.nome)
+    );
+    let criados = 0;
+    let ignorados = 0;
+    const erros: { linha?: number; motivo: string }[] = [];
 
-    let count = 0;
-    for (const { rows, nomeOriginal } of grupos.values()) {
-      const temGrade = rows.some(
-        (r) => (r.tamanho || "").trim() || (r.cor || "").trim()
-      );
-      const primeiro = rows[0];
+    for (const item of plano) {
+      if (item.acao === "ignorar_existente") {
+        ignorados++;
+        continue;
+      }
+      const p = item.produto;
       const { data: prod, error } = await supabase
         .from("produtos")
         .insert({
-          nome: nomeOriginal,
-          categoria: (primeiro.categoria || "").trim() || null,
-          marca: (primeiro.marca || "").trim() || null,
-          preco: Number(primeiro.preco || 0),
-          custo: Number(primeiro.custo || 0),
-          estoque: temGrade ? 0 : Number(primeiro.estoque || 0),
-          status: (primeiro.status || "").trim() || "ativo",
-          tem_variacoes: temGrade,
+          nome: p.nome,
+          categoria: p.categoria,
+          marca: p.marca,
+          preco: p.preco,
+          custo: p.custo,
+          estoque: p.temVariacoes ? 0 : p.estoque,
+          status: p.status,
+          tem_variacoes: p.temVariacoes,
         })
         .select("id")
         .single();
-      if (error) return { ok: count, erro: error.message };
+      if (error || !prod) {
+        erros.push({ motivo: `${p.nome}: ${error?.message ?? "falha ao criar"}` });
+        continue;
+      }
 
-      if (temGrade && prod) {
-        const linhasGrade = rows.filter(
-          (r) => (r.tamanho || "").trim() || (r.cor || "").trim()
-        );
-        // Monta os atributos (modelo novo) espelhando também tamanho/cor legados.
-        const variacoes = linhasGrade.map((r) => {
-          const t = (r.tamanho || "").trim();
-          const c = (r.cor || "").trim();
-          const atributos: Atributos = {};
-          if (t) atributos.Tamanho = t;
-          if (c) atributos.Cor = c;
+      if (p.temVariacoes) {
+        if (p.opcoes.length) {
+          const { error: oerr } = await supabase.from("produto_opcoes").insert(
+            p.opcoes.map((o) => ({
+              produto_id: prod.id,
+              nome: o.nome,
+              tipo: "lista",
+              obrigatorio: o.obrigatorio,
+              ordem: o.ordem,
+              valores_permitidos: o.valores_permitidos,
+            }))
+          );
+          if (oerr) erros.push({ motivo: `${p.nome} (opções): ${oerr.message}` });
+        }
+        // Espelha atributos nas colunas legadas tamanho/cor (compatibilidade).
+        const vs = p.variacoes.map((v) => {
+          const legado = atributosParaLegado(v.atributos);
           return {
             produto_id: prod.id,
-            atributos,
-            tamanho: t || null,
-            cor: c || null,
-            preco: r.preco ? Number(r.preco) : null,
-            custo: r.custo ? Number(r.custo) : null,
-            estoque: Number(r.estoque || 0),
+            atributos: v.atributos,
+            tamanho: legado.tamanho,
+            cor: legado.cor,
+            sku: v.sku,
+            codigo_barras: v.codigo_barras,
+            preco: v.preco,
+            custo: v.custo,
+            estoque: v.estoque,
           };
         });
-        if (variacoes.length) {
-          const { error: verr } = await supabase
-            .from("produto_variacoes")
-            .insert(variacoes);
-          if (verr) return { ok: count, erro: verr.message };
-          // Cria as opções "Tamanho"/"Cor" com os valores presentes.
-          const opcoesNovas = definicoesOpcoesLegado(linhasGrade, prod.id);
-          if (opcoesNovas.length) {
-            await supabase.from("produto_opcoes").insert(opcoesNovas);
-          }
+        const { error: verr } = await supabase
+          .from("produto_variacoes")
+          .insert(vs);
+        if (verr) {
+          erros.push({ motivo: `${p.nome} (variações): ${verr.message}` });
+          continue;
         }
       }
-      count++;
+      criados++;
     }
+
     await carregarDados();
-    return { ok: count };
+    return { criados, ignorados, erros };
   }
 
   async function carregarVariacoes(produtoId: string) {
@@ -1683,52 +1649,64 @@ export default function ProdutosPage() {
               <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                 Produtos cadastrados
               </h2>
-              <CsvTools
-                nomeArquivo="produtos"
-                headers={[
-                  "nome",
-                  "categoria",
-                  "marca",
-                  "preco",
-                  "custo",
-                  "estoque",
-                  "status",
-                  "tamanho",
-                  "cor",
-                ]}
-                linhas={produtos.flatMap((p) => {
-                  const vs = todasVariacoes.filter((v) => v.produto_id === p.id);
-                  if (p.tem_variacoes && vs.length > 0) {
-                    // Uma linha por variação (grade preservada).
-                    return vs.map((v) => [
-                      p.nome,
-                      p.categoria || "",
-                      p.marca || "",
-                      Number(v.preco ?? p.preco ?? 0),
-                      Number(v.custo ?? p.custo ?? 0),
-                      Number(v.estoque || 0),
-                      p.status || "ativo",
-                      v.tamanho || "",
-                      v.cor || "",
-                    ]);
-                  }
-                  return [
-                    [
-                      p.nome,
-                      p.categoria || "",
-                      p.marca || "",
-                      Number(p.preco || 0),
-                      Number(p.custo || 0),
-                      Number(p.estoque || 0),
-                      p.status || "ativo",
-                      "",
-                      "",
-                    ],
-                  ];
-                })}
-                ajuda="Colunas: nome, categoria, marca, preco, custo, estoque, status, tamanho, cor. Linhas com o mesmo nome + tamanho/cor viram a grade do produto."
-                onImportar={importarProdutosCSV}
-              />
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <CsvTools
+                    nomeArquivo="produtos"
+                    headers={[
+                      "nome",
+                      "categoria",
+                      "marca",
+                      "preco",
+                      "custo",
+                      "estoque",
+                      "status",
+                      "tamanho",
+                      "cor",
+                    ]}
+                    linhas={produtos.flatMap((p) => {
+                      const vs = todasVariacoes.filter(
+                        (v) => v.produto_id === p.id
+                      );
+                      if (p.tem_variacoes && vs.length > 0) {
+                        // Uma linha por variação (grade preservada).
+                        return vs.map((v) => [
+                          p.nome,
+                          p.categoria || "",
+                          p.marca || "",
+                          Number(v.preco ?? p.preco ?? 0),
+                          Number(v.custo ?? p.custo ?? 0),
+                          Number(v.estoque || 0),
+                          p.status || "ativo",
+                          v.tamanho || "",
+                          v.cor || "",
+                        ]);
+                      }
+                      return [
+                        [
+                          p.nome,
+                          p.categoria || "",
+                          p.marca || "",
+                          Number(p.preco || 0),
+                          Number(p.custo || 0),
+                          Number(p.estoque || 0),
+                          p.status || "ativo",
+                          "",
+                          "",
+                        ],
+                      ];
+                    })}
+                  />
+                  <ProdutoImportWizard
+                    nomesExistentes={produtos.map((p) => p.nome)}
+                    onImportar={persistirImportacao}
+                  />
+                </div>
+                <p className="max-w-md text-right text-xs text-[#94a3b8]">
+                  O assistente aceita cabeçalhos comuns (produto, preço venda,
+                  tamanho, cor, sku…) e agrupa linhas do mesmo nome em variações.
+                </p>
+              </div>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

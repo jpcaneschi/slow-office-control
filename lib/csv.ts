@@ -2,8 +2,29 @@
 
 type Celula = string | number | null | undefined;
 
+// Caracteres que o Excel/Sheets interpretam como início de fórmula.
+const INICIO_FORMULA = /^[=+\-@\t\r]/;
+
+/**
+ * Neutraliza CSV injection: célula que começa com = + - @ (tab/CR) ganha um
+ * apóstrofo à frente, para o Excel/Sheets tratarem como texto e não executarem
+ * fórmula. O nosso próprio parser remove essa guarda (round-trip sem perda).
+ */
+function neutralizarFormula(s: string): string {
+  return INICIO_FORMULA.test(s) ? `'${s}` : s;
+}
+
+/** Remove a guarda de fórmula (apóstrofo à frente de = + - @) na reimportação. */
+export function removerGuardaFormula(s: string): string {
+  if (s.length >= 2 && s[0] === "'" && INICIO_FORMULA.test(s.slice(1))) {
+    return s.slice(1);
+  }
+  return s;
+}
+
 function escapar(valor: Celula): string {
-  const s = valor === null || valor === undefined ? "" : String(valor);
+  const bruto = valor === null || valor === undefined ? "" : String(valor);
+  const s = neutralizarFormula(bruto);
   // Envolve em aspas se tiver vírgula, aspas ou quebra de linha.
   if (/[",\n;]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
@@ -46,7 +67,7 @@ export function parseCSV(texto: string): Record<string, string>[] {
     const campos = dividirCampos(linhas[i], sep);
     const obj: Record<string, string> = {};
     headers.forEach((h, idx) => {
-      obj[h] = (campos[idx] ?? "").trim();
+      obj[h] = removerGuardaFormula((campos[idx] ?? "").trim());
     });
     registros.push(obj);
   }
