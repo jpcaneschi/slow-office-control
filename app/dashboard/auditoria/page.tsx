@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ShieldCheck } from "lucide-react";
+import {
+  montarDetalhe,
+  resolverAcao,
+  type AuditoriaDados,
+  type DiffLinha,
+} from "@/lib/auditoria-utils";
 
 type Log = {
   id: string;
@@ -11,69 +17,9 @@ type Log = {
   acao: string;
   entidade: string | null;
   registro_id: string | null;
-  dados: Record<string, unknown> | null;
+  dados: AuditoriaDados | null;
   created_at: string;
 };
-
-const ACAO_LABEL: Record<string, string> = {
-  venda_criada: "Venda criada",
-  venda_cancelada: "Venda cancelada",
-  papel_alterado: "Papel alterado",
-  membro_removido: "Membro removido",
-  produto_excluido: "Produto excluído",
-};
-
-const ACAO_COR: Record<string, string> = {
-  venda_criada: "#15803d",
-  venda_cancelada: "#b91c1c",
-  papel_alterado: "#1d4ed8",
-  membro_removido: "#b91c1c",
-  produto_excluido: "#b45309",
-};
-
-// Entidades dos triggers genéricos (tabela -> nome amigável no singular).
-const ENTIDADE_LABEL: Record<string, string> = {
-  clientes: "cliente",
-  produtos: "produto",
-  produto_variacoes: "variação",
-  funcionarios: "funcionário",
-  vales: "vale",
-  servicos: "serviço",
-  atendimentos_servico: "atendimento",
-  tatuagem_atendimentos: "tatuagem",
-  despesas: "despesa",
-  despesas_recorrentes: "conta recorrente",
-  configuracoes: "configuração",
-};
-const OP_VERBO: Record<string, { verbo: string; cor: string }> = {
-  insert: { verbo: "Criou", cor: "#15803d" },
-  update: { verbo: "Editou", cor: "#1d4ed8" },
-  delete: { verbo: "Excluiu", cor: "#b91c1c" },
-};
-
-// Resolve rótulo + cor de uma ação (semântica antiga OU trigger genérico).
-function resolverAcao(acao: string): { label: string; cor: string } {
-  if (ACAO_LABEL[acao]) {
-    return { label: ACAO_LABEL[acao], cor: ACAO_COR[acao] || "#475569" };
-  }
-  const m = /^(insert|update|delete)_(.+)$/.exec(acao);
-  if (m) {
-    const op = OP_VERBO[m[1]];
-    const ent = ENTIDADE_LABEL[m[2]] || m[2];
-    if (op) return { label: `${op.verbo} ${ent}`, cor: op.cor };
-  }
-  return { label: acao, cor: "#475569" };
-}
-
-// Descreve um registro pelo campo mais representativo.
-function descreverRegistro(obj: unknown): string {
-  if (!obj || typeof obj !== "object") return "";
-  const o = obj as Record<string, unknown>;
-  for (const campo of ["nome", "descricao", "cliente_nome", "email"]) {
-    if (typeof o[campo] === "string" && o[campo]) return String(o[campo]);
-  }
-  return "";
-}
 
 export default function AuditoriaPage() {
   const [logs, setLogs] = useState<Log[]>([]);
@@ -107,27 +53,14 @@ export default function AuditoriaPage() {
     () =>
       logs.map((l) => {
         const { label, cor } = resolverAcao(l.acao);
-        const dados = l.dados as Record<string, unknown> | null;
-        let detalhe = "";
-        if (dados) {
-          if ("depois" in dados || "antes" in dados) {
-            // Trigger genérico: mostra o registro representado.
-            detalhe =
-              descreverRegistro(dados.depois) ||
-              descreverRegistro(dados.antes) ||
-              "";
-          } else {
-            detalhe = Object.entries(dados)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(" · ");
-          }
-        }
+        const { alteracoes, resumo } = montarDetalhe(l.dados);
         return {
           ...l,
           autor: (l.user_id && emailPorUser[l.user_id]) || "—",
           label,
           cor,
-          detalhe,
+          alteracoes,
+          resumo,
         };
       }),
     [logs, emailPorUser]
@@ -169,7 +102,7 @@ export default function AuditoriaPage() {
               </thead>
               <tbody>
                 {linhas.map((l) => (
-                  <tr key={l.id} className="border-b border-[#f1f5f9]">
+                  <tr key={l.id} className="border-b border-[#f1f5f9] align-top">
                     <td className="py-3 pr-4 whitespace-nowrap text-[#64748b]">
                       {new Date(l.created_at).toLocaleString("pt-BR")}
                     </td>
@@ -182,7 +115,9 @@ export default function AuditoriaPage() {
                         {l.label}
                       </span>
                     </td>
-                    <td className="py-3 text-[#64748b]">{l.detalhe || "—"}</td>
+                    <td className="py-3 text-[#64748b]">
+                      <Detalhes alteracoes={l.alteracoes} resumo={l.resumo} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -192,4 +127,30 @@ export default function AuditoriaPage() {
       </div>
     </section>
   );
+}
+
+// Renderiza o diff "antes → depois" por campo (ou o resumo textual).
+function Detalhes({ alteracoes, resumo }: { alteracoes: DiffLinha[]; resumo: string }) {
+  if (alteracoes.length > 0) {
+    return (
+      <div className="space-y-1">
+        {resumo ? <p className="text-[#0f172a]">{resumo}</p> : null}
+        <ul className="space-y-0.5">
+          {alteracoes.map((a) => (
+            <li key={a.campo} className="flex flex-wrap items-center gap-1.5">
+              <span className="font-medium text-[#475569]">{a.campo}:</span>
+              <span className="rounded bg-[#fef2f2] px-1.5 py-0.5 text-[#b91c1c] line-through">
+                {a.antes}
+              </span>
+              <span className="text-[#94a3b8]">→</span>
+              <span className="rounded bg-[#f0fdf4] px-1.5 py-0.5 text-[#15803d]">
+                {a.depois}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  return <>{resumo || "—"}</>;
 }
