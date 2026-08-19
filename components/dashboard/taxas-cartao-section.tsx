@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Trash2, Plus } from "lucide-react";
+import { primeiroErro, validarTaxaPercentual, validarTaxaFixa } from "@/lib/validacoes";
 
 type Taxa = {
   id: string;
@@ -60,12 +61,12 @@ export function TaxasCartaoSection() {
     const pct = Number(taxaPct);
     const fixa = Number(taxaFixa) || 0;
 
-    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-      setErro("A taxa (%) deve ficar entre 0 e 100.");
-      return;
-    }
-    if (fixa < 0) {
-      setErro("A taxa fixa não pode ser negativa.");
+    const erro = primeiroErro(
+      validarTaxaPercentual(taxaPct, "a taxa (%)"),
+      validarTaxaFixa(taxaFixa, false)
+    );
+    if (erro) {
+      setErro(erro);
       return;
     }
 

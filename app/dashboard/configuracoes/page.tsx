@@ -13,6 +13,15 @@ import {
   MODULO_LABEL,
   MODULO_DESCRICAO,
 } from "@/lib/modulos";
+import {
+  primeiroErro,
+  validarTexto,
+  validarPercentual,
+  validarParcelas,
+  validarParcelaMinima,
+  validarPrazoMeses,
+  validarPrazoDias,
+} from "@/lib/validacoes";
 
 type Configuracao = {
   id: string;
@@ -284,23 +293,18 @@ export default function ConfiguracoesPage() {
     const tatuagemNumero = Number(tatuagemPercentual);
     const parcelasNumero = Number(maxParcelas);
 
-    if (!nomeOperacao.trim()) {
-      setErro("Informe o nome da operação.");
-      return;
-    }
-
-    if (!Number.isFinite(pixNumero) || pixNumero < 0) {
-      setErro("Informe um desconto Pix válido.");
-      return;
-    }
-
-    if (!Number.isFinite(tatuagemNumero) || tatuagemNumero < 0 || tatuagemNumero > 100) {
-      setErro("O percentual de tatuagem deve ficar entre 0% e 100%.");
-      return;
-    }
-
-    if (!Number.isFinite(parcelasNumero) || parcelasNumero <= 0) {
-      setErro("Informe um número máximo de parcelas válido.");
+    // Validação (front) espelhando as CHECK constraints do banco (0025/0043).
+    const erro = primeiroErro(
+      validarTexto("o nome da operação", nomeOperacao),
+      validarPercentual(pixDesconto, "o desconto Pix"),
+      validarPercentual(tatuagemPercentual, "o percentual de tatuagem"),
+      validarParcelas(maxParcelas, 24),
+      validarParcelaMinima(parcelaMinima, false),
+      validarPrazoMeses(promissoriaPrazo),
+      validarPrazoDias(condicionalPrazo)
+    );
+    if (erro) {
+      setErro(erro);
       return;
     }
 
