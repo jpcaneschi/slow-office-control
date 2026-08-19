@@ -64,3 +64,22 @@ begin;
   --   values ('QA TESTE INTRUSO', 'COLE_O_ORG_ID_DE_B');
   -- Resultado esperado: erro "new row violates row-level security policy".
 rollback;
+
+-- ── (5) Tabelas SENSÍVEIS novas: A não vê nada de outra empresa ───────────────
+-- Salários (funcionarios), adiantamentos (vales) e taxas de cartão são os dados
+-- mais críticos p/ vazar. Áreas #1/#3 adicionaram/mexeram nelas → revalidar aqui.
+begin;
+  set local role authenticated;
+  select set_config('request.jwt.claims',
+    json_build_object('sub', 'COLE_O_UUID_A', 'role', 'authenticated')::text, true);
+
+  select count(*) as funcionarios_de_outra_org
+    from public.funcionarios where organization_id <> current_org_id();
+  select count(*) as vales_de_outra_org
+    from public.vales where organization_id <> current_org_id();
+  select count(*) as taxas_de_outra_org
+    from public.taxas_cartao where organization_id <> current_org_id();
+  select count(*) as promissorias_de_outra_org
+    from public.promissorias where organization_id <> current_org_id();
+  -- Esperado: 0 em TODAS (a RLS filtra por empresa antes do <> avaliar).
+rollback;
