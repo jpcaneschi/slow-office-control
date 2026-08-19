@@ -6,12 +6,35 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO, carregarConfigEmpresa } from "@/lib/empresa-config";
 import { CsvTools } from "@/components/dashboard/csv-tools";
+import {
+  ProdutoImportWizard,
+  type RelatorioImport,
+} from "@/components/dashboard/produto-import-wizard";
 import { formatDataHoraBR } from "@/lib/datas";
+import {
+  rotuloVariacao,
+  assinaturaExiste,
+  gerarCombinacoes,
+  validarCombinacao,
+  atributosParaLegado,
+  type ProdutoOpcao,
+  type OpcaoTipo,
+  type Atributos,
+} from "@/lib/variacoes-utils";
+import {
+  planejarImportacao,
+  type ProdutoImport,
+} from "@/lib/csv-importador";
+import {
+  agregarEstoqueVariacoes,
+  estoqueEfetivo as estoqueEfetivoUtil,
+} from "@/lib/estoque-utils";
 
 type Produto = {
   id: string;
   nome: string;
   categoria: string | null;
+  marca: string | null;
   preco: number | null;
   custo: number | null;
   estoque: number | null;
@@ -23,14 +46,18 @@ type Produto = {
 type Variacao = {
   id: string;
   produto_id?: string;
+  atributos: Atributos | null;
   tamanho: string | null;
   cor: string | null;
   sku: string | null;
+  codigo_barras: string | null;
   preco: number | null;
   custo: number | null;
   estoque: number | null;
   status: string | null;
 };
+
+type Opcao = ProdutoOpcao & { id: string };
 
 type Movimentacao = {
   id: string;
@@ -95,6 +122,7 @@ export default function ProdutosPage() {
 
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("Camiseta");
+  const [marca, setMarca] = useState("");
   const [preco, setPreco] = useState("");
   const [custo, setCusto] = useState("");
   const [estoque, setEstoque] = useState("");
@@ -109,10 +137,21 @@ export default function ProdutosPage() {
   // Variações (grade) do produto em edição
   const [temVariacoes, setTemVariacoes] = useState(false);
   const [variacoes, setVariacoes] = useState<Variacao[]>([]);
-  const [varTamanho, setVarTamanho] = useState("");
-  const [varCor, setVarCor] = useState("");
+  const [opcoes, setOpcoes] = useState<Opcao[]>([]);
+  // Nova opção (definição) do produto
+  const [novaOpcaoNome, setNovaOpcaoNome] = useState("");
+  const [novaOpcaoTipo, setNovaOpcaoTipo] = useState<OpcaoTipo>("lista");
+  const [novaOpcaoObrigatorio, setNovaOpcaoObrigatorio] = useState(true);
+  const [novaOpcaoValores, setNovaOpcaoValores] = useState("");
+  const [novaOpcaoUnidade, setNovaOpcaoUnidade] = useState("");
+  const [savingOpcao, setSavingOpcao] = useState(false);
+  // Nova variação (combinação de valores das opções)
+  const [varAtributos, setVarAtributos] = useState<Record<string, string>>({});
   const [varEstoque, setVarEstoque] = useState("");
   const [varPreco, setVarPreco] = useState("");
+  const [varCusto, setVarCusto] = useState("");
+  const [varSku, setVarSku] = useState("");
+  const [varBarras, setVarBarras] = useState("");
   const [savingVar, setSavingVar] = useState(false);
   // produto_id -> soma de estoque das variações (para exibir na lista)
   const [somaVariacoes, setSomaVariacoes] = useState<Record<string, number>>({});
@@ -121,7 +160,7 @@ export default function ProdutosPage() {
   async function carregarProdutos() {
     const { data, error } = await supabase
       .from("produtos")
-      .select("id, nome, categoria, preco, custo, estoque, status, imagem_url, tem_variacoes")
+      .select("id, nome, categoria, marca, preco, custo, estoque, status, imagem_url, tem_variacoes")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -134,88 +173,105 @@ export default function ProdutosPage() {
     // Variações completas (para soma na lista E para o CSV com grade).
     const { data: vars } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, sku, codigo_barras, preco, custo, estoque, status");
     setTodasVariacoes((vars as Variacao[]) || []);
-    const mapa: Record<string, number> = {};
-    for (const v of vars || []) {
-      const pid = v.produto_id as string;
-      mapa[pid] = (mapa[pid] || 0) + Number(v.estoque || 0);
-    }
-    setSomaVariacoes(mapa);
+    setSomaVariacoes(
+      agregarEstoqueVariacoes(
+        (vars as { produto_id: string; estoque: number | null }[]) || []
+      )
+    );
   }
 
   function estoqueEfetivo(produto: Produto) {
-    if (produto.tem_variacoes) return somaVariacoes[produto.id] || 0;
-    return Number(produto.estoque || 0);
+    return estoqueEfetivoUtil(produto, somaVariacoes);
   }
 
-  // Importa CSV agrupando linhas pelo NOME: linhas com tamanho/cor viram a grade.
-  async function importarProdutosCSV(
-    linhas: Record<string, string>[]
-  ): Promise<{ ok: number; erro?: string }> {
-    const grupos = new Map<
-      string,
-      { rows: Record<string, string>[]; nomeOriginal: string }
-    >();
-    for (const r of linhas) {
-      const nome = (r.nome || "").trim();
-      if (!nome) continue;
-      const key = nome.toLowerCase();
-      if (!grupos.has(key)) grupos.set(key, { rows: [], nomeOriginal: nome });
-      grupos.get(key)!.rows.push(r);
-    }
-    if (grupos.size === 0)
-      return { ok: 0, erro: "Nenhuma linha com nome válido." };
+  // Persiste os produtos já estruturados pelo assistente de importação (#6).
+  // Idempotente: produto com nome já existente é ignorado (não duplica).
+  async function persistirImportacao(
+    produtosImport: ProdutoImport[]
+  ): Promise<RelatorioImport> {
+    const plano = planejarImportacao(
+      produtosImport,
+      produtos.map((p) => p.nome)
+    );
+    let criados = 0;
+    let ignorados = 0;
+    const erros: { linha?: number; motivo: string }[] = [];
 
-    let count = 0;
-    for (const { rows, nomeOriginal } of grupos.values()) {
-      const temGrade = rows.some(
-        (r) => (r.tamanho || "").trim() || (r.cor || "").trim()
-      );
-      const primeiro = rows[0];
+    for (const item of plano) {
+      if (item.acao === "ignorar_existente") {
+        ignorados++;
+        continue;
+      }
+      const p = item.produto;
       const { data: prod, error } = await supabase
         .from("produtos")
         .insert({
-          nome: nomeOriginal,
-          categoria: (primeiro.categoria || "").trim() || null,
-          preco: Number(primeiro.preco || 0),
-          custo: Number(primeiro.custo || 0),
-          estoque: temGrade ? 0 : Number(primeiro.estoque || 0),
-          status: (primeiro.status || "").trim() || "ativo",
-          tem_variacoes: temGrade,
+          nome: p.nome,
+          categoria: p.categoria,
+          marca: p.marca,
+          preco: p.preco,
+          custo: p.custo,
+          estoque: p.temVariacoes ? 0 : p.estoque,
+          status: p.status,
+          tem_variacoes: p.temVariacoes,
         })
         .select("id")
         .single();
-      if (error) return { ok: count, erro: error.message };
+      if (error || !prod) {
+        erros.push({ motivo: `${p.nome}: ${error?.message ?? "falha ao criar"}` });
+        continue;
+      }
 
-      if (temGrade && prod) {
-        const variacoes = rows
-          .filter((r) => (r.tamanho || "").trim() || (r.cor || "").trim())
-          .map((r) => ({
+      if (p.temVariacoes) {
+        if (p.opcoes.length) {
+          const { error: oerr } = await supabase.from("produto_opcoes").insert(
+            p.opcoes.map((o) => ({
+              produto_id: prod.id,
+              nome: o.nome,
+              tipo: "lista",
+              obrigatorio: o.obrigatorio,
+              ordem: o.ordem,
+              valores_permitidos: o.valores_permitidos,
+            }))
+          );
+          if (oerr) erros.push({ motivo: `${p.nome} (opções): ${oerr.message}` });
+        }
+        // Espelha atributos nas colunas legadas tamanho/cor (compatibilidade).
+        const vs = p.variacoes.map((v) => {
+          const legado = atributosParaLegado(v.atributos);
+          return {
             produto_id: prod.id,
-            tamanho: (r.tamanho || "").trim() || null,
-            cor: (r.cor || "").trim() || null,
-            preco: r.preco ? Number(r.preco) : null,
-            custo: r.custo ? Number(r.custo) : null,
-            estoque: Number(r.estoque || 0),
-          }));
-        if (variacoes.length) {
-          const { error: verr } = await supabase
-            .from("produto_variacoes")
-            .insert(variacoes);
-          if (verr) return { ok: count, erro: verr.message };
+            atributos: v.atributos,
+            tamanho: legado.tamanho,
+            cor: legado.cor,
+            sku: v.sku,
+            codigo_barras: v.codigo_barras,
+            preco: v.preco,
+            custo: v.custo,
+            estoque: v.estoque,
+          };
+        });
+        const { error: verr } = await supabase
+          .from("produto_variacoes")
+          .insert(vs);
+        if (verr) {
+          erros.push({ motivo: `${p.nome} (variações): ${verr.message}` });
+          continue;
         }
       }
-      count++;
+      criados++;
     }
+
     await carregarDados();
-    return { ok: count };
+    return { criados, ignorados, erros };
   }
 
   async function carregarVariacoes(produtoId: string) {
     const { data, error } = await supabase
       .from("produto_variacoes")
-      .select("id, tamanho, cor, sku, preco, custo, estoque, status")
+      .select("id, atributos, tamanho, cor, sku, codigo_barras, preco, custo, estoque, status")
       .eq("produto_id", produtoId)
       .order("created_at", { ascending: true });
     if (error) {
@@ -224,6 +280,25 @@ export default function ProdutosPage() {
     }
     setVariacoes(data || []);
   }
+
+  async function carregarOpcoes(produtoId: string) {
+    const { data, error } = await supabase
+      .from("produto_opcoes")
+      .select("id, nome, tipo, unidade, obrigatorio, ordem, valores_permitidos")
+      .eq("produto_id", produtoId)
+      .order("ordem", { ascending: true });
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setOpcoes((data as Opcao[]) || []);
+  }
+
+  // Nomes das opções na ordem definida — usado para rotular a variação.
+  const ordemOpcoes = useMemo(
+    () => [...opcoes].sort((a, b) => a.ordem - b.ordem).map((o) => o.nome),
+    [opcoes]
+  );
 
   async function alternarTemVariacoes(valor: boolean) {
     setTemVariacoes(valor);
@@ -241,14 +316,99 @@ export default function ProdutosPage() {
     }
   }
 
+  async function adicionarOpcao() {
+    if (!editandoId) return;
+    const nomeOpcao = novaOpcaoNome.trim();
+    if (!nomeOpcao) {
+      setErro("Informe o nome da opção (ex.: Tamanho, Cor, Numeração).");
+      return;
+    }
+    if (opcoes.some((o) => o.nome.toLowerCase() === nomeOpcao.toLowerCase())) {
+      setErro(`Já existe uma opção "${nomeOpcao}".`);
+      return;
+    }
+    const valores =
+      novaOpcaoTipo === "lista"
+        ? Array.from(
+            new Set(
+              novaOpcaoValores
+                .split(",")
+                .map((v) => v.trim())
+                .filter(Boolean)
+            )
+          )
+        : [];
+    if (novaOpcaoTipo === "lista" && valores.length === 0) {
+      setErro("Liste ao menos um valor (separados por vírgula).");
+      return;
+    }
+    setSavingOpcao(true);
+    setErro("");
+    const { error } = await supabase.from("produto_opcoes").insert({
+      produto_id: editandoId,
+      nome: nomeOpcao,
+      tipo: novaOpcaoTipo,
+      unidade: novaOpcaoUnidade.trim() || null,
+      obrigatorio: novaOpcaoObrigatorio,
+      ordem: opcoes.length,
+      valores_permitidos: valores,
+    });
+    if (error) {
+      setErro(error.message);
+      setSavingOpcao(false);
+      return;
+    }
+    setNovaOpcaoNome("");
+    setNovaOpcaoTipo("lista");
+    setNovaOpcaoObrigatorio(true);
+    setNovaOpcaoValores("");
+    setNovaOpcaoUnidade("");
+    await carregarOpcoes(editandoId);
+    setSavingOpcao(false);
+  }
+
+  async function removerOpcao(id: string) {
+    if (
+      !window.confirm(
+        "Remover esta opção? As variações já criadas não são apagadas."
+      )
+    )
+      return;
+    const { error } = await supabase
+      .from("produto_opcoes")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    if (editandoId) await carregarOpcoes(editandoId);
+  }
+
   async function adicionarVariacao() {
     if (!editandoId) return;
-    if (!varTamanho.trim() && !varCor.trim()) {
-      setErro("Informe ao menos tamanho ou cor da variação.");
+    // Monta os atributos a partir dos valores escolhidos por opção.
+    const atributos: Atributos = {};
+    for (const o of opcoes) {
+      const v = (varAtributos[o.nome] ?? "").trim();
+      if (v) atributos[o.nome] = v;
+    }
+    if (opcoes.length === 0) {
+      setErro("Crie ao menos uma opção (ex.: Tamanho) antes das variações.");
+      return;
+    }
+    const erroValidacao = validarCombinacao(atributos, opcoes);
+    if (erroValidacao) {
+      setErro(erroValidacao);
+      return;
+    }
+    if (assinaturaExiste(atributos, variacoes.map((v) => v.atributos))) {
+      setErro("Essa combinação já existe na grade.");
       return;
     }
     const estoqueNum = Number(varEstoque || 0);
     const precoNum = varPreco ? Number(varPreco) : null;
+    const custoNum = varCusto ? Number(varCusto) : null;
     if (!Number.isFinite(estoqueNum) || estoqueNum < 0) {
       setErro("Estoque da variação não pode ser negativo.");
       return;
@@ -257,24 +417,69 @@ export default function ProdutosPage() {
       setErro("Preço da variação não pode ser negativo.");
       return;
     }
+    if (custoNum !== null && (!Number.isFinite(custoNum) || custoNum < 0)) {
+      setErro("Custo da variação não pode ser negativo.");
+      return;
+    }
     setSavingVar(true);
     setErro("");
+    const legado = atributosParaLegado(atributos);
     const { error } = await supabase.from("produto_variacoes").insert({
       produto_id: editandoId,
-      tamanho: varTamanho.trim() || null,
-      cor: varCor.trim() || null,
+      atributos,
+      tamanho: legado.tamanho,
+      cor: legado.cor,
+      sku: varSku.trim() || null,
+      codigo_barras: varBarras.trim() || null,
       estoque: estoqueNum,
       preco: precoNum,
+      custo: custoNum,
     });
     if (error) {
       setErro(error.message);
       setSavingVar(false);
       return;
     }
-    setVarTamanho("");
-    setVarCor("");
+    setVarAtributos({});
     setVarEstoque("");
     setVarPreco("");
+    setVarCusto("");
+    setVarSku("");
+    setVarBarras("");
+    await carregarVariacoes(editandoId);
+    await carregarProdutos();
+    setSavingVar(false);
+  }
+
+  // Cria de uma vez todas as combinações das opções de lista que ainda faltam.
+  async function gerarTodasCombinacoes() {
+    if (!editandoId) return;
+    const combos = gerarCombinacoes(opcoes);
+    const faltantes = combos.filter(
+      (c) => !assinaturaExiste(c, variacoes.map((v) => v.atributos))
+    );
+    if (faltantes.length === 0) {
+      setErro("Todas as combinações já existem na grade.");
+      return;
+    }
+    setSavingVar(true);
+    setErro("");
+    const linhas = faltantes.map((atributos) => {
+      const legado = atributosParaLegado(atributos);
+      return {
+        produto_id: editandoId,
+        atributos,
+        tamanho: legado.tamanho,
+        cor: legado.cor,
+        estoque: 0,
+      };
+    });
+    const { error } = await supabase.from("produto_variacoes").insert(linhas);
+    if (error) {
+      setErro(error.message);
+      setSavingVar(false);
+      return;
+    }
     await carregarVariacoes(editandoId);
     await carregarProdutos();
     setSavingVar(false);
@@ -312,13 +517,15 @@ export default function ProdutosPage() {
 
     // Mapa de variação (id -> "tamanho · cor") e de usuário (id -> e-mail).
     const [varsRes, membrosRes] = await Promise.all([
-      supabase.from("produto_variacoes").select("id, tamanho, cor"),
+      supabase.from("produto_variacoes").select("id, atributos, tamanho, cor"),
       supabase.from("organization_members").select("user_id, email"),
     ]);
     const vmap: Record<string, string> = {};
     for (const v of varsRes.data || []) {
-      vmap[v.id as string] =
-        [v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação";
+      vmap[v.id as string] = rotuloVariacao(v.atributos as Atributos, {
+        tamanho: v.tamanho as string | null,
+        cor: v.cor as string | null,
+      });
     }
     setVariacaoLabel(vmap);
     const emap: Record<string, string> = {};
@@ -347,6 +554,7 @@ export default function ProdutosPage() {
   function limparFormulario() {
     setNome("");
     setCategoria("Camiseta");
+    setMarca("");
     setPreco("");
     setCusto("");
     setEstoque("");
@@ -355,10 +563,18 @@ export default function ProdutosPage() {
     setEditandoId(null);
     setTemVariacoes(false);
     setVariacoes([]);
-    setVarTamanho("");
-    setVarCor("");
+    setOpcoes([]);
+    setNovaOpcaoNome("");
+    setNovaOpcaoTipo("lista");
+    setNovaOpcaoObrigatorio(true);
+    setNovaOpcaoValores("");
+    setNovaOpcaoUnidade("");
+    setVarAtributos({});
     setVarEstoque("");
     setVarPreco("");
+    setVarCusto("");
+    setVarSku("");
+    setVarBarras("");
   }
 
   function limparMovimentacao() {
@@ -372,6 +588,7 @@ export default function ProdutosPage() {
     setEditandoId(produto.id);
     setNome(produto.nome || "");
     setCategoria(produto.categoria || "Camiseta");
+    setMarca(produto.marca || "");
     setPreco(produto.preco?.toString() || "");
     setCusto(produto.custo?.toString() || "");
     setEstoque(produto.estoque?.toString() || "");
@@ -379,7 +596,12 @@ export default function ProdutosPage() {
     setImagemUrl(produto.imagem_url || "");
     setTemVariacoes(!!produto.tem_variacoes);
     setVariacoes([]);
-    if (produto.tem_variacoes) carregarVariacoes(produto.id);
+    setOpcoes([]);
+    setVarAtributos({});
+    if (produto.tem_variacoes) {
+      carregarVariacoes(produto.id);
+      carregarOpcoes(produto.id);
+    }
     setErro("");
   }
 
@@ -478,6 +700,7 @@ export default function ProdutosPage() {
         .update({
           nome: nome.trim(),
           categoria,
+          marca: marca.trim() || null,
           preco: precoNumero,
           custo: custoNumero,
           estoque: estoqueNumero,
@@ -496,6 +719,7 @@ export default function ProdutosPage() {
       const { error } = await supabase.from("produtos").insert({
         nome: nome.trim(),
         categoria,
+        marca: marca.trim() || null,
         preco: precoNumero,
         custo: custoNumero,
         estoque: estoqueNumero,
@@ -807,6 +1031,18 @@ export default function ProdutosPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">
+                  Marca <span className="text-[#94a3b8]">(opcional)</span>
+                </label>
+                <input
+                  value={marca}
+                  onChange={(e) => setMarca(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                  placeholder="Ex: Nike, Slow, sem marca"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">
                   Preço de venda
                 </label>
                 <input
@@ -869,7 +1105,7 @@ export default function ProdutosPage() {
                   className="h-4 w-4 accent-[#2563eb]"
                 />
                 <span className="text-sm font-semibold text-[#334155]">
-                  Este produto usa grade (tamanho/cor)
+                  Este produto tem variações (grade)
                 </span>
               </label>
 
@@ -891,84 +1127,270 @@ export default function ProdutosPage() {
               )}
 
               {temVariacoes && (
-                <div className="rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4">
-                  <p className="text-sm font-bold text-[#1e3a8a]">Grade do produto</p>
+                <div className="space-y-4 rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4">
                   {!editandoId ? (
-                    <p className="mt-2 text-xs text-[#64748b]">
+                    <p className="text-xs text-[#64748b]">
                       Salve o produto primeiro; depois abra em “Editar” para
-                      montar a grade (tamanhos e cores).
+                      definir as opções (ex.: Tamanho, Cor, Numeração) e montar a
+                      grade.
                     </p>
                   ) : (
                     <>
-                      {variacoes.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          {variacoes.map((v) => (
-                            <div
-                              key={v.id}
-                              className="flex items-center justify-between gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2"
-                            >
-                              <span className="text-sm text-[#0f172a]">
-                                {[v.tamanho, v.cor].filter(Boolean).join(" · ") ||
-                                  "Variação"}
-                                <span className="ml-2 text-xs text-[#64748b]">
-                                  {Number(v.estoque || 0)} un
-                                  {v.preco
-                                    ? ` · R$ ${Number(v.preco).toFixed(2)}`
-                                    : ""}
-                                </span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => removerVariacao(v.id)}
-                                className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                      {/* 1) Opções do produto (definições) */}
+                      <div>
+                        <p className="text-sm font-bold text-[#1e3a8a]">
+                          Opções do produto
+                        </p>
+                        <p className="mt-0.5 text-xs text-[#64748b]">
+                          Defina o que varia (Tamanho, Cor, Numeração, Voltagem…).
+                          Só o que você criar aqui aparece na venda.
+                        </p>
+
+                        {opcoes.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {opcoes.map((o) => (
+                              <div
+                                key={o.id}
+                                className="flex items-center justify-between gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2"
                               >
-                                Remover
-                              </button>
+                                <span className="text-sm text-[#0f172a]">
+                                  <span className="font-semibold">{o.nome}</span>
+                                  <span className="ml-1 text-xs text-[#64748b]">
+                                    ({o.tipo}
+                                    {o.obrigatorio ? " · obrigatória" : " · opcional"})
+                                  </span>
+                                  {o.valores_permitidos.length > 0 && (
+                                    <span className="ml-2 text-xs text-[#94a3b8]">
+                                      {o.valores_permitidos.join(", ")}
+                                    </span>
+                                  )}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removerOpcao(o.id)}
+                                  className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <input
+                            value={novaOpcaoNome}
+                            onChange={(e) => setNovaOpcaoNome(e.target.value)}
+                            placeholder="Nome (ex.: Tamanho)"
+                            className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                          />
+                          <select
+                            value={novaOpcaoTipo}
+                            onChange={(e) =>
+                              setNovaOpcaoTipo(e.target.value as OpcaoTipo)
+                            }
+                            className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                          >
+                            <option value="lista">Lista de valores</option>
+                            <option value="numero">Número</option>
+                            <option value="numero_unidade">Número + unidade</option>
+                            <option value="texto">Texto livre</option>
+                          </select>
+                          {novaOpcaoTipo === "lista" && (
+                            <input
+                              value={novaOpcaoValores}
+                              onChange={(e) => setNovaOpcaoValores(e.target.value)}
+                              placeholder="Valores: P, M, G"
+                              className="col-span-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                          )}
+                          {novaOpcaoTipo === "numero_unidade" && (
+                            <input
+                              value={novaOpcaoUnidade}
+                              onChange={(e) => setNovaOpcaoUnidade(e.target.value)}
+                              placeholder="Unidade (ex.: V, ml)"
+                              className="col-span-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                          )}
+                          <label className="col-span-2 flex cursor-pointer items-center gap-2 text-xs text-[#475569]">
+                            <input
+                              type="checkbox"
+                              checked={novaOpcaoObrigatorio}
+                              onChange={(e) =>
+                                setNovaOpcaoObrigatorio(e.target.checked)
+                              }
+                              className="h-4 w-4 accent-[#2563eb]"
+                            />
+                            Obrigatória (toda variação precisa ter esse valor)
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={adicionarOpcao}
+                          disabled={savingOpcao}
+                          className="mt-2 w-full rounded-xl border border-[#bfdbfe] bg-white px-3 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#eff6ff] disabled:opacity-60"
+                        >
+                          {savingOpcao ? "Adicionando..." : "+ Adicionar opção"}
+                        </button>
+                      </div>
+
+                      {/* 2) Variações (combinações) */}
+                      {opcoes.length > 0 && (
+                        <div className="border-t border-[#dbeafe] pt-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-[#1e3a8a]">
+                              Variações da grade
+                            </p>
+                            <button
+                              type="button"
+                              onClick={gerarTodasCombinacoes}
+                              disabled={savingVar}
+                              className="rounded-lg px-2 py-1 text-xs font-semibold text-[#1d4ed8] hover:bg-[#eff6ff] disabled:opacity-60"
+                            >
+                              Gerar todas
+                            </button>
+                          </div>
+
+                          {variacoes.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {variacoes.map((v) => (
+                                <div
+                                  key={v.id}
+                                  className="flex items-center justify-between gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2"
+                                >
+                                  <span className="text-sm text-[#0f172a]">
+                                    {rotuloVariacao(
+                                      v.atributos,
+                                      { tamanho: v.tamanho, cor: v.cor },
+                                      ordemOpcoes
+                                    )}
+                                    <span className="ml-2 text-xs text-[#64748b]">
+                                      {Number(v.estoque || 0)} un
+                                      {v.preco
+                                        ? ` · R$ ${Number(v.preco).toFixed(2)}`
+                                        : ""}
+                                      {v.sku ? ` · ${v.sku}` : ""}
+                                    </span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removerVariacao(v.id)}
+                                    className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
+
+                          {/* Um campo por opção */}
+                          <div className="mt-3 space-y-2">
+                            {[...opcoes]
+                              .sort((a, b) => a.ordem - b.ordem)
+                              .map((o) => (
+                                <div key={o.id}>
+                                  <label className="mb-1 block text-xs text-[#475569]">
+                                    {o.nome}
+                                    {o.obrigatorio ? " *" : ""}
+                                  </label>
+                                  {o.tipo === "lista" &&
+                                  o.valores_permitidos.length > 0 ? (
+                                    <select
+                                      value={varAtributos[o.nome] || ""}
+                                      onChange={(e) =>
+                                        setVarAtributos((prev) => ({
+                                          ...prev,
+                                          [o.nome]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                                    >
+                                      <option value="">
+                                        {o.obrigatorio ? "Selecione" : "(nenhum)"}
+                                      </option>
+                                      {o.valores_permitidos.map((val) => (
+                                        <option key={val} value={val}>
+                                          {val}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      type={
+                                        o.tipo === "numero" ||
+                                        o.tipo === "numero_unidade"
+                                          ? "number"
+                                          : "text"
+                                      }
+                                      value={varAtributos[o.nome] || ""}
+                                      onChange={(e) =>
+                                        setVarAtributos((prev) => ({
+                                          ...prev,
+                                          [o.nome]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder={
+                                        o.unidade ? `Valor (${o.unidade})` : "Valor"
+                                      }
+                                      className="w-full rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={varEstoque}
+                              onChange={(e) => setVarEstoque(e.target.value)}
+                              placeholder="Estoque"
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={varPreco}
+                              onChange={(e) => setVarPreco(e.target.value)}
+                              placeholder="Preço (opcional)"
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={varCusto}
+                              onChange={(e) => setVarCusto(e.target.value)}
+                              placeholder="Custo (opcional)"
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                            <input
+                              value={varSku}
+                              onChange={(e) => setVarSku(e.target.value)}
+                              placeholder="SKU (opcional)"
+                              className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                            <input
+                              value={varBarras}
+                              onChange={(e) => setVarBarras(e.target.value)}
+                              placeholder="Código de barras (opcional)"
+                              className="col-span-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={adicionarVariacao}
+                            disabled={savingVar}
+                            className="mt-2 w-full rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:opacity-60"
+                          >
+                            {savingVar ? "Adicionando..." : "+ Adicionar variação"}
+                          </button>
                         </div>
                       )}
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <input
-                          value={varTamanho}
-                          onChange={(e) => setVarTamanho(e.target.value)}
-                          placeholder="Tamanho (P/M/G)"
-                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
-                        />
-                        <input
-                          value={varCor}
-                          onChange={(e) => setVarCor(e.target.value)}
-                          placeholder="Cor"
-                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={varEstoque}
-                          onChange={(e) => setVarEstoque(e.target.value)}
-                          placeholder="Estoque"
-                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={varPreco}
-                          onChange={(e) => setVarPreco(e.target.value)}
-                          placeholder="Preço (opcional)"
-                          className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={adicionarVariacao}
-                        disabled={savingVar}
-                        className="mt-2 w-full rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:opacity-60"
-                      >
-                        {savingVar ? "Adicionando..." : "+ Adicionar à grade"}
-                      </button>
                     </>
                   )}
                 </div>
@@ -1229,49 +1651,64 @@ export default function ProdutosPage() {
               <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
                 Produtos cadastrados
               </h2>
-              <CsvTools
-                nomeArquivo="produtos"
-                headers={[
-                  "nome",
-                  "categoria",
-                  "preco",
-                  "custo",
-                  "estoque",
-                  "status",
-                  "tamanho",
-                  "cor",
-                ]}
-                linhas={produtos.flatMap((p) => {
-                  const vs = todasVariacoes.filter((v) => v.produto_id === p.id);
-                  if (p.tem_variacoes && vs.length > 0) {
-                    // Uma linha por variação (grade preservada).
-                    return vs.map((v) => [
-                      p.nome,
-                      p.categoria || "",
-                      Number(v.preco ?? p.preco ?? 0),
-                      Number(v.custo ?? p.custo ?? 0),
-                      Number(v.estoque || 0),
-                      p.status || "ativo",
-                      v.tamanho || "",
-                      v.cor || "",
-                    ]);
-                  }
-                  return [
-                    [
-                      p.nome,
-                      p.categoria || "",
-                      Number(p.preco || 0),
-                      Number(p.custo || 0),
-                      Number(p.estoque || 0),
-                      p.status || "ativo",
-                      "",
-                      "",
-                    ],
-                  ];
-                })}
-                ajuda="Colunas: nome, categoria, preco, custo, estoque, status, tamanho, cor. Linhas com o mesmo nome + tamanho/cor viram a grade do produto."
-                onImportar={importarProdutosCSV}
-              />
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <CsvTools
+                    nomeArquivo="produtos"
+                    headers={[
+                      "nome",
+                      "categoria",
+                      "marca",
+                      "preco",
+                      "custo",
+                      "estoque",
+                      "status",
+                      "tamanho",
+                      "cor",
+                    ]}
+                    linhas={produtos.flatMap((p) => {
+                      const vs = todasVariacoes.filter(
+                        (v) => v.produto_id === p.id
+                      );
+                      if (p.tem_variacoes && vs.length > 0) {
+                        // Uma linha por variação (grade preservada).
+                        return vs.map((v) => [
+                          p.nome,
+                          p.categoria || "",
+                          p.marca || "",
+                          Number(v.preco ?? p.preco ?? 0),
+                          Number(v.custo ?? p.custo ?? 0),
+                          Number(v.estoque || 0),
+                          p.status || "ativo",
+                          v.tamanho || "",
+                          v.cor || "",
+                        ]);
+                      }
+                      return [
+                        [
+                          p.nome,
+                          p.categoria || "",
+                          p.marca || "",
+                          Number(p.preco || 0),
+                          Number(p.custo || 0),
+                          Number(p.estoque || 0),
+                          p.status || "ativo",
+                          "",
+                          "",
+                        ],
+                      ];
+                    })}
+                  />
+                  <ProdutoImportWizard
+                    nomesExistentes={produtos.map((p) => p.nome)}
+                    onImportar={persistirImportacao}
+                  />
+                </div>
+                <p className="max-w-md text-right text-xs text-[#94a3b8]">
+                  O assistente aceita cabeçalhos comuns (produto, preço venda,
+                  tamanho, cor, sku…) e agrupa linhas do mesmo nome em variações.
+                </p>
+              </div>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

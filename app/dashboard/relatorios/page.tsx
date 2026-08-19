@@ -6,6 +6,8 @@ import { FileText, Receipt, Wallet, PenTool, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
+import { calcularAcerto } from "@/lib/comissao-utils";
+import { montarFolha } from "@/lib/folha-utils";
 import {
   PromissoriaPdf,
   ValePdf,
@@ -112,10 +114,10 @@ export default function RelatoriosPage() {
   const [fCargo, setFCargo] = useState("");
   const [fRef, setFRef] = useState(refMesAno());
   const [fBase, setFBase] = useState("");
-  const [fBonus, setFBonus] = useState("");
-  const [fBonusLabel, setFBonusLabel] = useState("");
-  const [fDesc, setFDesc] = useState("");
-  const [fDescLabel, setFDescLabel] = useState("");
+  // Outros descontos (faltas etc.) — opcional. Comissão/serviços/vales vêm dos
+  // registros reais (fonte única), não de digitação manual desconectada.
+  const [fOutros, setFOutros] = useState("");
+  const [fOutrosLabel, setFOutrosLabel] = useState("");
 
   // Repasse
   const [rTatuador, setRTatuador] = useState("");
@@ -202,43 +204,32 @@ export default function RelatoriosPage() {
     if (!f) return null;
     const noPeriodo = (d: string) =>
       (!fInicio || d >= fInicio) && (!fFim || d <= fFim);
-    const comissaoVendas = vendasFolha
-      .filter(
-        (v) =>
-          v.funcionario_id === f.id &&
-          v.status === "concluida" &&
-          noPeriodo((v.created_at || "").slice(0, 10))
-      )
-      .reduce((s, v) => s + Number(v.total || 0) * (f.comissao_percentual / 100), 0);
-    const repasseServicos = servFolha
-      .filter((a) => a.funcionario_id === f.id && noPeriodo(a.data))
-      .reduce(
-        (s, a) =>
-          s + Number(a.valor || 0) * (1 - Number(a.percentual_loja || 0) / 100),
-        0
-      );
-    const valesTotal = valesReais
-      .filter((vl) => vl.funcionario_id === f.id && noPeriodo(vl.data))
-      .reduce((s, vl) => s + Number(vl.valor || 0), 0);
+    // Fonte única (mesma fórmula/exclusões da tela de Funcionários e do PDF).
+    const a = calcularAcerto(
+      f,
+      { vendas: vendasFolha, servicos: servFolha, vales: valesReais },
+      {
+        vendaNoPeriodo: (v) => noPeriodo((v.created_at || "").slice(0, 10)),
+        dataNoPeriodo: (d) => noPeriodo(d),
+      }
+    );
     return {
       nome: f.nome,
       salario: f.salario_fixo,
-      comissaoVendas,
-      repasseServicos,
-      bonus: comissaoVendas + repasseServicos,
-      vales: valesTotal,
+      comissaoPct: f.comissao_percentual,
+      qtdVendas: a.qtdVendas,
+      vendido: a.vendido,
+      comissaoVendas: a.comissao,
+      repasseServicos: a.repasse,
+      vales: a.vales,
     };
   }, [funcionarios, fFuncId, fInicio, fFim, vendasFolha, servFolha, valesReais]);
 
-  // Ao trocar de funcionário/período, preenche os campos da folha com dados reais.
+  // Ao trocar de funcionário/período, preenche nome/salário com dados reais.
   useEffect(() => {
     if (!folhaCalc) return;
     setFFunc(folhaCalc.nome);
     setFBase(String(folhaCalc.salario));
-    setFBonus(folhaCalc.bonus.toFixed(2));
-    setFBonusLabel("Comissão + serviços do período");
-    setFDesc(folhaCalc.vales.toFixed(2));
-    setFDescLabel("Vales do período");
   }, [folhaCalc]);
 
   function construirDocumento(): { doc: React.ReactElement; nome: string } | null {
@@ -294,11 +285,17 @@ export default function RelatoriosPage() {
             funcionario={fFunc.trim()}
             cargo={fCargo.trim()}
             referencia={fRef.trim()}
+            periodoInicio={fInicio}
+            periodoFim={fFim}
             salarioBase={Number(fBase) || 0}
-            bonus={Number(fBonus) || 0}
-            bonusLabel={fBonusLabel.trim()}
-            descontos={Number(fDesc) || 0}
-            descontosLabel={fDescLabel.trim()}
+            comissao={folhaCalc?.comissaoVendas || 0}
+            qtdVendas={folhaCalc?.qtdVendas || 0}
+            totalVendido={folhaCalc?.vendido || 0}
+            comissaoPct={folhaCalc?.comissaoPct || 0}
+            repasseServicos={folhaCalc?.repasseServicos || 0}
+            vales={folhaCalc?.vales || 0}
+            outrosDescontos={Number(fOutros) || 0}
+            outrosDescontosLabel={fOutrosLabel.trim()}
           />
         ),
         nome: `recibo-${slug(fFunc)}.pdf`,
@@ -608,10 +605,13 @@ export default function RelatoriosPage() {
             </div>
             {folhaCalc && (
               <div className="rounded-xl border border-[#e8ecf4] bg-[#f8fafc] p-4 text-sm text-[#475569] md:col-span-2">
-                Preenchido com dados reais do período: comissão de vendas{" "}
-                <b>{brl(folhaCalc.comissaoVendas)}</b> + serviços{" "}
+                Dados reais do período ({folhaCalc.qtdVendas} venda
+                {folhaCalc.qtdVendas === 1 ? "" : "s"} · {brl(folhaCalc.vendido)}{" "}
+                a {folhaCalc.comissaoPct}%): comissão{" "}
+                <b>{brl(folhaCalc.comissaoVendas)}</b> · serviços{" "}
                 <b>{brl(folhaCalc.repasseServicos)}</b> · vales{" "}
-                <b>{brl(folhaCalc.vales)}</b>. Você ainda pode ajustar abaixo.
+                <b>{brl(folhaCalc.vales)}</b>. Esses valores entram no recibo
+                automaticamente.
               </div>
             )}
             <div>
@@ -626,46 +626,26 @@ export default function RelatoriosPage() {
                 placeholder="0,00"
               />
             </div>
+            <div className="hidden md:block" />
             <div>
-              <label className={labelClass}>Bônus / adicional (R$)</label>
+              <label className={labelClass}>Outros descontos (R$)</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                value={fBonus}
-                onChange={(e) => setFBonus(e.target.value)}
+                value={fOutros}
+                onChange={(e) => setFOutros(e.target.value)}
                 className={inputClass}
-                placeholder="0,00"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Descrição do bônus</label>
-              <input
-                value={fBonusLabel}
-                onChange={(e) => setFBonusLabel(e.target.value)}
-                className={inputClass}
-                placeholder="Ex: comissão"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Descontos (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={fDesc}
-                onChange={(e) => setFDesc(e.target.value)}
-                className={inputClass}
-                placeholder="0,00"
+                placeholder="0,00 (ex.: faltas)"
               />
             </div>
             <div>
               <label className={labelClass}>Descrição do desconto</label>
               <input
-                value={fDescLabel}
-                onChange={(e) => setFDescLabel(e.target.value)}
+                value={fOutrosLabel}
+                onChange={(e) => setFOutrosLabel(e.target.value)}
                 className={inputClass}
-                placeholder="Ex: vale, faltas"
+                placeholder="Ex: faltas"
               />
             </div>
             <div className="rounded-xl border border-[#2563eb]/20 bg-[#eff6ff] p-4 md:col-span-2">
@@ -675,9 +655,14 @@ export default function RelatoriosPage() {
                 </span>
                 <span className="text-lg font-black text-[#1d4ed8]">
                   {brl(
-                    (Number(fBase) || 0) +
-                      (Number(fBonus) || 0) -
-                      (Number(fDesc) || 0)
+                    montarFolha({
+                      salarioBase: Number(fBase) || 0,
+                      comissao: folhaCalc?.comissaoVendas || 0,
+                      qtdVendas: folhaCalc?.qtdVendas || 0,
+                      repasseServicos: folhaCalc?.repasseServicos || 0,
+                      vales: folhaCalc?.vales || 0,
+                      outrosDescontos: Number(fOutros) || 0,
+                    }).liquido
                   )}
                 </span>
               </div>

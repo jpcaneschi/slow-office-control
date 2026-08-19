@@ -5,12 +5,23 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 import { EquipeSection } from "@/components/dashboard/equipe-section";
+import { TaxasCartaoSection } from "@/components/dashboard/taxas-cartao-section";
+import { usePapel } from "@/components/dashboard/role-context";
 import {
   MODULOS_OPCIONAIS,
   MODULOS_PADRAO,
   MODULO_LABEL,
   MODULO_DESCRICAO,
 } from "@/lib/modulos";
+import {
+  primeiroErro,
+  validarTexto,
+  validarPercentual,
+  validarParcelas,
+  validarParcelaMinima,
+  validarPrazoMeses,
+  validarPrazoDias,
+} from "@/lib/validacoes";
 
 type Configuracao = {
   id: string;
@@ -32,6 +43,7 @@ type Profile = {
 };
 
 export default function ConfiguracoesPage() {
+  const { recarregar: recarregarPapel } = usePapel();
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -281,23 +293,18 @@ export default function ConfiguracoesPage() {
     const tatuagemNumero = Number(tatuagemPercentual);
     const parcelasNumero = Number(maxParcelas);
 
-    if (!nomeOperacao.trim()) {
-      setErro("Informe o nome da operação.");
-      return;
-    }
-
-    if (!Number.isFinite(pixNumero) || pixNumero < 0) {
-      setErro("Informe um desconto Pix válido.");
-      return;
-    }
-
-    if (!Number.isFinite(tatuagemNumero) || tatuagemNumero < 0 || tatuagemNumero > 100) {
-      setErro("O percentual de tatuagem deve ficar entre 0% e 100%.");
-      return;
-    }
-
-    if (!Number.isFinite(parcelasNumero) || parcelasNumero <= 0) {
-      setErro("Informe um número máximo de parcelas válido.");
+    // Validação (front) espelhando as CHECK constraints do banco (0025/0043).
+    const erro = primeiroErro(
+      validarTexto("o nome da operação", nomeOperacao),
+      validarPercentual(pixDesconto, "o desconto Pix"),
+      validarPercentual(tatuagemPercentual, "o percentual de tatuagem"),
+      validarParcelas(maxParcelas, 24),
+      validarParcelaMinima(parcelaMinima, false),
+      validarPrazoMeses(promissoriaPrazo),
+      validarPrazoDias(condicionalPrazo)
+    );
+    if (erro) {
+      setErro(erro);
       return;
     }
 
@@ -329,6 +336,9 @@ export default function ConfiguracoesPage() {
 
     setSucesso("Configurações do sistema salvas com sucesso.");
     await carregarDados();
+    // Revalida papel + módulos no contexto → o menu reflete o toggle na hora,
+    // sem exigir novo login / recarregar a página.
+    await recarregarPapel();
     setSalvandoSistema(false);
   }
 
@@ -783,6 +793,8 @@ export default function ConfiguracoesPage() {
               {salvandoSistema ? "Salvando..." : "Salvar negócio"}
             </button>
           </div>
+
+          <TaxasCartaoSection />
         </div>
       )}
     </section>

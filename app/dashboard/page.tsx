@@ -23,7 +23,7 @@ type Venda = {
 };
 
 type Cliente = { id: string; nome: string };
-type Promissoria = { valor_total: number | null; status: string };
+type Promissoria = { id: string; valor_total: number | null; status: string };
 type Condicional = { id: string; status: string };
 type AtendimentoTat = {
   data: string;
@@ -98,6 +98,9 @@ export default function DashboardPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
+  const [pagamentosProm, setPagamentosProm] = useState<
+    { promissoria_id: string; valor: number }[]
+  >([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
   const [atendServico, setAtendServico] = useState<
@@ -117,16 +120,18 @@ export default function DashboardPage() {
       condicionaisRes,
       atendRes,
       servRes,
+      pagamentosRes,
     ] = await Promise.all([
       supabase
         .from("vendas")
         .select("id, cliente_id, forma_pagamento, total, status, created_at")
         .order("created_at", { ascending: false }),
       supabase.from("clientes").select("id, nome"),
-      supabase.from("promissorias").select("valor_total, status"),
+      supabase.from("promissorias").select("id, valor_total, status"),
       supabase.from("condicionais").select("id, status"),
       supabase.from("tatuagem_atendimentos").select("data, valor, percentual"),
       supabase.from("atendimentos_servico").select("valor, percentual_loja, data"),
+      supabase.from("promissoria_pagamentos").select("promissoria_id, valor"),
     ]);
 
     const primeiroErro =
@@ -140,6 +145,7 @@ export default function DashboardPage() {
     setVendas(vendasRes.data || []);
     setClientes(clientesRes.data || []);
     setPromissorias(promissoriasRes.data || []);
+    setPagamentosProm(pagamentosRes.data || []);
     setCondicionais(condicionaisRes.data || []);
     setAtendimentos(atendRes.data || []);
     setAtendServico(servRes.data || []);
@@ -197,9 +203,27 @@ export default function DashboardPage() {
       somaRepasse(atendimentos, inicioMesAnterior, inicioMes) +
       somaServicos(atendServico, inicioMesAnterior, inicioMes);
 
+    // Contas a receber = SALDO (valor_total − pagamentos) das promissórias ainda
+    // devidas (em aberto/atrasadas). Exclui pagas e canceladas. Considera os
+    // pagamentos parciais (antes somava o valor original e ignorava recebimentos).
+    const pagoPorProm = new Map<string, number>();
+    for (const pg of pagamentosProm) {
+      pagoPorProm.set(
+        pg.promissoria_id,
+        (pagoPorProm.get(pg.promissoria_id) || 0) + Number(pg.valor || 0)
+      );
+    }
     const contasReceber = promissorias
-      .filter((p) => p.status === "em_aberto")
-      .reduce((acc, p) => acc + Number(p.valor_total || 0), 0);
+      .filter((p) => p.status === "em_aberto" || p.status === "atrasado")
+      .reduce(
+        (acc, p) =>
+          acc +
+          Math.max(
+            0,
+            Number(p.valor_total || 0) - (pagoPorProm.get(p.id) || 0)
+          ),
+        0
+      );
 
     const condicionaisAbertas = condicionais.filter((c) => c.status === "aberto").length;
 
@@ -224,7 +248,7 @@ export default function DashboardPage() {
       condicionaisAbertas,
       spark,
     };
-  }, [vendas, promissorias, condicionais, atendimentos, atendServico, janela]);
+  }, [vendas, promissorias, pagamentosProm, condicionais, atendimentos, atendServico, janela]);
 
   const ultimasVendas: VendaRow[] = useMemo(() => {
     return vendas

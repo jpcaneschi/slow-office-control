@@ -74,7 +74,9 @@ export function NotificationsBell() {
     };
   }, []);
 
-  const naoLidas = notifs.filter((n) => !n.lida).length;
+  // "Alerta ativo" = ainda não lido E cuja condição ainda vale (não resolvida).
+  // Notificação resolvida (ex.: estoque reposto) fica no histórico mas não conta.
+  const alertasAtivos = notifs.filter((n) => !n.lida && !n.resolvida).length;
 
   async function abrirNotificacao(n: Notificacao) {
     if (!n.lida) {
@@ -99,9 +101,9 @@ export function NotificationsBell() {
         className="relative rounded-xl border border-[#e8ecf4] bg-white p-2.5 text-[#475569] transition hover:bg-[#f4f6fb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
       >
         <Bell className="h-5 w-5" />
-        {naoLidas > 0 && (
+        {alertasAtivos > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2563eb] px-1 text-[11px] font-bold text-white">
-            {naoLidas > 9 ? "9+" : naoLidas}
+            {alertasAtivos > 9 ? "9+" : alertasAtivos}
           </span>
         )}
       </button>
@@ -110,7 +112,7 @@ export function NotificationsBell() {
         <div className="absolute right-0 z-40 mt-2 w-[min(92vw,360px)] overflow-hidden rounded-2xl border border-[#e8ecf4] bg-white shadow-[0_16px_44px_rgba(15,23,42,0.16)]">
           <div className="flex items-center justify-between border-b border-[#eef2f7] px-4 py-3">
             <h4 className="text-sm font-bold text-[#0f172a]">Notificações</h4>
-            {naoLidas > 0 && (
+            {notifs.some((n) => !n.lida) && (
               <button
                 onClick={lerTodas}
                 className="flex items-center gap-1 text-xs font-semibold text-[#2563eb] transition hover:underline"
@@ -139,7 +141,7 @@ export function NotificationsBell() {
                     key={n.id}
                     onClick={() => abrirNotificacao(n)}
                     className={`flex w-full items-start gap-3 border-b border-[#f1f5f9] px-4 py-3 text-left transition hover:bg-[#f8fafc] ${
-                      n.lida ? "" : "bg-[#eff6ff]/40"
+                      n.resolvida ? "opacity-60" : n.lida ? "" : "bg-[#eff6ff]/40"
                     }`}
                   >
                     <span
@@ -151,8 +153,14 @@ export function NotificationsBell() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="text-sm font-bold text-[#0f172a]">{n.titulo}</span>
-                        {!n.lida && (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563eb]" />
+                        {n.resolvida ? (
+                          <span className="rounded-full bg-[#f0fdf4] px-1.5 py-0.5 text-[10px] font-bold text-[#15803d]">
+                            Resolvida
+                          </span>
+                        ) : (
+                          !n.lida && (
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563eb]" />
+                          )
                         )}
                       </span>
                       {n.descricao && (

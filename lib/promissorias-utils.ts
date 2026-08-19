@@ -25,7 +25,22 @@ export function obterCorStatus(status: string) {
   }
 }
 
-export function validarRegrasPromissoria(valorTotal: number, parcelas: number) {
+export type ConfigPromissoria = {
+  /** Prazo máximo em meses (configuracoes.promissoria_prazo_meses). */
+  prazoMaxMeses: number;
+  /** Parcela mínima em R$ (configuracoes.parcela_minima). */
+  parcelaMinima: number;
+};
+
+/**
+ * Valida a promissória usando a CONFIG da loja (fonte única), não valores fixos.
+ * O backend deve validar de novo — aqui é a UX amigável.
+ */
+export function validarRegrasPromissoria(
+  valorTotal: number,
+  parcelas: number,
+  config: ConfigPromissoria
+) {
   if (!valorTotal || valorTotal <= 0) {
     return "Informe um valor total válido.";
   }
@@ -34,15 +49,32 @@ export function validarRegrasPromissoria(valorTotal: number, parcelas: number) {
     return "Informe uma quantidade de parcelas válida.";
   }
 
-  if (parcelas > 4) {
-    return "O prazo máximo para dividir é de 4 meses.";
+  if (parcelas > config.prazoMaxMeses) {
+    return `O prazo máximo para dividir é de ${config.prazoMaxMeses} ${
+      config.prazoMaxMeses === 1 ? "mês" : "meses"
+    }.`;
   }
 
   const valorParcela = calcularParcelaSugerida(valorTotal, parcelas);
 
-  if (valorParcela < 300) {
-    return "A parcela mínima deve ser de R$ 300 por mês.";
+  if (config.parcelaMinima > 0 && valorParcela < config.parcelaMinima) {
+    return `A parcela mínima deve ser de ${formatCurrency(
+      config.parcelaMinima
+    )} por mês.`;
   }
 
   return "";
+}
+
+/**
+ * Saldo devedor de uma promissória (fonte única). Cancelada = 0 (sai dos
+ * saldos/contas a receber). Nunca negativo.
+ */
+export function calcularSaldoPromissoria(
+  valorTotal: number,
+  totalPago: number,
+  status: string
+): number {
+  if (status === "cancelado") return 0;
+  return Math.max(0, Number(valorTotal || 0) - Number(totalPago || 0));
 }

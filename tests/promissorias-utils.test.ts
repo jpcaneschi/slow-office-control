@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularParcelaSugerida,
+  calcularSaldoPromissoria,
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
+
+// Config de exemplo (fonte única): prazo 4 meses, parcela mínima R$300.
+const CFG = { prazoMaxMeses: 4, parcelaMinima: 300 };
 
 describe("calcularParcelaSugerida", () => {
   it("divide o valor pelas parcelas", () => {
@@ -14,20 +18,43 @@ describe("calcularParcelaSugerida", () => {
   });
 });
 
-describe("validarRegrasPromissoria", () => {
-  it("aceita dentro das regras (<=4 meses, parcela >= 300)", () => {
-    expect(validarRegrasPromissoria(1200, 4)).toBe("");
+describe("validarRegrasPromissoria (config como fonte única)", () => {
+  it("aceita dentro das regras da config", () => {
+    expect(validarRegrasPromissoria(1200, 4, CFG)).toBe("");
   });
   it("recusa valor inválido", () => {
-    expect(validarRegrasPromissoria(0, 2)).toMatch(/valor total/i);
+    expect(validarRegrasPromissoria(0, 2, CFG)).toMatch(/valor total/i);
   });
   it("recusa parcelas inválidas", () => {
-    expect(validarRegrasPromissoria(1000, 0)).toMatch(/parcelas/i);
+    expect(validarRegrasPromissoria(1000, 0, CFG)).toMatch(/parcelas/i);
   });
-  it("recusa prazo maior que 4 meses", () => {
-    expect(validarRegrasPromissoria(3000, 5)).toMatch(/4 meses/i);
+  it("usa o prazo máximo da CONFIG (não o fixo 4)", () => {
+    // Com prazo 6 na config, 5 meses é válido.
+    expect(
+      validarRegrasPromissoria(3000, 5, { prazoMaxMeses: 6, parcelaMinima: 0 })
+    ).toBe("");
+    // Com prazo 4, 5 meses é recusado.
+    expect(validarRegrasPromissoria(3000, 5, CFG)).toMatch(/4 meses/i);
   });
-  it("recusa parcela abaixo de R$ 300", () => {
-    expect(validarRegrasPromissoria(400, 4)).toMatch(/300/);
+  it("usa a parcela mínima da CONFIG", () => {
+    expect(validarRegrasPromissoria(400, 4, CFG)).toMatch(/300/);
+    // parcelaMinima 0 = sem mínimo → aceita parcela pequena.
+    expect(
+      validarRegrasPromissoria(400, 4, { prazoMaxMeses: 4, parcelaMinima: 0 })
+    ).toBe("");
+  });
+});
+
+describe("calcularSaldoPromissoria", () => {
+  it("saldo = total − pago", () => {
+    expect(calcularSaldoPromissoria(400, 100, "em_aberto")).toBe(300);
+  });
+  it("nunca negativo (pago >= total)", () => {
+    expect(calcularSaldoPromissoria(400, 500, "em_aberto")).toBe(0);
+    expect(calcularSaldoPromissoria(400, 400, "pago")).toBe(0);
+  });
+  it("cancelada não entra nos saldos (sempre 0)", () => {
+    expect(calcularSaldoPromissoria(400, 0, "cancelado")).toBe(0);
+    expect(calcularSaldoPromissoria(400, 100, "cancelado")).toBe(0);
   });
 });

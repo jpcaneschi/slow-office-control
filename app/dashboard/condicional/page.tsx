@@ -13,6 +13,13 @@ import {
   parseDataLocal,
   formatDataBR,
 } from "@/lib/datas";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
+import {
+  resumirFinalizacao,
+  ESTADO_LABEL,
+  type MovResumo,
+  type VendaItemResumo,
+} from "@/lib/condicional-utils";
 
 const PDFDownloadLink = dynamic(
   () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
@@ -39,6 +46,7 @@ type Produto = {
 type Variacao = {
   id: string;
   produto_id: string;
+  atributos: Atributos | null;
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
@@ -57,6 +65,15 @@ type Condicional = {
   data_limite: string;
   data_retorno: string | null;
   observacao: string | null;
+  venda_id: string | null;
+};
+
+type VendaGerada = {
+  id: string;
+  total: number | null;
+  desconto_pix: number | null;
+  valor_bruto: number | null;
+  forma_pagamento: string | null;
 };
 
 type CondicionalItem = {
@@ -94,6 +111,12 @@ export default function CondicionalPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [condicionalItens, setCondicionalItens] = useState<CondicionalItem[]>([]);
+  // Histórico da finalização (Área #9): movimentos por condicional + venda gerada.
+  const [movPorCond, setMovPorCond] = useState<Record<string, MovResumo[]>>({});
+  const [vendaPorId, setVendaPorId] = useState<Record<string, VendaGerada>>({});
+  const [vendaItensPorVenda, setVendaItensPorVenda] = useState<
+    Record<string, VendaItemResumo[]>
+  >({});
   const [nomeOperacao, setNomeOperacao] = useState("");
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -135,7 +158,7 @@ export default function CondicionalPage() {
       supabase
         .from("condicionais")
         .select(
-          "id, created_at, cliente_id, responsavel, status, data_saida, data_limite, data_retorno, observacao"
+          "id, created_at, cliente_id, responsavel, status, data_saida, data_limite, data_retorno, observacao, venda_id"
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -158,12 +181,71 @@ export default function CondicionalPage() {
 
     setClientes(clientesRes.data || []);
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
-    setCondicionais(condicionaisRes.data || []);
+    const condicionaisData = (condicionaisRes.data || []) as Condicional[];
+    setCondicionais(condicionaisData);
     setCondicionalItens(itensRes.data || []);
+
+    // Detalhamento da finalização: movimentos de estoque dos condicionais já
+    // encerrados + a venda gerada (com seus itens) de cada um.
+    const encerradosIds = condicionaisData
+      .filter((c) => c.status === "finalizado" || c.status === "recolhido")
+      .map((c) => c.id);
+    const vendaIds = condicionaisData
+      .map((c) => c.venda_id)
+      .filter((id): id is string => !!id);
+
+    if (encerradosIds.length > 0) {
+      const { data: movs } = await supabase
+        .from("estoque_movimentacoes")
+        .select("produto_id, variacao_id, tipo, quantidade, referencia_id")
+        .in("referencia_id", encerradosIds);
+      const mapaMov: Record<string, MovResumo[]> = {};
+      for (const m of (movs as (MovResumo & { referencia_id: string })[]) || []) {
+        (mapaMov[m.referencia_id] ??= []).push({
+          produto_id: m.produto_id,
+          variacao_id: m.variacao_id,
+          tipo: m.tipo,
+          quantidade: Number(m.quantidade || 0),
+        });
+      }
+      setMovPorCond(mapaMov);
+    } else {
+      setMovPorCond({});
+    }
+
+    if (vendaIds.length > 0) {
+      const [vendasRes, vendaItensRes] = await Promise.all([
+        supabase
+          .from("vendas")
+          .select("id, total, desconto_pix, valor_bruto, forma_pagamento")
+          .in("id", vendaIds),
+        supabase
+          .from("venda_itens")
+          .select("venda_id, produto_id, variacao_id, quantidade")
+          .in("venda_id", vendaIds),
+      ]);
+      const mapaVenda: Record<string, VendaGerada> = {};
+      for (const v of (vendasRes.data as VendaGerada[]) || []) mapaVenda[v.id] = v;
+      setVendaPorId(mapaVenda);
+      const mapaItens: Record<string, VendaItemResumo[]> = {};
+      for (const vi of (vendaItensRes.data as (VendaItemResumo & {
+        venda_id: string;
+      })[]) || []) {
+        (mapaItens[vi.venda_id] ??= []).push({
+          produto_id: vi.produto_id,
+          variacao_id: vi.variacao_id,
+          quantidade: Number(vi.quantidade || 0),
+        });
+      }
+      setVendaItensPorVenda(mapaItens);
+    } else {
+      setVendaPorId({});
+      setVendaItensPorVenda({});
+    }
 
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -243,6 +325,15 @@ export default function CondicionalPage() {
     return condicionalItens.filter((item) => item.condicional_id === condicionalId);
   }
 
+  function nomeComVariante(produtoId: string, variacaoId: string | null) {
+    const base = getProdutoNome(produtoId);
+    if (!variacaoId) return base;
+    const v = variacoes.find((x) => x.id === variacaoId);
+    return v
+      ? `${base} (${rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })})`
+      : base;
+  }
+
   const variacoesDoProduto = variacoes.filter((v) => v.produto_id === produtoId);
   const produtoSelecionado = produtos.find((p) => p.id === produtoId);
 
@@ -295,7 +386,7 @@ export default function CondicionalPage() {
       : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
-      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
       : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
@@ -553,7 +644,7 @@ export default function CondicionalPage() {
       <PageHeader
         eyebrow="Módulo operacional"
         title="Condicional"
-        description="Controle peças deixadas com o cliente, prazo de retorno, situação do condicional e preparação para conversão futura em venda."
+        description="Controle peças deixadas com o cliente, prazo de retorno e converta em venda o que o cliente ficou — devolvendo o restante ao estoque."
       />
 
       {erro && (
@@ -709,7 +800,7 @@ export default function CondicionalPage() {
                         value={v.id}
                         disabled={Number(v.estoque || 0) <= 0}
                       >
-                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"}{" "}
+                        {rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })}{" "}
                         — estoque {Number(v.estoque || 0)}
                       </option>
                     ))}
@@ -801,8 +892,8 @@ export default function CondicionalPage() {
               <p>• O prazo padrão é de {prazoDias} {prazoDias === 1 ? "dia" : "dias"}.</p>
               <p>• As peças saem temporariamente do estoque.</p>
               <p>• Quando recolhido, o produto volta ao estoque.</p>
-              <p>• Depois vamos permitir converter itens escolhidos em venda.</p>
-              <p>• PDF profissional já habilitado nesta etapa.</p>
+              <p>• Você pode converter em venda o que o cliente ficou; o restante volta ao estoque.</p>
+              <p>• Ao finalizar, o histórico mostra o que foi vendido, devolvido e a venda gerada.</p>
             </div>
           </div>
 
@@ -848,6 +939,30 @@ export default function CondicionalPage() {
                   const atrasado =
                     condicional.status === "aberto" &&
                     parseDataLocal(condicional.data_limite) < parseDataLocal(hoje);
+
+                  const encerrado =
+                    condicional.status === "finalizado" ||
+                    condicional.status === "recolhido";
+                  const vendaGerada = condicional.venda_id
+                    ? vendaPorId[condicional.venda_id] || null
+                    : null;
+                  const resumo = encerrado
+                    ? resumirFinalizacao(
+                        itens.map((i) => ({
+                          id: i.id,
+                          produto_id: i.produto_id,
+                          variacao_id: i.variacao_id,
+                          quantidade: i.quantidade,
+                          preco_unitario: i.preco_unitario,
+                          status: i.status,
+                        })),
+                        movPorCond[condicional.id] || [],
+                        condicional.venda_id
+                          ? vendaItensPorVenda[condicional.venda_id] || []
+                          : []
+                      )
+                    : null;
+                  const movimentos = movPorCond[condicional.id] || [];
 
                   return (
                     <div
@@ -904,7 +1019,7 @@ export default function CondicionalPage() {
                                   ? variacoes.find((x) => x.id === item.variacao_id)
                                   : null;
                                 const nome = v
-                                  ? `${getProdutoNome(item.produto_id)} (${[v.tamanho, v.cor].filter(Boolean).join(" · ")})`
+                                  ? `${getProdutoNome(item.produto_id)} (${rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })})`
                                   : getProdutoNome(item.produto_id);
                                 return (
                                   <div
@@ -918,6 +1033,106 @@ export default function CondicionalPage() {
                               })}
                             </div>
                           </div>
+
+                          {/* Área #9: detalhamento da finalização */}
+                          {resumo && (
+                            <div className="mt-2 rounded-[20px] border border-[#bbf7d0] bg-[#f0fdf4]/60 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#15803d]">
+                                  Resumo da finalização
+                                </p>
+                                {condicional.data_retorno && (
+                                  <span className="text-xs text-[#64748b]">
+                                    Retorno: {formatDataBR(condicional.data_retorno)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="mt-1 text-sm text-[#334155]">
+                                {resumo.totalVendidoQtd} vendida
+                                {resumo.totalVendidoQtd === 1 ? "" : "s"} ·{" "}
+                                {resumo.totalDevolvidoQtd} devolvida
+                                {resumo.totalDevolvidoQtd === 1 ? "" : "s"} ·
+                                Responsável: {condicional.responsavel || "-"}
+                              </p>
+
+                              <div className="mt-2 space-y-1.5">
+                                {resumo.itens.map((it) => (
+                                  <div
+                                    key={`${it.produto_id}-${it.variacao_id ?? ""}`}
+                                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-[#dcfce7] bg-white px-3 py-2 text-sm text-[#475569]"
+                                  >
+                                    <span className="flex-1 text-[#0f172a]">
+                                      {nomeComVariante(it.produto_id, it.variacao_id)}
+                                    </span>
+                                    <span className="text-xs text-[#64748b]">
+                                      levou {it.enviado}
+                                    </span>
+                                    {it.vendido > 0 && (
+                                      <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-xs font-bold text-[#1d4ed8]">
+                                        vendeu {it.vendido}
+                                      </span>
+                                    )}
+                                    {it.devolvido > 0 && (
+                                      <span className="rounded-full bg-[#fff7ed] px-2 py-0.5 text-xs font-bold text-[#b45309]">
+                                        devolveu {it.devolvido}
+                                      </span>
+                                    )}
+                                    <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-bold text-[#475569]">
+                                      {ESTADO_LABEL[it.estado]}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {vendaGerada && (
+                                <div className="mt-2 rounded-xl border border-[#bfdbfe] bg-white px-3 py-2 text-sm">
+                                  <span className="font-bold text-[#0f172a]">
+                                    Venda gerada:{" "}
+                                    {formatCurrency(Number(vendaGerada.total || 0))}
+                                  </span>
+                                  {Number(vendaGerada.desconto_pix || 0) > 0 && (
+                                    <span className="ml-2 text-xs text-[#15803d]">
+                                      desconto {formatCurrency(Number(vendaGerada.desconto_pix))}
+                                    </span>
+                                  )}
+                                  {vendaGerada.forma_pagamento && (
+                                    <span className="ml-2 text-xs text-[#64748b]">
+                                      · {vendaGerada.forma_pagamento}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {movimentos.length > 0 && (
+                                <details className="mt-2 text-sm">
+                                  <summary className="cursor-pointer text-xs font-semibold text-[#475569]">
+                                    Movimentos de estoque ({movimentos.length})
+                                  </summary>
+                                  <div className="mt-1.5 space-y-1">
+                                    {movimentos.map((m, idx) => (
+                                      <div
+                                        key={`${m.produto_id}-${m.tipo}-${idx}`}
+                                        className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs text-[#64748b]"
+                                      >
+                                        <span>
+                                          {nomeComVariante(m.produto_id, m.variacao_id)}
+                                        </span>
+                                        <span className="font-semibold">
+                                          {m.tipo === "retorno_condicional"
+                                            ? "retorno"
+                                            : m.tipo === "condicional"
+                                            ? "saída"
+                                            : m.tipo}{" "}
+                                          {m.quantidade}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex flex-col gap-2 md:min-w-[190px]">
@@ -996,7 +1211,7 @@ export default function CondicionalPage() {
                                 ? variacoes.find((v) => v.id === item.variacao_id)
                                 : null;
                               const nomeItem = vLabel
-                                ? `${getProdutoNome(item.produto_id)} (${[vLabel.tamanho, vLabel.cor].filter(Boolean).join(" · ")})`
+                                ? `${getProdutoNome(item.produto_id)} (${rotuloVariacao(vLabel.atributos, { tamanho: vLabel.tamanho, cor: vLabel.cor })})`
                                 : getProdutoNome(item.produto_id);
                               const qv = Math.max(
                                 0,

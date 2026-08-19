@@ -234,6 +234,17 @@ export default function FinanceiroPage() {
     [despesasPeriodo]
   );
 
+  // Taxas de cartão são lançadas como despesa (categoria "Taxa de cartão").
+  // Já entram em despesasTotal (por isso o resultado fica correto) — aqui só as
+  // destacamos para leitura separada (faturamento × taxas × resultado).
+  const taxasCartao = useMemo(
+    () =>
+      despesasPeriodo
+        .filter((d) => d.categoria === "Taxa de cartão")
+        .reduce((acc, d) => acc + Number(d.valor || 0), 0),
+    [despesasPeriodo]
+  );
+
   const resultado = lucroBruto - despesasTotal;
 
   const vendasPix = useMemo(() => {
@@ -423,6 +434,11 @@ export default function FinanceiroPage() {
           <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
             {formatCurrency(despesasTotal)}
           </p>
+          {taxasCartao > 0 && (
+            <p className="mt-2 text-xs text-[#94a3b8]">
+              Inclui {formatCurrency(taxasCartao)} de taxas de cartão
+            </p>
+          )}
         </div>
 
         <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
@@ -694,6 +710,7 @@ export default function FinanceiroPage() {
               <p>• Repasse de tatuagem: {formatCurrency(receitaTatuagem)}</p>
               <p>• Custo dos produtos: {formatCurrency(custoProdutos)}</p>
               <p>• Lucro bruto: {formatCurrency(lucroBruto)}</p>
+              <p>• Taxas de cartão: {formatCurrency(taxasCartao)}</p>
               <p>• Total de despesas: {formatCurrency(despesasTotal)}</p>
               <p>• Resultado líquido: {formatCurrency(resultado)}</p>
               <p>• Vendas no Pix: {vendasPix}</p>

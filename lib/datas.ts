@@ -100,3 +100,32 @@ export function dataValida(iso: string | null | undefined): boolean {
     dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
   );
 }
+
+/**
+ * Normaliza uma data digitada ou importada (CSV) para "YYYY-MM-DD".
+ * Aceita "AAAA-MM-DD" (ISO, com ou sem hora) e "DD/MM/AAAA" (formato BR,
+ * também com "-" ou "." como separador). NÃO converte fuso — é tudo string.
+ * Retorna:
+ *   • ""    → entrada vazia (campo opcional, sem valor)
+ *   • ISO   → "YYYY-MM-DD" quando a data é real
+ *   • null  → formato irreconhecível ou data impossível (ex.: 29/02 não-bissexto)
+ */
+export function normalizarDataEntrada(
+  v: string | null | undefined
+): string | null {
+  if (v === null || v === undefined) return "";
+  const s = String(v).trim();
+  if (s === "") return "";
+  // ISO: AAAA-MM-DD (aceita timestamp, corta na parte da data)
+  const iso = s.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    return dataValida(iso) ? iso : null;
+  }
+  // BR: DD/MM/AAAA (separadores / . -)
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(s);
+  if (m) {
+    const cand = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return dataValida(cand) ? cand : null;
+  }
+  return null;
+}

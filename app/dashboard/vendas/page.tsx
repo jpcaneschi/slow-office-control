@@ -15,6 +15,8 @@ import {
   formatCurrency,
   obterCorFormaPagamento,
 } from "@/lib/vendas-utils";
+import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
 type Cliente = {
   id: string;
@@ -34,6 +36,7 @@ type Produto = {
 type Variacao = {
   id: string;
   produto_id: string;
+  atributos: Atributos | null;
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
@@ -105,6 +108,7 @@ export default function VendasPage() {
   const [valorRecebido, setValorRecebido] = useState("");
   const [parcelas, setParcelas] = useState("1");
   const [taxaCartao, setTaxaCartao] = useState("0");
+  const [taxasRegras, setTaxasRegras] = useState<RegraTaxa[]>([]);
   const [mesesPromissoria, setMesesPromissoria] = useState("1");
   const [venctoPromissoria, setVenctoPromissoria] = useState("");
   const [entradaMisto, setEntradaMisto] = useState("");
@@ -162,7 +166,7 @@ export default function VendasPage() {
     // Variações ativas de todos os produtos (para a grade na venda).
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -177,6 +181,15 @@ export default function VendasPage() {
     setMaxParcelasCfg(cfg.max_parcelas);
     setParcelaMinimaCfg(cfg.parcela_minima);
     setPromMaxCfg(cfg.promissoria_prazo_meses);
+
+    // Regras de taxa de cartão (ativas) — para auto-preencher a taxa no PDV.
+    const { data: taxasData } = await supabase
+      .from("taxas_cartao")
+      .select(
+        "id, tipo, bandeira, parcelas_min, parcelas_max, taxa_percentual, taxa_fixa, ativo, permite_ajuste_manual_pdv"
+      )
+      .eq("ativo", true);
+    setTaxasRegras((taxasData as RegraTaxa[]) || []);
     setLoading(false);
   }
 
@@ -259,6 +272,28 @@ export default function VendasPage() {
       ? totalRascunho * (1 - taxaNum / 100)
       : totalRascunho;
 
+  // Regra de taxa aplicável (por tipo crédito + faixa de parcelas). Quando existe,
+  // o PDV auto-preenche a taxa; só permite editar se a regra autorizar.
+  const regraTaxaAplicavel = useMemo(
+    () =>
+      formaPagamento === "cartao"
+        ? encontrarRegraTaxa(taxasRegras, {
+            tipo: "credito",
+            parcelas: parcelasNum,
+          })
+        : null,
+    [formaPagamento, parcelasNum, taxasRegras]
+  );
+  const taxaBloqueada =
+    !!regraTaxaAplicavel && !regraTaxaAplicavel.permite_ajuste_manual_pdv;
+
+  // Auto-preenche a taxa quando a regra aplicável muda (troca de parcelas/forma).
+  useEffect(() => {
+    if (regraTaxaAplicavel) {
+      setTaxaCartao(String(regraTaxaAplicavel.taxa_percentual));
+    }
+  }, [regraTaxaAplicavel]);
+
   // Fiado / promissória (venda inteira) e misto (entrada + restante no fiado).
   const mesesNum = Math.max(1, parseInt(mesesPromissoria) || 1);
   const entradaNum = Number(entradaMisto || 0);
@@ -335,7 +370,7 @@ export default function VendasPage() {
       : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
-      ? `${produto.nome} (${[variacao.tamanho, variacao.cor].filter(Boolean).join(" · ")})`
+      ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
       : produto.nome;
 
     if (quantidadeNumero > estoqueAtual) {
@@ -552,10 +587,17 @@ export default function VendasPage() {
     }
 
     setDevolvendo(true);
+    // Chave de idempotência: um retry/duplo-envio desta MESMA requisição não
+    // estorna o estoque duas vezes (o backend vira no-op).
+    const idempotencyKey =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `devol-${vendaId}-${Date.now()}`;
     const { error } = await supabase.rpc("devolver_itens_venda", {
       p_venda_id: vendaId,
       p_itens: devolver,
       p_motivo: null,
+      p_idempotency_key: idempotencyKey,
     });
     if (error) {
       setErro(error.message);
@@ -733,9 +775,23 @@ export default function VendasPage() {
                       max="100"
                       value={taxaCartao}
                       onChange={(e) => setTaxaCartao(e.target.value)}
-                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                      disabled={taxaBloqueada}
+                      title={
+                        taxaBloqueada
+                          ? "Taxa definida pela regra cadastrada (ajuste manual bloqueado)."
+                          : undefined
+                      }
+                      className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
+                  {regraTaxaAplicavel && (
+                    <p className="col-span-2 text-xs text-[#94a3b8]">
+                      Taxa da regra cadastrada
+                      {taxaBloqueada
+                        ? " (ajuste manual bloqueado)."
+                        : " — você pode ajustar se precisar."}
+                    </p>
+                  )}
                   <p className="col-span-2 text-xs font-semibold text-[#1d4ed8]">
                     Você recebe (líquido): {formatCurrency(valorLiquidoRascunho)}
                   </p>
@@ -865,7 +921,7 @@ export default function VendasPage() {
               {produtoSelecionado?.tem_variacoes && (
                 <div>
                   <label className="mb-2 block text-sm text-[#475569]">
-                    Variação (tamanho/cor)
+                    Variação
                   </label>
                   <select
                     value={variacaoId}
@@ -879,8 +935,10 @@ export default function VendasPage() {
                         value={v.id}
                         disabled={Number(v.estoque || 0) <= 0}
                       >
-                        {[v.tamanho, v.cor].filter(Boolean).join(" · ") ||
-                          "Variação"}{" "}
+                        {rotuloVariacao(v.atributos, {
+                          tamanho: v.tamanho,
+                          cor: v.cor,
+                        })}{" "}
                         — estoque {Number(v.estoque || 0)}
                       </option>
                     ))}

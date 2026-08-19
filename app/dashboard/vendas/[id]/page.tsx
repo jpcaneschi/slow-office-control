@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { formatDataHoraBR } from "@/lib/datas";
+import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
 type Venda = {
   id: string;
@@ -19,6 +20,10 @@ type Venda = {
   total: number | null;
   parcelas: number | null;
   taxa: number | null;
+  taxa_valor: number | null;
+  valor_bruto: number | null;
+  custo_total: number | null;
+  margem: number | null;
   valor_liquido: number | null;
   valor_recebido: number | null;
   troco: number | null;
@@ -68,7 +73,7 @@ export default function VendaDetalhePage() {
     const { data: v } = await supabase
       .from("vendas")
       .select(
-        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, parcelas, taxa, valor_liquido, valor_recebido, troco, entrada_forma, motivo_cancelamento, observacao, status, created_at"
+        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, parcelas, taxa, taxa_valor, valor_bruto, custo_total, margem, valor_liquido, valor_recebido, troco, entrada_forma, motivo_cancelamento, observacao, status, created_at"
       )
       .eq("id", id)
       .maybeSingle();
@@ -113,15 +118,23 @@ export default function VendaDetalhePage() {
     if (variacaoIds.length) {
       const { data: vars } = await supabase
         .from("produto_variacoes")
-        .select("id, tamanho, cor")
+        .select("id, atributos, tamanho, cor")
         .in("id", variacaoIds);
       const vmap = new Map<string, string>();
-      (vars as { id: string; tamanho: string | null; cor: string | null }[] | null)?.forEach(
-        (v) =>
-          vmap.set(
-            v.id,
-            [v.tamanho, v.cor].filter(Boolean).join(" · ") || "Variação"
-          )
+      (
+        vars as
+          | {
+              id: string;
+              atributos: Atributos | null;
+              tamanho: string | null;
+              cor: string | null;
+            }[]
+          | null
+      )?.forEach((v) =>
+        vmap.set(
+          v.id,
+          rotuloVariacao(v.atributos, { tamanho: v.tamanho, cor: v.cor })
+        )
       );
       setVariacaoNome(vmap);
     }
@@ -201,7 +214,12 @@ export default function VendaDetalhePage() {
               {venda.forma_pagamento === "cartao" && (
                 <>
                   <Campo rotulo="Parcelas" valor={`${venda.parcelas || 1}x`} />
-                  <Campo rotulo="Taxa" valor={`${Number(venda.taxa || 0)}%`} />
+                  <Campo
+                    rotulo="Taxa da maquininha"
+                    valor={`${Number(venda.taxa || 0)}% · ${formatCurrency(
+                      Number(venda.taxa_valor || 0)
+                    )}`}
+                  />
                   <Campo
                     rotulo="Valor líquido (após taxa)"
                     valor={formatCurrency(Number(venda.valor_liquido || 0))}
@@ -304,6 +322,25 @@ export default function VendaDetalhePage() {
                 {formatCurrency(Number(venda.total || 0))}
               </span>
             </div>
+            {venda.forma_pagamento === "cartao" &&
+              Number(venda.taxa_valor || 0) > 0 && (
+                <div className="mt-3 space-y-1 border-t border-[#eef2f7] pt-3">
+                  <Linha
+                    rotulo="Taxa da maquininha"
+                    valor={`- ${formatCurrency(Number(venda.taxa_valor || 0))}`}
+                  />
+                  <Linha
+                    rotulo="Valor líquido"
+                    valor={formatCurrency(Number(venda.valor_liquido || 0))}
+                  />
+                  {venda.margem != null && (
+                    <Linha
+                      rotulo="Margem (líquido − custo)"
+                      valor={formatCurrency(Number(venda.margem || 0))}
+                    />
+                  )}
+                </div>
+              )}
           </div>
         </>
       )}

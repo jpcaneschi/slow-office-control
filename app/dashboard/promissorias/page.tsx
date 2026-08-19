@@ -5,10 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
   calcularParcelaSugerida,
+  calcularSaldoPromissoria,
   formatCurrency,
   obterCorStatus,
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
+import { carregarConfigEmpresa } from "@/lib/empresa-config";
 
 type Cliente = {
   id: string;
@@ -45,9 +47,17 @@ export default function PromissoriasPage() {
   const [valorPagamento, setValorPagamento] = useState<Record<string, string>>({});
   const [pagando, setPagando] = useState(false);
 
+  // Config da loja (fonte única): prazo máximo e parcela mínima.
+  const [prazoMaxMeses, setPrazoMaxMeses] = useState(4);
+  const [parcelaMinima, setParcelaMinima] = useState(0);
+
   async function carregarDados() {
     setLoading(true);
     setErro("");
+
+    const cfg = await carregarConfigEmpresa();
+    setPrazoMaxMeses(cfg.promissoria_prazo_meses);
+    setParcelaMinima(cfg.parcela_minima);
 
     const [clientesRes, promissoriasRes, pagamentosRes] = await Promise.all([
       supabase
@@ -81,9 +91,10 @@ export default function PromissoriasPage() {
   }, [pagamentos]);
 
   function saldoDe(prom: Promissoria) {
-    return Math.max(
-      0,
-      Number(prom.valor_total || 0) - (pagoPorPromissoria[prom.id] || 0)
+    return calcularSaldoPromissoria(
+      Number(prom.valor_total || 0),
+      pagoPorPromissoria[prom.id] || 0,
+      prom.status
     );
   }
 
@@ -118,7 +129,7 @@ export default function PromissoriasPage() {
 
   const totalAberto = useMemo(() => {
     return promissorias
-      .filter((item) => item.status !== "pago")
+      .filter((item) => item.status !== "pago" && item.status !== "cancelado")
       .reduce((acc, item) => acc + saldoDe(item), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promissorias, pagoPorPromissoria]);
@@ -139,7 +150,10 @@ export default function PromissoriasPage() {
   const valorTotalNumero = Number(valorTotal || 0);
   const parcelasNumero = Number(parcelas || 0);
   const valorParcelaSugerida = calcularParcelaSugerida(valorTotalNumero, parcelasNumero);
-  const regraMensagem = validarRegrasPromissoria(valorTotalNumero, parcelasNumero);
+  const regraMensagem = validarRegrasPromissoria(valorTotalNumero, parcelasNumero, {
+    prazoMaxMeses,
+    parcelaMinima,
+  });
 
   function limparFormulario() {
     setClienteId("");
@@ -157,7 +171,10 @@ export default function PromissoriasPage() {
       return;
     }
 
-    const mensagemRegra = validarRegrasPromissoria(valorTotalNumero, parcelasNumero);
+    const mensagemRegra = validarRegrasPromissoria(valorTotalNumero, parcelasNumero, {
+      prazoMaxMeses,
+      parcelaMinima,
+    });
 
     if (mensagemRegra) {
       setErro(mensagemRegra);
@@ -212,11 +229,17 @@ export default function PromissoriasPage() {
     }
 
     setPagando(true);
+    // Chave de idempotência: reenvio/duplo-clique não gera pagamento duplicado.
+    const idempKey =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${prom.id}-${Date.now()}`;
     const { error } = await supabase.rpc("registrar_pagamento_promissoria", {
       p_promissoria_id: prom.id,
       p_valor: valor,
       p_forma: null,
       p_obs: null,
+      p_idempotency_key: idempKey,
     });
     if (error) {
       setErro(error.message);
@@ -381,9 +404,18 @@ export default function PromissoriasPage() {
               Regras atuais da loja
             </h2>
             <div className="mt-4 space-y-3 text-sm text-[#475569]">
-              <p>• O prazo máximo segue o definido em Configurações.</p>
-              <p>• A parcela mínima deve ser de R$ 300 por mês.</p>
-              <p>• O sistema só deve aceitar promissórias dentro dessa regra.</p>
+              <p>
+                • Prazo máximo: {prazoMaxMeses}{" "}
+                {prazoMaxMeses === 1 ? "mês" : "meses"} (definido em Configurações).
+              </p>
+              <p>
+                • Parcela mínima:{" "}
+                {parcelaMinima > 0
+                  ? `${formatCurrency(parcelaMinima)} por mês`
+                  : "sem mínimo"}
+                .
+              </p>
+              <p>• O sistema valida no servidor — não só nesta tela.</p>
             </div>
           </div>
         </div>
@@ -399,6 +431,7 @@ export default function PromissoriasPage() {
                 { v: "em_aberto", l: "Em aberto" },
                 { v: "pago", l: "Pagas" },
                 { v: "atrasado", l: "Atrasadas" },
+                { v: "cancelado", l: "Canceladas" },
               ].map((f) => (
                 <button
                   key={f.v}
@@ -480,6 +513,10 @@ export default function PromissoriasPage() {
                         {item.status === "pago" ? (
                           <span className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-center text-sm font-bold text-[#15803d]">
                             Quitada ✓
+                          </span>
+                        ) : item.status === "cancelado" ? (
+                          <span className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-2 text-center text-sm font-bold text-[#64748b]">
+                            Cancelada
                           </span>
                         ) : (
                           <>
