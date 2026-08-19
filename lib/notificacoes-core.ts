@@ -142,10 +142,15 @@ export type ExistenteNotificacao = {
   chave: string;
   resolvida: boolean;
   lida: boolean;
+  tipo?: string;
+  titulo?: string;
+  descricao?: string | null;
+  href?: string | null;
 };
 
 export type PlanoSincronizacao = {
   inserir: NovaNotificacao[]; // condição nova → cria notificação ativa
+  atualizar: NovaNotificacao[]; // condição continua, mas texto/valor mudou
   reativar: string[]; // chaves cuja condição voltou a valer → resolvida=false
   resolver: string[]; // chaves cuja condição deixou de valer → resolvida=true
 };
@@ -164,6 +169,22 @@ export function planejarSincronizacao(
   const ativasSet = new Set(ativas.map((a) => a.chave));
 
   const inserir = ativas.filter((a) => !existentePorChave.has(a.chave));
+  const atualizar = ativas.filter((ativa) => {
+    const existente = existentePorChave.get(ativa.chave);
+    if (!existente) return false;
+    const temSnapshot =
+      existente.tipo !== undefined ||
+      existente.titulo !== undefined ||
+      existente.descricao !== undefined ||
+      existente.href !== undefined;
+    if (!temSnapshot) return false;
+    return (
+      existente.tipo !== ativa.tipo ||
+      existente.titulo !== ativa.titulo ||
+      existente.descricao !== ativa.descricao ||
+      existente.href !== ativa.href
+    );
+  });
   const reativar = existentes
     .filter((e) => e.resolvida && ativasSet.has(e.chave))
     .map((e) => e.chave);
@@ -171,5 +192,5 @@ export function planejarSincronizacao(
     .filter((e) => !e.resolvida && !ativasSet.has(e.chave))
     .map((e) => e.chave);
 
-  return { inserir, reativar, resolver };
+  return { inserir, atualizar, reativar, resolver };
 }

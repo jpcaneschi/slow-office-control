@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
@@ -254,8 +255,12 @@ export default function ConfiguracoesPage() {
     }
 
     if (novaSenha.trim()) {
-      if (novaSenha.trim().length < 6) {
-        setErro("A nova senha deve ter pelo menos 6 caracteres.");
+      if (
+        novaSenha.trim().length < 8 ||
+        !/[a-zA-Z]/.test(novaSenha) ||
+        !/\d/.test(novaSenha)
+      ) {
+        setErro("Use pelo menos 8 caracteres, com letras e números.");
         return;
       }
 
@@ -391,9 +396,12 @@ export default function ConfiguracoesPage() {
                 <div className="flex items-center gap-4 rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-4">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[#e8ecf4] bg-[#f1f5f9]">
                     {avatarUrl ? (
-                      <img
+                      <Image
                         src={avatarUrl}
                         alt="Foto de perfil"
+                        width={64}
+                        height={64}
+                        unoptimized
                         className="h-full w-full object-cover"
                       />
                     ) : (

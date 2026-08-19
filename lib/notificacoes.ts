@@ -52,7 +52,9 @@ export async function sincronizarNotificacoes(): Promise<void> {
       supabase.from("condicionais").select("id, status, data_limite"),
       supabase.from("eventos").select("id, titulo, tipo, status, data"),
       supabase.from("clientes").select("id, nome, data_nascimento"),
-      supabase.from("notificacoes").select("chave, resolvida, lida"),
+      supabase
+        .from("notificacoes")
+        .select("chave, tipo, titulo, descricao, href, resolvida, lida"),
     ]);
 
   const dados: DadosAlerta = {
@@ -66,7 +68,7 @@ export async function sincronizarNotificacoes(): Promise<void> {
 
   const ativas = calcularAtivas(dados, hojeISO, em7ISO);
   const existentes = (notRes.data as ExistenteNotificacao[]) || [];
-  const { inserir, reativar, resolver } = planejarSincronizacao(
+  const { inserir, atualizar, reativar, resolver } = planejarSincronizacao(
     existentes,
     ativas
   );
@@ -79,6 +81,23 @@ export async function sincronizarNotificacoes(): Promise<void> {
       supabase
         .from("notificacoes")
         .upsert(inserir, { onConflict: "chave", ignoreDuplicates: true })
+    );
+  }
+  if (atualizar.length > 0) {
+    trabalhos.push(
+      Promise.all(
+        atualizar.map((notificacao) =>
+          supabase
+            .from("notificacoes")
+            .update({
+              tipo: notificacao.tipo,
+              titulo: notificacao.titulo,
+              descricao: notificacao.descricao,
+              href: notificacao.href,
+            })
+            .eq("chave", notificacao.chave)
+        )
+      )
     );
   }
   if (reativar.length > 0) {

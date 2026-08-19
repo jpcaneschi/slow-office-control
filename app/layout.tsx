@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Slow Office Control",
-  description: "Sistema de gestão para sua empresa — clientes, vendas, estoque, agenda e financeiro.",
+  title: {
+    default: "Nexo Gestão",
+    template: "%s | Nexo Gestão",
+  },
+  description:
+    "Gestão segura para lojas: vendas, estoque, clientes, financeiro, equipe e relatórios em um só lugar.",
 };
 
 export const viewport: Viewport = {

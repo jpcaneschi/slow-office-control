@@ -1,11 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 // Content Security Policy compatível com as páginas ESTÁTICAS do Next.
 // (A versão com nonce exigiria renderização dinâmica em todas as páginas e
 // quebrava os scripts do próprio Next em produção -> tela branca.)
 // 'unsafe-inline'/'self' liberam os scripts do Next; ainda assim bloqueamos
 // scripts de outros domínios, conexões fora do Supabase, iframes e afins.
-export function proxy(_request: NextRequest) {
+export function proxy() {
   const isDev = process.env.NODE_ENV === "development";
 
   const csp = [

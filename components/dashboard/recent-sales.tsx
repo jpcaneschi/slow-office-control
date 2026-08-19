@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CreditCard,
   Banknote,
@@ -74,6 +77,7 @@ export function RecentSales({
   totalValor: number;
   loading: boolean;
 }) {
+  const router = useRouter();
   return (
     <div className="flex h-full flex-col rounded-3xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
       <div className="mb-4 flex items-center justify-between">
@@ -128,12 +132,12 @@ export function RecentSales({
                     aria-label={`Ver detalhes da venda de ${v.cliente}`}
                     className="cursor-pointer border-t border-[#f1f5f9] text-sm transition hover:bg-[#f8fafc] focus:outline-none focus-visible:bg-[#eff6ff]"
                     onClick={() => {
-                      window.location.href = `/dashboard/vendas/${v.id}`;
+                      router.push(`/dashboard/vendas/${v.id}`);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        window.location.href = `/dashboard/vendas/${v.id}`;
+                        router.push(`/dashboard/vendas/${v.id}`);
                       }
                     }}
                   >

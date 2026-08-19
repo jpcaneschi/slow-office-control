@@ -27,6 +27,8 @@ type VendaItem = {
 
 type Despesa = {
   id: string;
+  despesa_recorrente_id: string | null;
+  competencia: string | null;
   descricao: string;
   categoria: string;
   valor: number;
@@ -123,7 +125,7 @@ export default function FinanceiroPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("despesas")
-        .select("id, descricao, categoria, valor, data, responsavel, observacao, created_at")
+        .select("id, despesa_recorrente_id, competencia, descricao, categoria, valor, data, responsavel, observacao, created_at")
         .order("created_at", { ascending: false }),
       supabase.from("tatuagem_atendimentos").select("valor, percentual, data"),
       supabase
@@ -266,7 +268,8 @@ export default function FinanceiroPage() {
   function lancadaEsteMes(rec: Recorrente) {
     return despesas.some(
       (d) =>
-        d.descricao === rec.descricao && (d.data || "").startsWith(mesPrefix)
+        d.despesa_recorrente_id === rec.id &&
+        (d.competencia || "").startsWith(mesPrefix)
     );
   }
 
@@ -319,22 +322,9 @@ export default function FinanceiroPage() {
 
   async function lancarRecorrente(rec: Recorrente) {
     setErro("");
-    const agora = new Date();
-    const ano = agora.getFullYear();
-    const mes = agora.getMonth();
-    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
-    const dia = Math.min(Math.max(rec.dia_vencimento || 1, 1), ultimoDia);
-    const dataISO = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(
-      dia
-    ).padStart(2, "0")}`;
-
-    const { error } = await supabase.from("despesas").insert({
-      descricao: rec.descricao,
-      categoria: rec.categoria,
-      valor: rec.valor,
-      data: dataISO,
-      responsavel: null,
-      observacao: "Conta recorrente",
+    const { error } = await supabase.rpc("lancar_despesa_recorrente", {
+      p_recorrente_id: rec.id,
+      p_competencia: `${mesPrefix}-01`,
     });
     if (error) {
       setErro(error.message);

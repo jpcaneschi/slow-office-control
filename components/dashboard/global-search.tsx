@@ -82,7 +82,6 @@ export function GlobalSearch() {
   function abrir(r: ResultadoBusca) {
     setOpen(false);
     setQ(""); // limpa a busca ao navegar para outro módulo
-    reqId.current++; // invalida qualquer busca em voo
     router.push(r.href);
   }
 

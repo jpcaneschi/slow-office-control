@@ -75,6 +75,46 @@ export function calcularSaldoPromissoria(
   totalPago: number,
   status: string
 ): number {
-  if (status === "cancelado") return 0;
+  if (status === "cancelado" || status === "pago") return 0;
   return Math.max(0, Number(valorTotal || 0) - Number(totalPago || 0));
+}
+
+export type PagamentoPromissoria = {
+  promissoria_id: string;
+  valor: number | null;
+};
+
+export type PromissoriaComSaldo = {
+  id: string;
+  valor_total: number | null;
+  status: string;
+};
+
+/** Soma os pagamentos por promissória para todos os painéis usarem a mesma fonte. */
+export function agregarPagamentosPromissoria(
+  pagamentos: PagamentoPromissoria[]
+): Record<string, number> {
+  const totais: Record<string, number> = {};
+  for (const pagamento of pagamentos) {
+    totais[pagamento.promissoria_id] =
+      (totais[pagamento.promissoria_id] || 0) + Number(pagamento.valor || 0);
+  }
+  return totais;
+}
+
+/** Saldo total real: desconta pagamentos e zera títulos pagos/cancelados. */
+export function calcularSaldoTotalPromissorias(
+  promissorias: PromissoriaComSaldo[],
+  pagoPorPromissoria: Record<string, number>
+): number {
+  return promissorias.reduce(
+    (total, promissoria) =>
+      total +
+      calcularSaldoPromissoria(
+        Number(promissoria.valor_total || 0),
+        pagoPorPromissoria[promissoria.id] || 0,
+        promissoria.status
+      ),
+    0
+  );
 }

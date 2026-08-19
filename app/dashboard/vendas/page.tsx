@@ -433,11 +433,7 @@ export default function VendasPage() {
     setVenctoPromissoria("");
     setEntradaMisto("");
     setEntradaFormaMisto("pix");
-    setIdempKey(
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : String(Date.now())
-    );
+    setIdempKey(crypto.randomUUID());
     setDescontoManual("0");
     setObservacao("");
     setProdutoId("");

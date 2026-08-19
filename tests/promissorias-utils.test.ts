@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  agregarPagamentosPromissoria,
   calcularParcelaSugerida,
   calcularSaldoPromissoria,
+  calcularSaldoTotalPromissorias,
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
 
@@ -56,5 +58,28 @@ describe("calcularSaldoPromissoria", () => {
   it("cancelada não entra nos saldos (sempre 0)", () => {
     expect(calcularSaldoPromissoria(400, 0, "cancelado")).toBe(0);
     expect(calcularSaldoPromissoria(400, 100, "cancelado")).toBe(0);
+  });
+  it("paga não volta a aparecer por falta de linha legada de pagamento", () => {
+    expect(calcularSaldoPromissoria(400, 0, "pago")).toBe(0);
+  });
+});
+
+describe("saldo consolidado de promissórias", () => {
+  it("desconta pagamentos e ignora títulos pagos/cancelados", () => {
+    const pagamentos = agregarPagamentosPromissoria([
+      { promissoria_id: "aberta", valor: 100 },
+      { promissoria_id: "aberta", valor: 50 },
+      { promissoria_id: "cancelada", valor: 10 },
+    ]);
+    expect(
+      calcularSaldoTotalPromissorias(
+        [
+          { id: "aberta", valor_total: 400, status: "em_aberto" },
+          { id: "cancelada", valor_total: 410, status: "cancelado" },
+          { id: "paga", valor_total: 60, status: "pago" },
+        ],
+        pagamentos
+      )
+    ).toBe(250);
   });
 });

@@ -11,12 +11,14 @@ import { rotaBloqueadaPorModulo } from "@/lib/modulos";
  * Só age depois que o papel foi carregado (evita redirecionar no flash inicial).
  */
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { papel, carregando, modulos } = usePapel();
+  const { papel, carregando, modulos, adminPlataforma } = usePapel();
   const pathname = usePathname();
   const router = useRouter();
 
   const bloqueado =
-    !podeAcessar(papel, pathname) || rotaBloqueadaPorModulo(pathname, modulos);
+    !podeAcessar(papel, pathname) ||
+    rotaBloqueadaPorModulo(pathname, modulos) ||
+    (pathname.startsWith("/dashboard/acessos") && !adminPlataforma);
   const permitido = carregando || !bloqueado;
 
   useEffect(() => {

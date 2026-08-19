@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 
 // Webhook do provedor de checkout (Kiwify / Cacto / etc.).
 // Recebe a notificação de compra/assinatura e atualiza public.subscriptions.
@@ -9,11 +10,20 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Billing webhook is not configured");
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    url,
+    key,
     { auth: { persistSession: false } }
   );
+}
+
+function tokenValido(recebido: string, esperado: string) {
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(esperado);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 // Normaliza o status do provedor para o nosso vocabulário.
@@ -70,18 +80,40 @@ function pick(obj: unknown, caminhos: string[]): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  // Verificação por token compartilhado (configure o mesmo token no provedor).
-  const token = req.nextUrl.searchParams.get("token");
+  // O segredo vai em header, nunca na URL (URLs aparecem em logs e histórico).
+  const authorization = req.headers.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : req.headers.get("x-webhook-token") || "";
   const esperado = process.env.BILLING_WEBHOOK_TOKEN;
-  if (!esperado || token !== esperado) {
+  if (!esperado || !tokenValido(token, esperado)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let payload: unknown = {};
+  const limitePayload = 64 * 1024;
+  const tamanhoDeclarado = Number(req.headers.get("content-length") || 0);
+  if (Number.isFinite(tamanhoDeclarado) && tamanhoDeclarado > limitePayload) {
+    return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+  }
+
+  // Content-Length pode faltar (por exemplo, em transferências fragmentadas),
+  // então o limite também precisa ser aplicado aos bytes realmente recebidos.
+  let corpo: string;
   try {
-    payload = await req.json();
+    corpo = await req.text();
   } catch {
-    payload = {};
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+
+  if (Buffer.byteLength(corpo, "utf8") > limitePayload) {
+    return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(corpo);
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
   const email = pick(payload, [
@@ -104,17 +136,23 @@ export async function POST(req: NextRequest) {
       "webhook_event_type",
     ]) || "";
 
-  if (!email) {
+  const emailNormalizado = email?.trim().toLowerCase() || "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
     return NextResponse.json({ ok: true, ignored: "sem email no payload" });
   }
 
-  const db = admin();
+  let db: ReturnType<typeof admin>;
+  try {
+    db = admin();
+  } catch {
+    return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  }
 
   // Correlaciona pelo e-mail do dono (membership).
   const { data: membro } = await db
     .from("organization_members")
     .select("organization_id")
-    .ilike("email", email)
+    .eq("email", emailNormalizado)
     .limit(1)
     .maybeSingle();
 
@@ -129,14 +167,15 @@ export async function POST(req: NextRequest) {
     "id",
     "data.id",
     "transaction_id",
-  ]);
+  ])?.slice(0, 200);
+  const provider = (pick(payload, ["provider"]) || "checkout").slice(0, 80);
 
   const { error } = await db.from("subscriptions").upsert(
     {
       organization_id: membro.organization_id,
-      provider: pick(payload, ["provider"]) || "checkout",
+      provider,
       external_id: externalId,
-      email,
+      email: emailNormalizado,
       status,
       updated_at: new Date().toISOString(),
     },
@@ -144,7 +183,8 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Falha ao atualizar assinatura no webhook:", error.message);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, status });

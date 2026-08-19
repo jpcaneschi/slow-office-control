@@ -261,6 +261,8 @@ export default function CondicionalPage() {
 
   useEffect(() => {
     carregarDados();
+    // A função usa o estado inicial; recargas posteriores são explícitas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [filtroStatus, setFiltroStatus] = useState("todos");

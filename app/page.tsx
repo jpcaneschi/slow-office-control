@@ -1,720 +1,565 @@
 import Link from "next/link";
-import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import {
-  ShoppingCart,
-  Package,
-  Users,
-  CircleDollarSign,
-  ClipboardList,
-  CalendarDays,
-  FileText,
-  PenTool,
-  ShieldCheck,
-  Smartphone,
   ArrowRight,
+  BarChart3,
+  Boxes,
+  CalendarDays,
   Check,
-  X,
-  Star,
   ChevronDown,
+  CircleDollarSign,
+  ClipboardCheck,
+  FileCheck2,
+  FileText,
+  LockKeyhole,
   MessageCircle,
+  PackageCheck,
+  ReceiptText,
+  ShieldCheck,
+  ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  Sparkles,
+  Store,
+  TrendingUp,
+  UserCheck,
+  Users,
+  WalletCards,
 } from "lucide-react";
 
-const recursos = [
-  {
-    icon: ShoppingCart,
-    cor: "#2563eb",
-    titulo: "Vendas",
-    texto: "Registre vendas rápido, com desconto no Pix e parcelamento, e veja o caixa crescer em tempo real.",
-  },
-  {
-    icon: Package,
-    cor: "#7c3aed",
-    titulo: "Produtos & Estoque",
-    texto: "Catálogo completo com foto, custo e preço. O estoque baixa sozinho e avisa quando algo está acabando.",
-  },
-  {
-    icon: Users,
-    cor: "#db2777",
-    titulo: "Clientes",
-    texto: "Cadastro de clientes com histórico, aniversários e status — pra você atender melhor e vender mais.",
-  },
-  {
-    icon: CircleDollarSign,
-    cor: "#059669",
-    titulo: "Financeiro",
-    texto: "Receitas, despesas, contas fixas do mês e resultado. Saiba exatamente quanto entra e quanto sai.",
-  },
-  {
-    icon: ClipboardList,
-    cor: "#ea580c",
-    titulo: "Condicional & Promissórias",
-    texto: "Controle peças em condicional e vendas a prazo, com prazos e documentos organizados.",
-  },
-  {
-    icon: CalendarDays,
-    cor: "#0891b2",
-    titulo: "Agenda & Lembretes",
-    texto: "Calendário com vencimentos, aniversários e feriados — nada mais passa despercebido.",
-  },
-  {
-    icon: FileText,
-    cor: "#4f46e5",
-    titulo: "Relatórios em PDF",
-    texto: "Promissória, vale, folha e recibos prontos pra imprimir, com visual limpo em preto e branco.",
-  },
-  {
-    icon: PenTool,
-    cor: "#c026d3",
-    titulo: "Área de serviços",
-    texto: "Módulos extras como tatuagem, com repasse automático e integração direta com o financeiro.",
-  },
-];
-
-const passos = [
-  {
-    n: "1",
-    titulo: "Cadastre sua loja",
-    texto: "Coloque seus produtos, preços e clientes — ou importe de onde você já vende.",
-  },
-  {
-    n: "2",
-    titulo: "Registre o dia a dia",
-    texto: "Vendas, entradas e saídas de estoque, condicionais e promissórias, tudo em segundos.",
-  },
-  {
-    n: "3",
-    titulo: "Acompanhe tudo",
-    texto: "Dashboard com faturamento, estoque e agenda, do computador ou do celular.",
-  },
-  {
-    n: "4",
-    titulo: "Gere documentos",
-    texto: "Relatórios e recibos em PDF profissionais, prontos pra entregar ou imprimir.",
-  },
-];
-
-const destaques = [
-  {
-    icon: ShieldCheck,
-    titulo: "Seus dados, protegidos",
-    texto: "Cada loja tem seu espaço isolado e seguro. Ninguém acessa o que é seu.",
-  },
-  {
-    icon: Smartphone,
-    titulo: "Funciona no celular",
-    texto: "Painel responsivo — gerencie a loja de qualquer lugar, a qualquer hora.",
-  },
-  {
-    icon: CircleDollarSign,
-    titulo: "Visão de dono",
-    texto: "Números claros do seu negócio pra decidir com segurança, sem achismo.",
-  },
-];
-
-// Contatos reais vêm de variáveis de ambiente. Sem eles, os botões apontam
-// para o cadastro (nunca para um número/e-mail fictício).
 const WHATSAPP = (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "");
 const CONTATO_EMAIL = process.env.NEXT_PUBLIC_CONTATO_EMAIL || "";
 
-const depoimentos = [
-  {
-    nome: "Rafael Souza",
-    papel: "Loja de streetwear",
-    foto: "/depo-1.png",
-    texto:
-      "Antes eu vivia perdido em planilha. Agora vejo o estoque e o caixa em segundos — mudou minha rotina.",
-  },
-  {
-    nome: "Camila Nunes",
-    papel: "Boutique feminina",
-    foto: "/depo-2.png",
-    texto:
-      "As promissórias e o condicional ficaram organizados de vez. Gerar os PDFs pra cliente é um clique.",
-  },
-  {
-    nome: "Sérgio Almeida",
-    papel: "Loja de calçados",
-    foto: "/depo-3.png",
-    texto:
-      "Simples até pra mim, que não sou muito de tecnologia. Uso do balcão e do celular sem complicação.",
-  },
-];
+const contatoHref = WHATSAPP
+  ? `https://wa.me/${WHATSAPP}?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Nexo.`
+  : CONTATO_EMAIL
+    ? `mailto:${CONTATO_EMAIL}?subject=Quero%20conhecer%20o%20Nexo`
+    : "/login?novo=1";
 
-const planos = [
+const modulos = [
   {
-    nome: "Essencial",
-    preco: "49",
-    desc: "Pra começar a organizar a loja.",
-    destaque: false,
-    itens: [
-      "Produtos e estoque",
-      "Clientes e vendas",
-      "Relatórios em PDF",
-      "Acesso pelo celular",
-    ],
+    icon: ShoppingCart,
+    titulo: "Vendas e caixa",
+    texto: "Pix, dinheiro, cartão, promissória e pagamento misto com estoque integrado.",
+    cor: "bg-[#eaf1ff] text-[#2563eb]",
   },
   {
-    nome: "Profissional",
-    preco: "89",
-    desc: "O mais escolhido pelas lojas.",
-    destaque: true,
-    itens: [
-      "Tudo do Essencial",
-      "Financeiro completo",
-      "Condicional e promissórias",
-      "Agenda e lembretes",
-      "Contas recorrentes",
-    ],
+    icon: Boxes,
+    titulo: "Produtos e estoque",
+    texto: "Grade por cor e tamanho, custos, preços e alertas de estoque baixo.",
+    cor: "bg-[#f3e8ff] text-[#7c3aed]",
   },
   {
-    nome: "Avançado",
-    preco: "149",
-    desc: "Pra quem quer o máximo.",
-    destaque: false,
-    itens: [
-      "Tudo do Profissional",
-      "Área de serviços (tatuagem)",
-      "Vários usuários",
-      "Suporte prioritário",
-    ],
+    icon: Users,
+    titulo: "Clientes",
+    texto: "Histórico de compras, aniversários, contatos e relacionamento em um só lugar.",
+    cor: "bg-[#fce7f3] text-[#db2777]",
+  },
+  {
+    icon: CircleDollarSign,
+    titulo: "Financeiro",
+    texto: "Entradas, despesas, contas recorrentes, taxas e visão clara do resultado.",
+    cor: "bg-[#dcfce7] text-[#059669]",
+  },
+  {
+    icon: ClipboardCheck,
+    titulo: "Condicional",
+    texto: "Peças fora da loja, prazos, devoluções e conversão em venda sem improviso.",
+    cor: "bg-[#ffedd5] text-[#ea580c]",
+  },
+  {
+    icon: FileText,
+    titulo: "Promissórias e PDFs",
+    texto: "Parcelas, recebimentos e documentos organizados, prontos para imprimir.",
+    cor: "bg-[#e0e7ff] text-[#4f46e5]",
+  },
+  {
+    icon: CalendarDays,
+    titulo: "Agenda e alertas",
+    texto: "Vencimentos, tarefas, aniversários e compromissos que não passam batido.",
+    cor: "bg-[#cffafe] text-[#0891b2]",
+  },
+  {
+    icon: ShieldCheck,
+    titulo: "Equipe e auditoria",
+    texto: "Permissões por função e histórico das ações sensíveis realizadas no sistema.",
+    cor: "bg-[#f1f5f9] text-[#334155]",
   },
 ];
 
 const faqs = [
   {
-    q: "Preciso instalar alguma coisa?",
-    a: "Não. O Nexo funciona direto no navegador, no computador ou no celular. É só entrar e usar.",
+    q: "O Nexo funciona no celular?",
+    a: "Sim. O painel é responsivo e pode ser usado no computador, tablet ou celular, direto pelo navegador.",
   },
   {
-    q: "Meus dados ficam seguros?",
-    a: "Sim. Cada loja tem seu espaço isolado, com acesso protegido por login. Ninguém vê os dados da sua loja além de você.",
+    q: "Uma loja consegue ver os dados de outra?",
+    a: "Não. Cada empresa opera em um espaço isolado no banco, com controle de acesso por usuário e função.",
   },
   {
-    q: "Serve para qualquer tipo de loja?",
-    a: "Sim. O Nexo foi feito pro comércio físico em geral — roupas, calçados, acessórios e serviços.",
+    q: "Como uma nova loja recebe acesso?",
+    a: "A loja envia uma solicitação e a equipe Nexo analisa o cadastro. O acesso não é liberado automaticamente.",
   },
   {
-    q: "Dá pra importar meus produtos?",
-    a: "Dá. É possível importar seu catálogo, inclusive com as fotos, pra você não começar do zero.",
-  },
-  {
-    q: "Consigo usar no celular?",
-    a: "Consegue. O painel é responsivo e funciona bem no celular, pra você gerenciar de qualquer lugar.",
-  },
-  {
-    q: "Como começo a usar?",
-    a: "É só clicar em Entrar e acessar sua conta. Se ainda não tem acesso, fale com a gente que ajudamos você a começar.",
+    q: "Consigo gerar documentos?",
+    a: "Sim. O sistema possui relatórios e documentos em PDF para rotinas como promissórias, vales e recibos.",
   },
 ];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-[#0f172a]">
-      <ScrollReveal />
-      {/* ─── Navegação ─────────────────────────────────────────────── */}
-      <header className="border-b border-[#eef2f7] bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-black tracking-tight text-[#1e40af]">
-              Nexo
+    <div className="min-h-screen bg-[#f7f9fc] text-[#0b1426]">
+      <header className="sticky top-0 z-50 border-b border-[#dfe7f2] bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#155eef] text-white shadow-[0_8px_20px_rgba(21,94,239,0.25)]">
+              <Store className="h-5 w-5" />
             </span>
-            <span className="hidden text-[10px] font-bold uppercase tracking-[0.3em] text-[#94a3b8] sm:inline">
-              Gestão
+            <span>
+              <span className="block text-xl font-black leading-none tracking-tight">Nexo</span>
+              <span className="mt-1 block text-[9px] font-extrabold uppercase tracking-[0.32em] text-[#7b8aa3]">
+                Gestão
+              </span>
             </span>
-          </div>
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-[#475569] md:flex">
-            <a href="#recursos" className="transition hover:text-[#2563eb]">
-              Recursos
-            </a>
-            <a href="#como-funciona" className="transition hover:text-[#2563eb]">
-              Como funciona
-            </a>
-            <a href="#planos" className="transition hover:text-[#2563eb]">
-              Planos
-            </a>
-            <a href="#contato" className="transition hover:text-[#2563eb]">
-              Contato
-            </a>
+          </Link>
+
+          <nav className="hidden items-center gap-7 text-sm font-bold text-[#4b5b73] lg:flex">
+            <a href="#produto" className="transition hover:text-[#155eef]">Produto</a>
+            <a href="#recursos" className="transition hover:text-[#155eef]">Recursos</a>
+            <a href="#seguranca" className="transition hover:text-[#155eef]">Segurança</a>
+            <a href="#duvidas" className="transition hover:text-[#155eef]">Dúvidas</a>
           </nav>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2.5">
             <Link
               href="/login"
-              className="hidden text-sm font-semibold text-[#475569] transition hover:text-[#2563eb] sm:block"
+              className="rounded-xl px-3 py-2 text-sm font-extrabold text-[#34425a] transition hover:bg-[#f1f5fb]"
             >
               Entrar
             </Link>
-            <Link
-              href="/login?novo=1"
-              className="rounded-full bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white shadow-[0_6px_18px_rgba(37,99,235,0.25)] transition hover:bg-[#1d4ed8]"
+            <a
+              href={contatoHref}
+              className="hidden items-center gap-2 rounded-xl bg-[#155eef] px-4 py-2.5 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(21,94,239,0.25)] transition hover:bg-[#0f4ed4] sm:inline-flex"
             >
-              Criar conta grátis
-            </Link>
+              Falar com a gente <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </header>
 
-      {/* ─── Hero ──────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#eff6ff] to-white" />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#3b82f6]/20 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 top-40 h-64 w-64 rounded-full bg-[#7c3aed]/10 blur-3xl" />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:py-24 lg:grid-cols-2">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
-              Gestão para o comércio físico
-            </p>
-            <h1 className="mt-4 text-4xl font-black leading-[1.1] tracking-tight text-[#0f172a] md:text-5xl">
-              Toda a sua loja em{" "}
-              <span className="text-[#2563eb]">um só lugar</span>.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-[#475569]">
-              O Nexo reúne vendas, estoque, clientes, financeiro e agenda num
-              painel simples e seguro — feito para lojas de verdade, no lugar de
-              planilhas soltas e cadernos.
-            </p>
-            <form
-              action="/login"
-              method="get"
-              className="mt-8 flex w-full max-w-md flex-col gap-3 sm:flex-row"
-            >
-              <input type="hidden" name="novo" value="1" />
-              <input
-                type="email"
-                name="email"
-                required
-                placeholder="Seu melhor e-mail"
-                className="flex-1 rounded-full border border-[#e2e8f0] bg-white px-5 py-3.5 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/15"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#2563eb] px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] transition hover:bg-[#1d4ed8]"
-              >
-                Criar conta grátis <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
-            <p className="mt-3 text-sm text-[#94a3b8]">
-              Comece grátis · Leva 1 minuto ·{" "}
-              <Link
-                href="/login"
-                className="font-semibold text-[#2563eb] hover:underline"
-              >
-                Já tenho conta
-              </Link>
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              {[
-                { icon: Check, t: "Simples de usar" },
-                { icon: Smartphone, t: "Acesso pelo celular" },
-                { icon: ShieldCheck, t: "Dados protegidos" },
-              ].map((c) => {
-                const Ic = c.icon;
-                return (
-                  <span
-                    key={c.t}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#475569] backdrop-blur"
-                  >
-                    <Ic className="h-3.5 w-3.5 text-[#2563eb]" />
-                    {c.t}
+      <main>
+        <section className="relative overflow-hidden border-b border-[#dfe7f2] bg-[#07152f] text-white">
+          <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:52px_52px]" />
+          <div className="pointer-events-none absolute -left-40 top-12 h-96 w-96 rounded-full bg-[#155eef]/35 blur-3xl" />
+          <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-[#06b6d4]/20 blur-3xl" />
+
+          <div className="relative mx-auto grid max-w-7xl gap-14 px-5 py-16 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:px-8 lg:py-24">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-bold text-[#bcd0ff]">
+                <Sparkles className="h-3.5 w-3.5" /> Gestão completa para lojas físicas
+              </div>
+              <h1 className="mt-6 max-w-2xl text-4xl font-black leading-[1.06] tracking-[-0.04em] sm:text-5xl xl:text-6xl">
+                Sua operação inteira, clara e sob controle.
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-[#b8c5da] sm:text-lg sm:leading-8">
+                Vendas, estoque, clientes e financeiro trabalhando juntos para você enxergar a loja como ela realmente está.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a
+                  href={contatoHref}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-black text-[#0f4ed4] transition hover:bg-[#edf3ff]"
+                >
+                  Conhecer o Nexo <ArrowRight className="h-4 w-4" />
+                </a>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3.5 text-sm font-black text-white transition hover:bg-white/10"
+                >
+                  Já sou cliente
+                </Link>
+              </div>
+
+              <div className="mt-8 grid max-w-lg gap-3 text-sm text-[#d5deed] sm:grid-cols-2">
+                {[
+                  "Acesso por aprovação",
+                  "Dados isolados por loja",
+                  "Permissões por funcionário",
+                  "Documentos em PDF",
+                ].map((item) => (
+                  <span key={item} className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#22c55e]/15 text-[#6ee7a8]">
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                    {item}
                   </span>
+                ))}
+              </div>
+            </div>
+
+            <ProductDashboardPreview />
+          </div>
+        </section>
+
+        <section className="border-b border-[#dfe7f2] bg-white">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-[#e5ebf4] px-5 lg:grid-cols-4 lg:divide-y-0 lg:px-8">
+            {[
+              { icon: ShoppingBag, titulo: "Operação integrada", texto: "Do balcão ao financeiro" },
+              { icon: Smartphone, titulo: "Acesso responsivo", texto: "Computador e celular" },
+              { icon: FileCheck2, titulo: "Documentos prontos", texto: "PDFs para o dia a dia" },
+              { icon: LockKeyhole, titulo: "Ambiente protegido", texto: "RLS e perfis de acesso" },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.titulo} className="flex min-h-32 items-center gap-3 px-4 py-6 lg:px-7">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#eef4ff] text-[#155eef]">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black text-[#14213a]">{item.titulo}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[#718096]">{item.texto}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="produto" className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+          <div className="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#155eef]">Visão de dono</p>
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em] text-[#101c32] sm:text-4xl">
+                Abra o painel e saiba o que precisa de atenção.
+              </h2>
+              <p className="mt-5 text-base leading-7 text-[#607089]">
+                O Nexo transforma o movimento da loja em indicadores fáceis de entender. Menos procura por informação, mais decisão com contexto.
+              </p>
+              <div className="mt-7 space-y-4">
+                {[
+                  { icon: TrendingUp, t: "Faturamento e resultado do período" },
+                  { icon: PackageCheck, t: "Estoque crítico e produtos mais vendidos" },
+                  { icon: WalletCards, t: "Contas, promissórias e despesas próximas" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.t} className="flex items-center gap-3 rounded-2xl border border-[#e3eaf4] bg-white p-4 shadow-[0_8px_24px_rgba(15,34,67,0.04)]">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ff] text-[#155eef]">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <p className="text-sm font-extrabold text-[#34425a]">{item.t}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <OperationsBoard />
+          </div>
+        </section>
+
+        <section id="recursos" className="border-y border-[#dfe7f2] bg-white py-20 lg:py-28">
+          <div className="mx-auto max-w-7xl px-5 lg:px-8">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#155eef]">Uma plataforma, várias rotinas</p>
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.03em] text-[#101c32] sm:text-4xl">
+                Tudo conversa. Nada fica solto.
+              </h2>
+              <p className="mt-4 leading-7 text-[#607089]">
+                Cada módulo foi pensado para refletir o trabalho real de uma loja, sem transformar tarefas simples em burocracia.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {modulos.map((modulo) => {
+                const Icon = modulo.icon;
+                return (
+                  <article key={modulo.titulo} className="group rounded-[24px] border border-[#e3eaf4] bg-[#fbfcfe] p-5 transition hover:-translate-y-1 hover:border-[#b9cdf7] hover:bg-white hover:shadow-[0_18px_42px_rgba(15,34,67,0.08)]">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${modulo.cor}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="mt-5 text-base font-black text-[#14213a]">{modulo.titulo}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#718096]">{modulo.texto}</p>
+                  </article>
                 );
               })}
             </div>
           </div>
+        </section>
 
-          {/* Foto (gerada) + cards flutuantes do painel */}
-          <div className="relative mx-auto w-full max-w-md pb-6">
-            <div className="overflow-hidden rounded-[28px] border-4 border-white bg-white shadow-[0_30px_60px_rgba(15,23,42,0.18)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hero-pessoas.png"
-                alt="Empreendedores de diferentes idades usando o Nexo"
-                width={1024}
-                height={1024}
-                className="w-full"
-              />
-            </div>
-
-            {/* Card flutuante: mini painel */}
-            <div className="absolute -bottom-5 -left-4 w-44 rounded-2xl border border-[#eef2f7] bg-white/95 p-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)] backdrop-blur">
-              <p className="text-[10px] font-semibold text-[#94a3b8]">
-                Vendas hoje
+        <section id="seguranca" className="bg-[#08172f] py-20 text-white lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-12 px-5 lg:grid-cols-2 lg:items-center lg:px-8">
+            <SecurityDiagram />
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#8fb2ff]">Multiempresa com isolamento</p>
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-[-0.03em] sm:text-4xl">
+                Cada loja no seu espaço. Cada pessoa no seu papel.
+              </h2>
+              <p className="mt-5 max-w-xl leading-7 text-[#b8c5da]">
+                O acesso aos dados é filtrado no banco e na aplicação. Uma empresa não recebe autorização para consultar registros de outra.
               </p>
-              <p className="text-xl font-black text-[#2563eb]">R$ 1.240</p>
-              <div className="mt-2 flex h-8 items-end gap-1">
-                {[40, 70, 55, 85, 60, 95].map((h, i) => (
-                  <div
-                    key={i}
-                    className="w-full rounded-t bg-gradient-to-t from-[#93c5fd] to-[#2563eb]"
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Badge flutuante: estoque */}
-            <div className="absolute -right-3 top-6 rounded-2xl border border-[#eef2f7] bg-white/95 px-3 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.16)] backdrop-blur">
-              <p className="text-[10px] font-semibold text-[#94a3b8]">Estoque</p>
-              <p className="text-sm font-black text-[#059669]">155 itens ✓</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Sobre ─────────────────────────────────────────────────── */}
-      <section className="reveal mx-auto max-w-4xl px-5 py-16 text-center">
-        <h2 className="text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-          O que é o Nexo?
-        </h2>
-        <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[#475569]">
-          O Nexo é um sistema de gestão pensado para o comércio físico — lojas de
-          roupa, calçados, acessórios e serviços. Em vez de informação espalhada
-          em papéis e planilhas, você tem tudo organizado, integrado e seguro,
-          acessível de qualquer lugar.
-        </p>
-      </section>
-
-      {/* ─── Sem vs Com o Nexo ─────────────────────────────────────── */}
-      <section className="bg-[#f8fafc] py-16">
-        <div className="mx-auto max-w-5xl px-5">
-          <h2 className="text-center text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-            Do caos à clareza
-          </h2>
-          <div className="reveal mt-10 grid gap-6 md:grid-cols-2">
-            <div className="rounded-3xl border border-[#fecaca] bg-white p-7">
-              <p className="text-sm font-bold uppercase tracking-wide text-[#dc2626]">
-                Sem o Nexo
-              </p>
-              <ul className="mt-5 space-y-3">
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 {[
-                  "Planilhas soltas e cadernos de anotação",
-                  "Estoque no chute, sem saber o que tem",
-                  "Promissória e vale em papel que some",
-                  "Nenhuma visão real do caixa",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-[#475569]">
-                    <X className="mt-0.5 h-5 w-5 shrink-0 text-[#f87171]" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-3xl border border-[#bbf7d0] bg-white p-7 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
-              <p className="text-sm font-bold uppercase tracking-wide text-[#15803d]">
-                Com o Nexo
-              </p>
-              <ul className="mt-5 space-y-3">
-                {[
-                  "Vendas, estoque e clientes integrados",
-                  "Estoque em tempo real, com alertas",
-                  "Documentos em PDF, sempre à mão",
-                  "Dashboard financeiro com visão de dono",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-[#334155]">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#16a34a]" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
+                  { icon: Store, t: "Dados separados por empresa" },
+                  { icon: UserCheck, t: "Dono, gerente, caixa e financeiro" },
+                  { icon: ShieldCheck, t: "Políticas RLS no banco" },
+                  { icon: ClipboardCheck, t: "Auditoria de ações sensíveis" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.t} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <Icon className="h-5 w-5 shrink-0 text-[#78a3ff]" />
+                      <p className="text-sm font-bold text-[#e3eaf6]">{item.t}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ─── Recursos ──────────────────────────────────────────────── */}
-      <section id="recursos" className="mx-auto max-w-6xl px-5 py-20">
-        <div className="text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
-            Recursos
-          </p>
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-            Tudo que a sua loja precisa
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
-            Um sistema completo, sem precisar de dez ferramentas diferentes.
-          </p>
-        </div>
-        <div className="reveal mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {recursos.map((r) => {
-            const Icon = r.icon;
-            return (
-              <div
-                key={r.titulo}
-                className="rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)]"
-              >
-                <span
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{ backgroundColor: `${r.cor}1a`, color: r.cor }}
-                >
-                  <Icon className="h-6 w-6" />
-                </span>
-                <h3 className="mt-4 text-lg font-black text-[#0f172a]">
-                  {r.titulo}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-[#64748b]">{r.texto}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ─── Como funciona ─────────────────────────────────────────── */}
-      <section id="como-funciona" className="bg-gradient-to-b from-[#1e40af] to-[#2563eb] py-20 text-white">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/70">
-              Como funciona
-            </p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight md:text-3xl">
-              Começar é simples
-            </h2>
-          </div>
-          <div className="reveal mt-12 grid gap-6 md:grid-cols-4">
-            {passos.map((p) => (
-              <div
-                key={p.n}
-                className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-black text-[#2563eb]">
-                  {p.n}
-                </span>
-                <h3 className="mt-4 text-lg font-black">{p.titulo}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/80">{p.texto}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Destaques ─────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-5 py-20">
-        <div className="reveal grid gap-6 md:grid-cols-3">
-          {destaques.map((d) => {
-            const Icon = d.icon;
-            return (
-              <div key={d.titulo} className="text-center">
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2563eb]/10 text-[#2563eb]">
-                  <Icon className="h-7 w-7" />
-                </span>
-                <h3 className="mt-4 text-lg font-black text-[#0f172a]">
-                  {d.titulo}
-                </h3>
-                <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-[#64748b]">
-                  {d.texto}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ─── Depoimentos ───────────────────────────────────────────── */}
-      <section className="bg-[#f8fafc] py-20">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="reveal text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
-              Depoimentos
-            </p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-              Quem usa, recomenda
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
-              Cenários ilustrativos de como o Nexo organiza o dia a dia da loja.
-              <br />
-              <span className="text-xs text-[#94a3b8]">
-                * Exemplos ilustrativos — serão substituídos por histórias reais
-                de clientes.
+        <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+          <div className="grid overflow-hidden rounded-[32px] border border-[#dfe7f2] bg-white shadow-[0_24px_60px_rgba(15,34,67,0.08)] lg:grid-cols-2">
+            <div className="p-7 sm:p-10 lg:p-12">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef4ff] text-[#155eef]">
+                <ReceiptText className="h-6 w-6" />
               </span>
-            </p>
-          </div>
-          <div className="reveal mt-12 grid gap-6 md:grid-cols-3">
-            {depoimentos.map((d) => (
-              <div
-                key={d.nome}
-                className="rounded-3xl border border-[#eef2f7] bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.05)]"
-              >
-                <div className="flex items-center gap-0.5 text-[#f59e0b]">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Star key={i} className="h-4 w-4 fill-current" />
-                  ))}
-                </div>
-                <p className="mt-4 leading-7 text-[#475569]">
-                  &ldquo;{d.texto}&rdquo;
-                </p>
-                <div className="mt-5 flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={d.foto}
-                    alt={d.nome}
-                    width={44}
-                    height={44}
-                    className="h-11 w-11 rounded-full object-cover"
-                  />
-                  <div>
-                    <p className="text-sm font-black text-[#0f172a]">{d.nome}</p>
-                    <p className="text-xs text-[#64748b]">{d.papel}</p>
-                  </div>
-                </div>
+              <h2 className="mt-6 text-3xl font-black tracking-[-0.03em] text-[#101c32]">Documentos que saem prontos.</h2>
+              <p className="mt-4 max-w-lg leading-7 text-[#607089]">
+                Gere PDFs limpos para as rotinas que precisam ir para o papel ou ser compartilhadas com o cliente.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {["Promissória", "Vale", "Recibo", "Relatório"].map((item) => (
+                  <span key={item} className="rounded-full border border-[#dbe4f0] bg-[#f8fafe] px-3 py-1.5 text-xs font-extrabold text-[#53627a]">
+                    {item}
+                  </span>
+                ))}
               </div>
-            ))}
+            </div>
+            <PdfPreview />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ─── Planos ────────────────────────────────────────────────── */}
-      <section id="planos" className="bg-[#f8fafc] py-20">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="reveal text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
-              Planos
-            </p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-              Escolha o plano da sua loja
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-[#64748b]">
-              Preços simples, sem surpresa. Cancele quando quiser.
-            </p>
+        <section id="duvidas" className="border-y border-[#dfe7f2] bg-white py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[0.7fr_1.3fr] lg:px-8">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#155eef]">Perguntas frequentes</p>
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.03em] text-[#101c32]">Antes de começar</h2>
+              <p className="mt-4 leading-7 text-[#607089]">Ficou com outra dúvida? Fale diretamente com a equipe Nexo.</p>
+            </div>
+            <div className="space-y-3">
+              {faqs.map((faq) => (
+                <details key={faq.q} className="group rounded-2xl border border-[#e3eaf4] bg-[#fbfcfe] p-5 open:bg-white open:shadow-[0_12px_28px_rgba(15,34,67,0.06)]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-black text-[#263650] [&::-webkit-details-marker]:hidden">
+                    {faq.q}
+                    <ChevronDown className="h-5 w-5 shrink-0 text-[#718096] transition group-open:rotate-180" />
+                  </summary>
+                  <p className="mt-3 pr-8 text-sm leading-6 text-[#607089]">{faq.a}</p>
+                </details>
+              ))}
+            </div>
           </div>
-          <div className="reveal mt-12 grid items-start gap-6 md:grid-cols-3">
-            {planos.map((p) => (
-              <div
-                key={p.nome}
-                className={`rounded-3xl border bg-white p-7 ${
-                  p.destaque
-                    ? "border-[#2563eb] shadow-[0_20px_50px_rgba(37,99,235,0.16)] ring-1 ring-[#2563eb]/20 md:-mt-2"
-                    : "border-[#eef2f7] shadow-[0_2px_12px_rgba(15,23,42,0.05)]"
-                }`}
-              >
-                {p.destaque && (
-                  <span className="mb-3 inline-block rounded-full bg-[#2563eb] px-3 py-1 text-xs font-bold text-white">
-                    Mais popular
-                  </span>
-                )}
-                <h3 className="text-xl font-black text-[#0f172a]">{p.nome}</h3>
-                <p className="mt-1 text-sm text-[#64748b]">{p.desc}</p>
-                <p className="mt-5">
-                  <span className="text-4xl font-black text-[#0f172a]">
-                    R$ {p.preco}
-                  </span>
-                  <span className="text-sm text-[#94a3b8]">/mês</span>
-                </p>
-                <ul className="mt-6 space-y-2.5">
-                  {p.itens.map((it) => (
-                    <li
-                      key={it}
-                      className="flex items-start gap-2 text-sm text-[#475569]"
-                    >
-                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#16a34a]" />
-                      {it}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/login?novo=1"
-                  className={`mt-7 block rounded-full px-5 py-3 text-center text-sm font-bold transition ${
-                    p.destaque
-                      ? "bg-[#2563eb] text-white shadow-[0_10px_26px_rgba(37,99,235,0.30)] hover:bg-[#1d4ed8]"
-                      : "border border-[#e2e8f0] text-[#334155] hover:bg-[#f8fafc]"
-                  }`}
-                >
-                  Começar
+        </section>
+
+        <section id="contato" className="px-5 py-20 lg:px-8 lg:py-24">
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[34px] bg-[#155eef] px-6 py-14 text-center text-white shadow-[0_28px_70px_rgba(21,94,239,0.28)] sm:px-12">
+            <div className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full border-[44px] border-white/10" />
+            <div className="pointer-events-none absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-[#06b6d4]/25 blur-2xl" />
+            <div className="relative">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#c8d9ff]">Pronto para organizar a operação?</p>
+              <h2 className="mx-auto mt-4 max-w-3xl text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+                Veja como o Nexo se encaixa na rotina da sua loja.
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl leading-7 text-[#e2eaff]">
+                O acesso é analisado individualmente para manter a plataforma organizada e segura.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <a href={contatoHref} className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-black text-[#0f4ed4] transition hover:bg-[#edf3ff]">
+                  <MessageCircle className="h-4 w-4" /> Falar com a equipe
+                </a>
+                <Link href="/login" className="rounded-xl border border-white/25 px-6 py-3.5 text-sm font-black text-white transition hover:bg-white/10">
+                  Entrar no sistema
                 </Link>
               </div>
-            ))}
+            </div>
           </div>
-          <p className="reveal mt-6 text-center text-xs text-[#94a3b8]">
-            * Valores ilustrativos — ajuste conforme o seu modelo de cobrança.
-          </p>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* ─── FAQ ───────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-3xl px-5 py-20">
-        <div className="reveal text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#2563eb]">
-            Dúvidas
-          </p>
-          <h2 className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl">
-            Perguntas frequentes
-          </h2>
-        </div>
-        <div className="reveal mt-10 space-y-3">
-          {faqs.map((f) => (
-            <details
-              key={f.q}
-              className="group rounded-2xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.04)]"
-            >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-[#0f172a] [&::-webkit-details-marker]:hidden">
-                {f.q}
-                <ChevronDown className="h-5 w-5 shrink-0 text-[#94a3b8] transition group-open:rotate-180" />
-              </summary>
-              <p className="mt-3 leading-7 text-[#64748b]">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── CTA final ─────────────────────────────────────────────── */}
-      <section id="contato" className="px-5 pb-20">
-        <div className="reveal mx-auto max-w-4xl rounded-[32px] bg-gradient-to-br from-[#1e40af] to-[#2563eb] px-8 py-14 text-center text-white shadow-[0_30px_60px_rgba(37,99,235,0.25)]">
-          <h2 className="text-2xl font-black tracking-tight md:text-3xl">
-            Pronto para organizar sua loja?
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-white/85">
-            Entre no Nexo e tenha o controle do seu negócio na palma da mão.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/login?novo=1"
-              className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-[#2563eb] transition hover:bg-[#f0f4ff]"
-            >
-              Criar conta grátis <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href={
-                CONTATO_EMAIL
-                  ? `mailto:${CONTATO_EMAIL}`
-                  : WHATSAPP
-                    ? `https://wa.me/${WHATSAPP}`
-                    : "/login?novo=1"
-              }
-              className="inline-flex items-center gap-2 rounded-full border border-white/30 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-white/10"
-            >
-              Falar com a gente
-            </a>
+      <footer className="border-t border-[#dfe7f2] bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+          <div className="flex items-center gap-2 text-[#14213a]">
+            <Store className="h-5 w-5 text-[#155eef]" />
+            <span className="font-black">Nexo Gestão</span>
           </div>
-        </div>
-      </section>
-
-      {/* ─── Rodapé ────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#eef2f7] bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-black tracking-tight text-[#1e40af]">
-              Nexo
-            </span>
-            <span className="text-xs text-[#94a3b8]">
-              Gestão para o comércio físico
-            </span>
-          </div>
-          <p className="text-sm text-[#94a3b8]">
-            © {new Date().getFullYear()} Nexo. Todos os direitos reservados.
-          </p>
+          <p className="text-xs text-[#7b8aa3]">© {new Date().getFullYear()} Nexo. Gestão para o comércio físico.</p>
         </div>
       </footer>
+    </div>
+  );
+}
 
-      {/* WhatsApp flutuante — só aparece se houver um número real configurado. */}
-      {WHATSAPP && (
-        <a
-          href={`https://wa.me/${WHATSAPP}?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20Nexo.`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Falar no WhatsApp"
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#25d366] px-4 py-3.5 font-bold text-white shadow-[0_10px_30px_rgba(37,211,102,0.45)] transition hover:brightness-105"
-        >
-          <MessageCircle className="h-5 w-5" />
-          <span className="hidden sm:inline">Fale no WhatsApp</span>
-        </a>
-      )}
+function ProductDashboardPreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-[720px]">
+      <div className="overflow-hidden rounded-[24px] border border-white/15 bg-[#f5f7fb] shadow-[0_34px_90px_rgba(0,0,0,0.42)]">
+        <div className="flex h-10 items-center gap-1.5 border-b border-[#dce4ef] bg-white px-4">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#ff6b6b]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#ffd166]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#4fd1a1]" />
+          <span className="ml-4 h-4 w-40 rounded-full bg-[#edf1f7]" />
+        </div>
+        <div className="flex min-h-[390px]">
+          <aside className="hidden w-40 shrink-0 bg-[#123f9a] p-4 sm:block">
+            <p className="text-lg font-black">Nexo</p>
+            <div className="mt-7 space-y-2">
+              {["Visão geral", "Vendas", "Produtos", "Clientes", "Financeiro"].map((item, index) => (
+                <div key={item} className={`rounded-lg px-2.5 py-2 text-[10px] font-bold ${index === 0 ? "bg-white text-[#155eef]" : "text-white/65"}`}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </aside>
+          <div className="min-w-0 flex-1 p-4 text-[#14213a] sm:p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-[#8190a7]">Bom dia, Slow Office</p>
+                <p className="mt-0.5 text-base font-black">Visão geral</p>
+              </div>
+              <span className="rounded-lg border border-[#dfe6f0] bg-white px-2.5 py-1.5 text-[9px] font-bold text-[#53627a]">Este mês</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+              {[
+                { l: "Faturamento", v: "R$ 18.450", c: "text-[#155eef]" },
+                { l: "Vendas", v: "127", c: "text-[#7c3aed]" },
+                { l: "Ticket médio", v: "R$ 145", c: "text-[#059669]" },
+                { l: "Estoque baixo", v: "8 itens", c: "text-[#dc2626]" },
+              ].map((card) => (
+                <div key={card.l} className="rounded-xl border border-[#e2e8f1] bg-white p-3">
+                  <p className="text-[8px] font-bold text-[#8a98ad]">{card.l}</p>
+                  <p className={`mt-1 text-sm font-black ${card.c}`}>{card.v}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1.45fr_.85fr]">
+              <div className="rounded-xl border border-[#e2e8f1] bg-white p-3.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black">Vendas por dia</p>
+                  <TrendingUp className="h-3.5 w-3.5 text-[#22c55e]" />
+                </div>
+                <div className="mt-5 flex h-24 items-end gap-2">
+                  {[42, 64, 51, 78, 58, 88, 74, 96, 81, 100].map((height, index) => (
+                    <div key={index} className="flex-1 rounded-t-sm bg-gradient-to-t from-[#9cbcff] to-[#155eef]" style={{ height: `${height}%` }} />
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-between text-[7px] font-bold text-[#9aa7ba]"><span>01</span><span>05</span><span>10</span><span>15</span><span>20</span></div>
+              </div>
+              <div className="rounded-xl border border-[#e2e8f1] bg-white p-3.5">
+                <p className="text-[10px] font-black">Estoque crítico</p>
+                <div className="mt-3 space-y-3">
+                  {[
+                    ["Camiseta Basic", "2 un.", "bg-[#155eef]"],
+                    ["Calça Wide", "1 un.", "bg-[#7c3aed]"],
+                    ["Moletom Class", "3 un.", "bg-[#06b6d4]"],
+                  ].map(([nome, qtd, cor]) => (
+                    <div key={nome} className="flex items-center gap-2">
+                      <span className={`h-7 w-7 rounded-lg ${cor}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[8px] font-bold">{nome}</span>
+                        <span className="block text-[7px] text-[#9aa7ba]">{qtd}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute -bottom-5 -left-3 rounded-2xl border border-[#dce5f2] bg-white px-4 py-3 text-[#14213a] shadow-[0_16px_40px_rgba(0,0,0,0.22)] sm:-left-8">
+        <p className="text-[9px] font-bold text-[#8190a7]">Venda registrada</p>
+        <p className="mt-1 text-sm font-black text-[#059669]">+ R$ 189,90</p>
+      </div>
+      <div className="absolute -right-3 -top-4 flex items-center gap-2 rounded-2xl border border-[#254e9d] bg-[#102f6c] px-4 py-3 shadow-xl sm:-right-6">
+        <ShieldCheck className="h-5 w-5 text-[#78a3ff]" />
+        <span className="text-[10px] font-black text-white">Dados protegidos</span>
+      </div>
+    </div>
+  );
+}
+
+function OperationsBoard() {
+  return (
+    <div className="rounded-[30px] border border-[#dfe7f2] bg-[#edf3fb] p-4 sm:p-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-[22px] bg-[#155eef] p-6 text-white sm:row-span-2">
+          <BarChart3 className="h-7 w-7 text-[#bcd0ff]" />
+          <p className="mt-10 text-xs font-bold text-[#c8d9ff]">Resultado estimado</p>
+          <p className="mt-2 text-3xl font-black">R$ 8.720</p>
+          <div className="mt-6 h-2 rounded-full bg-white/15"><div className="h-2 w-[72%] rounded-full bg-white" /></div>
+          <p className="mt-2 text-[10px] text-[#c8d9ff]">72% da meta do mês</p>
+        </div>
+        <div className="rounded-[22px] border border-[#dfe7f2] bg-white p-5">
+          <div className="flex items-center justify-between"><p className="text-xs font-black text-[#14213a]">Contas da semana</p><WalletCards className="h-5 w-5 text-[#ea580c]" /></div>
+          <p className="mt-5 text-2xl font-black text-[#14213a]">R$ 2.480</p>
+          <p className="mt-1 text-xs text-[#8190a7]">4 vencimentos próximos</p>
+        </div>
+        <div className="rounded-[22px] border border-[#dfe7f2] bg-white p-5">
+          <div className="flex items-center justify-between"><p className="text-xs font-black text-[#14213a]">Tarefas hoje</p><CalendarDays className="h-5 w-5 text-[#7c3aed]" /></div>
+          <div className="mt-4 space-y-2">
+            {["Conferir estoque", "Cobrar promissória"].map((item, index) => (
+              <div key={item} className="flex items-center gap-2 text-[11px] font-bold text-[#53627a]"><span className={`h-2 w-2 rounded-full ${index ? "bg-[#f59e0b]" : "bg-[#22c55e]"}`} />{item}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SecurityDiagram() {
+  return (
+    <div className="rounded-[30px] border border-white/10 bg-white/5 p-6 sm:p-8">
+      <div className="mx-auto flex max-w-md flex-col items-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-[24px] border border-[#6f99ef]/40 bg-[#155eef] shadow-[0_18px_50px_rgba(21,94,239,0.35)]">
+          <LockKeyhole className="h-9 w-9" />
+        </div>
+        <div className="h-10 w-px bg-gradient-to-b from-[#6f99ef] to-white/15" />
+        <div className="w-full rounded-2xl border border-white/10 bg-[#10284f] p-4 text-center">
+          <p className="text-xs font-black text-[#dbe6fb]">Camada de autorização</p>
+          <p className="mt-1 text-[10px] text-[#8fa3c2]">Sessão + empresa + papel + módulo</p>
+        </div>
+        <div className="grid h-10 w-2/3 grid-cols-3"><span className="border-r border-white/15" /><span className="border-x border-white/15" /><span className="border-l border-white/15" /></div>
+        <div className="grid w-full grid-cols-3 gap-3">
+          {["Loja A", "Loja B", "Loja C"].map((loja, index) => (
+            <div key={loja} className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+              <Store className={`mx-auto h-5 w-5 ${index === 0 ? "text-[#78a3ff]" : index === 1 ? "text-[#67e8f9]" : "text-[#c4b5fd]"}`} />
+              <p className="mt-2 text-[10px] font-black">{loja}</p>
+              <p className="mt-1 text-[8px] text-[#7f93b3]">dados isolados</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PdfPreview() {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center bg-[#edf3fb] p-8">
+      <div className="w-full max-w-[330px] rotate-[-2deg] rounded-md border border-[#cad4e2] bg-white p-6 shadow-[0_20px_50px_rgba(15,34,67,0.16)]">
+        <div className="flex items-start justify-between border-b-2 border-[#14213a] pb-4">
+          <div><p className="text-lg font-black text-[#14213a]">NEXO</p><p className="text-[8px] font-bold tracking-[0.2em] text-[#718096]">DOCUMENTO</p></div>
+          <FileText className="h-6 w-6 text-[#14213a]" />
+        </div>
+        <p className="mt-5 text-xs font-black text-[#14213a]">RECIBO DE PAGAMENTO</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {["Cliente", "Data", "Referência", "Valor"].map((item) => (
+            <div key={item} className="rounded border border-[#d9e0ea] p-2"><p className="text-[7px] font-bold uppercase text-[#8a98ad]">{item}</p><div className="mt-2 h-1.5 rounded bg-[#dfe5ed]" /></div>
+          ))}
+        </div>
+        <div className="mt-4 space-y-2">{[100, 82, 94].map((width) => <div key={width} className="h-1.5 rounded bg-[#e5eaf1]" style={{ width: `${width}%` }} />)}</div>
+        <div className="mt-8 flex justify-between gap-5"><div className="flex-1 border-t border-[#94a3b8] pt-1 text-center text-[7px] text-[#718096]">Responsável</div><div className="flex-1 border-t border-[#94a3b8] pt-1 text-center text-[7px] text-[#718096]">Cliente</div></div>
+      </div>
     </div>
   );
 }

@@ -18,6 +18,7 @@ const STATUS_INFO: Record<
   { label: string; cor: string; bg: string; borda: string }
 > = {
   ativa: { label: "Ativa", cor: "#15803d", bg: "#f0fdf4", borda: "#bbf7d0" },
+  trial: { label: "Teste gratuito", cor: "#1d4ed8", bg: "#eff6ff", borda: "#bfdbfe" },
   atrasada: { label: "Pagamento atrasado", cor: "#b45309", bg: "#fffbeb", borda: "#fde68a" },
   cancelada: { label: "Cancelada", cor: "#b91c1c", bg: "#fef2f2", borda: "#fecaca" },
   inativa: { label: "Sem assinatura", cor: "#475569", bg: "#f8fafc", borda: "#e8ecf4" },
@@ -53,7 +54,7 @@ export default function AssinaturaPage() {
 
   const status = assinatura?.status || "inativa";
   const info = STATUS_INFO[status] || STATUS_INFO.inativa;
-  const ativa = status === "ativa";
+  const ativa = status === "ativa" || status === "trial";
 
   const checkoutUrl = checkoutBase
     ? `${checkoutBase}${checkoutBase.includes("?") ? "&" : "?"}email=${encodeURIComponent(email)}`
@@ -162,7 +163,7 @@ export default function AssinaturaPage() {
           {/* O que está incluído */}
           <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.05] p-6">
             <p className="text-sm font-black uppercase tracking-wide text-[#2563eb]">
-              Plano Nexo
+              Plano {assinatura?.plano || "Nexo"}
             </p>
             <ul className="mt-4 space-y-2.5 text-sm text-[#334155]">
               {[

@@ -62,68 +62,14 @@ export async function garantirEmpresa(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: mem } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (mem?.organization_id) return mem.organization_id as string;
-
-  // Convite pendente para este e-mail? → entra na empresa do convite (não cria nova).
-  const email = (user.email || "").toLowerCase();
-  if (email) {
-    // A própria RLS já filtra convite pendente e não-expirado (0029), mas
-    // reforçamos aqui por clareza.
-    const { data: convite } = await supabase
-      .from("organization_invites")
-      .select("id, organization_id, papel, expires_at, status")
-      .ilike("email", email)
-      .eq("status", "pendente")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const naoExpirado =
-      !convite?.expires_at || new Date(convite.expires_at as string) > new Date();
-    if (convite?.organization_id && naoExpirado) {
-      await supabase.from("organization_members").insert({
-        organization_id: convite.organization_id,
-        user_id: user.id,
-        papel: (convite.papel as string) || "caixa",
-        email: user.email || null,
-      });
-      // Uso único: marca aceito + quem/quando.
-      await supabase
-        .from("organization_invites")
-        .update({
-          status: "aceito",
-          used_at: new Date().toISOString(),
-          used_by: user.id,
-        })
-        .eq("id", convite.id);
-      return convite.organization_id as string;
-    }
-  }
-
-  const { data: org, error } = await supabase
-    .from("organizations")
-    .insert({ nome: nomeLoja.trim() || "Minha empresa", owner_user_id: user.id })
-    .select("id")
-    .single();
-  if (error || !org) return null;
-
-  // Ordem importa: membership antes da unidade (RLS da store exige membership).
-  await supabase.from("organization_members").insert({
-    organization_id: org.id,
-    user_id: user.id,
-    papel: "owner",
-    email: user.email || null,
+  const { data, error } = await supabase.rpc("garantir_empresa", {
+    p_nome: nomeLoja.trim() || "Minha empresa",
   });
-  await supabase
-    .from("stores")
-    .insert({ organization_id: org.id, nome: "Unidade principal" });
-
-  return org.id as string;
+  if (error) {
+    console.error("Falha ao garantir empresa:", error.message);
+    return null;
+  }
+  return (data as string | null) ?? null;
 }
 
 /** Carrega a configuração da empresa do usuário logado (com padrões). */

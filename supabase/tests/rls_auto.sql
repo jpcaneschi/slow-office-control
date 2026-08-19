@@ -67,7 +67,7 @@ select
 do $$
 declare
   v_tabelas text[] := array[
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',
@@ -80,13 +80,13 @@ begin
   where n.nspname = 'public' and c.relkind = 'r'
     and c.relrowsecurity = false and c.relname = any(v_tabelas);
   if v_sem_rls is null then raise notice '[COBERTURA] OK: RLS ligado em todas as tabelas de negócio.';
-  else raise notice '[COBERTURA] FALHA: RLS DESLIGADO em: %', v_sem_rls; end if;
+  else raise exception '[COBERTURA] FALHA: RLS DESLIGADO em: %', v_sem_rls; end if;
 
   select string_agg(tablename || '.' || policyname, ', ') into v_abertas
   from pg_policies where schemaname = 'public' and tablename = any(v_tabelas)
     and (coalesce(qual, '') in ('true', '(true)') or coalesce(with_check, '') in ('true', '(true)'));
   if v_abertas is null then raise notice '[COBERTURA] OK: nenhuma policy aberta (using true).';
-  else raise notice '[COBERTURA] FALHA: policy ABERTA (vaza entre empresas): %', v_abertas; end if;
+  else raise exception '[COBERTURA] FALHA: policy ABERTA (vaza entre empresas): %', v_abertas; end if;
 
   select string_agg(tablename || '.' || policyname, ', ') into v_sem_org
   from pg_policies where schemaname = 'public' and tablename = any(v_tabelas)
@@ -124,7 +124,7 @@ begin
   reset role;
   raise notice '[ISOLAMENTO] Usuário A → empresa %.', v_org;
   if v_cross = 0 then raise notice '[ISOLAMENTO] OK: 0 linhas de outra empresa (%).', trim(msg);
-  else raise notice '[ISOLAMENTO] FALHA: A viu % linha(s) de outra empresa (%).', v_cross, trim(msg); end if;
+  else raise exception '[ISOLAMENTO] FALHA: A viu % linha(s) de outra empresa (%).', v_cross, trim(msg); end if;
 end $$;
 
 -- ═══ 3) TAMPERING — A tenta ESCREVER na empresa B (deve ser bloqueado) ═══════
@@ -142,9 +142,24 @@ begin
     raise exception 'INSERIU_EM_B';                       -- se chegou aqui, força desfazer
   exception when others then
     if sqlerrm = 'INSERIU_EM_B' then
-      raise notice '[TAMPERING] FALHA: A inseriu cliente na empresa B! (desfeito)';
+      raise exception '[TAMPERING] FALHA: A inseriu cliente na empresa B! (desfeito)';
     else
       raise notice '[TAMPERING] OK: A bloqueado ao escrever na empresa B (%).', sqlerrm;
+    end if;
+  end;
+
+  -- A não pode se adicionar como membro da empresa B sem convite/RPC.
+  begin
+    execute format(
+      'insert into public.organization_members (organization_id, user_id, papel) values (%L, %L, %L)',
+      current_setting('test.org_b', true), current_setting('test.user_a', true), 'owner'
+    );
+    raise exception 'AUTO_CONVITE_PASSOU';
+  exception when others then
+    if sqlerrm = 'AUTO_CONVITE_PASSOU' then
+      raise exception '[TAMPERING] FALHA: A entrou na empresa B sem convite! (desfeito)';
+    else
+      raise notice '[TAMPERING] OK: autoentrada em empresa B bloqueada (%).', sqlerrm;
     end if;
   end;
   reset role;
@@ -171,7 +186,7 @@ begin
     raise notice '[RBAC] OK: caixa não altera configuração (0 linhas).';
   exception when others then
     if sqlerrm = 'CFG_ALTEROU' then
-      raise notice '[RBAC] FALHA: caixa alterou % linha(s) de config! (desfeito)', n;
+      raise exception '[RBAC] FALHA: caixa alterou % linha(s) de config! (desfeito)', n;
     else
       raise notice '[RBAC] OK: caixa bloqueado em config (%).', sqlerrm;
     end if;
@@ -186,7 +201,7 @@ begin
       raise notice '[RBAC] OK: caixa não altera produto (0 linhas).';
     exception when others then
       if sqlerrm = 'PROD_ALTEROU' then
-        raise notice '[RBAC] FALHA: caixa alterou produto! (desfeito)';
+        raise exception '[RBAC] FALHA: caixa alterou produto! (desfeito)';
       else
         raise notice '[RBAC] OK: caixa bloqueado em produto (%).', sqlerrm;
       end if;
@@ -200,9 +215,21 @@ begin
       raise exception 'CANCELOU';
     exception when others then
       if sqlerrm = 'CANCELOU' then
-        raise notice '[RBAC] FALHA: caixa cancelou venda! (desfeito)';
+        raise exception '[RBAC] FALHA: caixa cancelou venda! (desfeito)';
       else
         raise notice '[RBAC] OK: caixa bloqueado ao cancelar venda (%).', sqlerrm;
+      end if;
+    end;
+
+    -- (4c.1) caixa também NÃO contorna cancelar_venda chamando o estorno direto.
+    begin
+      perform public.estornar_taxa_venda(current_setting('test.venda', true)::uuid);
+      raise exception 'ESTORNOU_TAXA_DIRETO';
+    exception when others then
+      if sqlerrm = 'ESTORNOU_TAXA_DIRETO' then
+        raise exception '[RBAC] FALHA: caixa chamou estornar_taxa_venda diretamente! (desfeito)';
+      else
+        raise notice '[RBAC] OK: caixa bloqueado no estorno direto de taxa (%).', sqlerrm;
       end if;
     end;
   else raise notice '[RBAC] SKIP cancelar: sem venda concluída no staging.'; end if;
@@ -211,7 +238,7 @@ begin
   begin
     execute 'select count(*) from public.audit_logs' into n;
     if n = 0 then raise notice '[RBAC] OK: caixa não lê audit_logs (0 visíveis).';
-    else raise notice '[RBAC] FALHA: caixa leu % registros de auditoria!', n; end if;
+    else raise exception '[RBAC] FALHA: caixa leu % registros de auditoria!', n; end if;
   exception when others then
     raise notice '[RBAC] OK: caixa bloqueado ao ler auditoria (%).', sqlerrm;
   end;
@@ -223,7 +250,7 @@ begin
     raise exception 'AUDIT_INSERIU';
   exception when others then
     if sqlerrm = 'AUDIT_INSERIU' then
-      raise notice '[RBAC] FALHA: insert manual em audit_logs passou! (desfeito)';
+      raise exception '[RBAC] FALHA: insert manual em audit_logs passou! (desfeito)';
     else
       raise notice '[RBAC] OK: audit_logs bloqueia insert manual (%).', sqlerrm;
     end if;

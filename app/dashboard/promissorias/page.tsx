@@ -230,10 +230,7 @@ export default function PromissoriasPage() {
 
     setPagando(true);
     // Chave de idempotência: reenvio/duplo-clique não gera pagamento duplicado.
-    const idempKey =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${prom.id}-${Date.now()}`;
+    const idempKey = crypto.randomUUID();
     const { error } = await supabase.rpc("registrar_pagamento_promissoria", {
       p_promissoria_id: prom.id,
       p_valor: valor,

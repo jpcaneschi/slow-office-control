@@ -549,6 +549,8 @@ export default function ProdutosPage() {
 
   useEffect(() => {
     carregarDados();
+    // A carga é única; as mutações chamam carregarDados diretamente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function limparFormulario() {

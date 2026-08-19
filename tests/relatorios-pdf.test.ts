@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
-import { renderToBuffer } from "@react-pdf/renderer";
+import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import {
   FolhaSalarialPdf,
   PromissoriaPdf,
@@ -11,7 +11,7 @@ import {
 // Render de verdade (Área #11): garante que os PDFs geram sem erro depois de
 // remover o letterSpacing e itemizar a folha. Um PDF válido começa com "%PDF-".
 async function pdfOk(el: React.ReactElement) {
-  const buf = await renderToBuffer(el);
+  const buf = await renderToBuffer(el as React.ReactElement<DocumentProps>);
   expect(buf.length).toBeGreaterThan(1000);
   expect(buf.slice(0, 5).toString()).toBe("%PDF-");
 }

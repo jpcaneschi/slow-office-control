@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { garantirEmpresa } from "@/lib/empresa-config";
+import { acessoPermiteEntrada, type StatusAcesso } from "@/lib/acesso-utils";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -32,7 +33,34 @@ export default function OnboardingPage() {
         router.replace("/login");
         return;
       }
-      const metaNome = (user.user_metadata?.nome as string) || "";
+
+      const [pedidoRes, adminRes] = await Promise.all([
+        supabase
+          .from("access_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase.rpc("is_platform_admin"),
+      ]);
+
+      if (adminRes.data === true) {
+        router.replace("/dashboard/acessos");
+        return;
+      }
+
+      const pedido = pedidoRes.data;
+      const pedidoError = pedidoRes.error;
+      const status = pedido?.status as StatusAcesso | undefined;
+      if (pedidoError || !acessoPermiteEntrada(status)) {
+        await supabase.auth.signOut();
+        router.replace(`/login?status=${status === "rejeitado" ? "rejeitado" : "pendente"}`);
+        return;
+      }
+
+      const metaNome =
+        (user.user_metadata?.nome_loja as string) ||
+        (user.user_metadata?.nome as string) ||
+        "";
       if (metaNome) setNomeLoja(metaNome);
 
       const { data: conf } = await supabase
@@ -58,7 +86,12 @@ export default function OnboardingPage() {
     setSalvando(true);
 
     // Cria empresa + unidade + membership — ou entra na empresa de um convite.
-    await garantirEmpresa(nomeLoja);
+    const empresaId = await garantirEmpresa(nomeLoja);
+    if (!empresaId) {
+      setErro("Não foi possível criar ou acessar a empresa. Tente novamente.");
+      setSalvando(false);
+      return;
+    }
 
     // Reconsulta: se a empresa já tem config (ex.: entrei por convite de equipe),
     // não duplica nem sobrescreve — apenas segue para o painel.

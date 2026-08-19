@@ -40,3 +40,22 @@ export function estoqueEfetivo(
   if (produto.tem_variacoes) return somaVariacoes[produto.id] || 0;
   return Number(produto.estoque || 0);
 }
+
+export type ProdutoEstoqueStatus = ProdutoEstoque & {
+  status?: string | null;
+};
+
+/** Conta produtos ativos com estoque efetivo definido e abaixo do limite. */
+export function contarProdutosEstoqueBaixo(
+  produtos: ProdutoEstoqueStatus[],
+  variacoes: VariacaoEstoque[],
+  limite: number
+): number {
+  const somaVariacoes = agregarEstoqueVariacoes(variacoes);
+  return produtos.filter((produto) => {
+    if ((produto.status || "ativo") !== "ativo") return false;
+    if (produto.tem_variacoes && somaVariacoes[produto.id] == null) return false;
+    if (!produto.tem_variacoes && produto.estoque == null) return false;
+    return estoqueEfetivo(produto, somaVariacoes) <= limite;
+  }).length;
+}

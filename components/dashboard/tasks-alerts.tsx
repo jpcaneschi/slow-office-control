@@ -15,12 +15,22 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { toISODate } from "@/lib/eventos-utils";
+import {
+  agregarPagamentosPromissoria,
+  calcularSaldoTotalPromissorias,
+} from "@/lib/promissorias-utils";
+import {
+  contarProdutosEstoqueBaixo,
+  type ProdutoEstoqueStatus,
+  type VariacaoEstoque,
+} from "@/lib/estoque-utils";
 
 const LIMITE_ESTOQUE = 5;
 
-type Produto = { estoque: number | null; status: string | null };
+type Produto = ProdutoEstoqueStatus;
 type Condicional = { status: string; data_limite: string | null };
-type Promissoria = { valor_total: number | null; status: string };
+type Promissoria = { id: string; valor_total: number | null; status: string };
+type Pagamento = { promissoria_id: string; valor: number | null };
 type EventoLite = { tipo: string; status: string; data: string };
 
 type Alerta = {
@@ -35,23 +45,29 @@ type Alerta = {
 
 export function TasksAlerts() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [variacoes, setVariacoes] = useState<VariacaoEstoque[]>([]);
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [promissorias, setPromissorias] = useState<Promissoria[]>([]);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [eventos, setEventos] = useState<EventoLite[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function carregar() {
       setLoading(true);
-      const [prodRes, condRes, promRes, evRes] = await Promise.all([
-        supabase.from("produtos").select("estoque, status"),
+      const [prodRes, varRes, condRes, promRes, pagRes, evRes] = await Promise.all([
+        supabase.from("produtos").select("id, estoque, status, tem_variacoes"),
+        supabase.from("produto_variacoes").select("produto_id, estoque"),
         supabase.from("condicionais").select("status, data_limite"),
-        supabase.from("promissorias").select("valor_total, status"),
+        supabase.from("promissorias").select("id, valor_total, status"),
+        supabase.from("promissoria_pagamentos").select("promissoria_id, valor"),
         supabase.from("eventos").select("tipo, status, data"),
       ]);
       setProdutos((prodRes.data as Produto[]) || []);
+      setVariacoes((varRes.data as VariacaoEstoque[]) || []);
       setCondicionais((condRes.data as Condicional[]) || []);
       setPromissorias((promRes.data as Promissoria[]) || []);
+      setPagamentos((pagRes.data as Pagamento[]) || []);
       setEventos((evRes.data as EventoLite[]) || []);
       setLoading(false);
     }
@@ -60,9 +76,11 @@ export function TasksAlerts() {
 
   const hoje = toISODate(new Date());
 
-  const estoqueBaixo = produtos.filter(
-    (p) => (p.status || "ativo") === "ativo" && p.estoque != null && p.estoque <= LIMITE_ESTOQUE
-  ).length;
+  const estoqueBaixo = contarProdutosEstoqueBaixo(
+    produtos,
+    variacoes,
+    LIMITE_ESTOQUE
+  );
 
   const tarefasHoje = eventos.filter(
     (e) => e.tipo === "tarefa" && e.status === "pendente" && e.data === hoje
@@ -75,9 +93,9 @@ export function TasksAlerts() {
   ).length;
 
   const promissoriasAbertas = promissorias.filter((p) => p.status === "em_aberto");
-  const promissoriasValor = promissoriasAbertas.reduce(
-    (acc, p) => acc + Number(p.valor_total || 0),
-    0
+  const promissoriasValor = calcularSaldoTotalPromissorias(
+    promissoriasAbertas,
+    agregarPagamentosPromissoria(pagamentos)
   );
 
   const plural = (n: number, sing: string, plu: string) =>

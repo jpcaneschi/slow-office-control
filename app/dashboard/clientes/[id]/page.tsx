@@ -6,6 +6,11 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatCurrency } from "@/lib/vendas-utils";
+import {
+  agregarPagamentosPromissoria,
+  calcularSaldoPromissoria,
+  calcularSaldoTotalPromissorias,
+} from "@/lib/promissorias-utils";
 import { ArrowLeft, ShoppingCart, FileText, ClipboardList, Sparkles } from "lucide-react";
 
 type Cliente = {
@@ -130,10 +135,7 @@ export default function ClienteHistoricoPage() {
   }, [clienteId]);
 
   const pagoPorProm = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const p of pagamentos)
-      m[p.promissoria_id] = (m[p.promissoria_id] || 0) + Number(p.valor || 0);
-    return m;
+    return agregarPagamentosPromissoria(pagamentos);
   }, [pagamentos]);
 
   const resumo = useMemo(() => {
@@ -142,13 +144,10 @@ export default function ClienteHistoricoPage() {
       (s, v) => s + Number(v.total || 0),
       0
     );
-    const saldoDevedor = promissorias
-      .filter((p) => p.status !== "pago")
-      .reduce(
-        (s, p) =>
-          s + Math.max(0, Number(p.valor_total || 0) - (pagoPorProm[p.id] || 0)),
-        0
-      );
+    const saldoDevedor = calcularSaldoTotalPromissorias(
+      promissorias,
+      pagoPorProm
+    );
     const condAbertos = condicionais.filter((c) => c.status === "aberto").length;
     return {
       totalComprado,
@@ -249,9 +248,10 @@ export default function ClienteHistoricoPage() {
           vazio={promissorias.length === 0}
         >
           {promissorias.map((p) => {
-            const saldo = Math.max(
-              0,
-              Number(p.valor_total || 0) - (pagoPorProm[p.id] || 0)
+            const saldo = calcularSaldoPromissoria(
+              Number(p.valor_total || 0),
+              pagoPorProm[p.id] || 0,
+              p.status
             );
             return (
               <Linha

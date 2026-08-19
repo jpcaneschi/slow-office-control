@@ -23,13 +23,14 @@ join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and c.relkind = 'r'
   and c.relname in (
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',
     'tatuagem_atendimentos','funcionarios','vales','servicos',
     'atendimentos_servico','taxas_cartao','organization_members',
-    'organization_invites','subscriptions','audit_logs'
+    'organization_invites','subscriptions','audit_logs','access_requests',
+    'platform_admins'
   )
 order by rls_ligado asc, tem_org_id asc, tabela;
 -- Esperado: nenhuma linha com rls_ligado = false.
@@ -41,12 +42,13 @@ join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r'
   and c.relrowsecurity = false
   and c.relname in (
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',
     'tatuagem_atendimentos','funcionarios','vales','servicos',
-    'atendimentos_servico','taxas_cartao','audit_logs'
+    'atendimentos_servico','taxas_cartao','audit_logs','access_requests',
+    'platform_admins'
   );
 -- Esperado: 0 linhas.
 
@@ -57,7 +59,7 @@ select tablename, policyname, cmd, qual, with_check
 from pg_policies
 where schemaname = 'public'
   and tablename in (
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',
@@ -74,7 +76,7 @@ select tablename, policyname, cmd, qual, with_check
 from pg_policies
 where schemaname = 'public'
   and tablename in (
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',

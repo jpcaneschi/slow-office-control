@@ -6,6 +6,7 @@ import {
   gerarCombinacoes,
   validarCombinacao,
   atributosParaLegado,
+  type Atributos,
   type ProdutoOpcao,
 } from "@/lib/variacoes-utils";
 
@@ -58,7 +59,10 @@ describe("assinaturaVariacao — White ≠ Off White ≠ Branco", () => {
 
 describe("assinaturaExiste", () => {
   it("detecta combinação duplicada", () => {
-    const existentes = [{ Tamanho: "P", Cor: "Azul" }, { Tamanho: "M" }];
+    const existentes: Atributos[] = [
+      { Tamanho: "P", Cor: "Azul" },
+      { Tamanho: "M" },
+    ];
     expect(assinaturaExiste({ Cor: "Azul", Tamanho: "P" }, existentes)).toBe(true);
     expect(assinaturaExiste({ Tamanho: "G" }, existentes)).toBe(false);
   });

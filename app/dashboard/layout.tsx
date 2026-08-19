@@ -19,6 +19,7 @@ import {
   Sparkles,
   CreditCard,
   ShieldCheck,
+  UserCheck,
   Menu,
   X,
   type LucideIcon,
@@ -28,6 +29,8 @@ import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { AuthGuard } from "@/components/dashboard/auth-guard";
+import { AccessGuard } from "@/components/dashboard/access-guard";
+import { SubscriptionGuard } from "@/components/dashboard/subscription-guard";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { RoleProvider, usePapel } from "@/components/dashboard/role-context";
 import { RouteGuard } from "@/components/dashboard/route-guard";
@@ -38,6 +41,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  platformAdminOnly?: boolean;
 };
 
 const navGroups: { titulo?: string; itens: NavItem[] }[] = [
@@ -73,6 +77,12 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
   {
     titulo: "Sistema",
     itens: [
+      {
+        href: "/dashboard/acessos",
+        label: "Novos acessos",
+        icon: UserCheck,
+        platformAdminOnly: true,
+      },
       { href: "/dashboard/assinatura", label: "Assinatura", icon: CreditCard },
       { href: "/dashboard/auditoria", label: "Auditoria", icon: ShieldCheck },
       { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
@@ -97,12 +107,13 @@ function NavSections({
   isActive: (href: string) => boolean;
   onNavigate?: () => void;
 }) {
-  const { papel, modulos } = usePapel();
+  const { papel, modulos, adminPlataforma } = usePapel();
   const gruposVisiveis = navGroups
     .map((grupo) => ({
       ...grupo,
       itens: grupo.itens.filter(
         (item) =>
+          (!item.platformAdminOnly || adminPlataforma) &&
           podeAcessar(papel, item.href) &&
           !rotaBloqueadaPorModulo(item.href, modulos)
       ),
@@ -207,6 +218,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
+    <AccessGuard>
+    <SubscriptionGuard>
     <RoleProvider>
     <PeriodProvider>
     <div className="min-h-screen bg-[#f4f6fb] text-[#0f172a]">
@@ -325,6 +338,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
     </PeriodProvider>
     </RoleProvider>
+    </SubscriptionGuard>
+    </AccessGuard>
     </AuthGuard>
   );
 }

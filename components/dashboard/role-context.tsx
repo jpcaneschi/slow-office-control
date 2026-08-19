@@ -16,6 +16,7 @@ type Ctx = {
   papel: Papel;
   carregando: boolean;
   modulos: string[];
+  adminPlataforma: boolean;
   /** Recarrega papel + módulos (ex.: após ligar/desligar um módulo nas configs). */
   recarregar: () => Promise<void>;
 };
@@ -26,6 +27,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   // a guarda de rota só age depois de `carregando` virar false.
   const [papel, setPapel] = useState<Papel>("owner");
   const [modulos, setModulos] = useState<string[]>(MODULOS_PADRAO);
+  const [adminPlataforma, setAdminPlataforma] = useState(false);
   const [carregando, setCarregando] = useState(true);
 
   const carregar = useCallback(async () => {
@@ -36,7 +38,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setCarregando(false);
       return;
     }
-    const [membroRes, cfgRes] = await Promise.all([
+    const [membroRes, cfgRes, adminRes] = await Promise.all([
       supabase
         .from("organization_members")
         .select("papel")
@@ -49,10 +51,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle(),
+      supabase.rpc("is_platform_admin"),
     ]);
     setPapel(normalizarPapel(membroRes.data?.papel as string | undefined));
     const mods = cfgRes.data?.modulos_ativos as string[] | null;
     setModulos(mods && mods.length ? mods : MODULOS_PADRAO);
+    setAdminPlataforma(adminRes.data === true);
     setCarregando(false);
   }, []);
 
@@ -68,7 +72,13 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   return (
     <RoleContext.Provider
-      value={{ papel, carregando, modulos, recarregar: carregar }}
+      value={{
+        papel,
+        carregando,
+        modulos,
+        adminPlataforma,
+        recarregar: carregar,
+      }}
     >
       {children}
     </RoleContext.Provider>

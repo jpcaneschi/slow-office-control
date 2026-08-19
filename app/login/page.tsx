@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, Lock, Building2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Mail, Lock, Building2, UserRound, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { acessoPermiteEntrada, mensagemStatusAcesso } from "@/lib/acesso-utils";
 
 export default function LoginPage() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar">("entrar");
   const [nome, setNome] = useState("");
+  const [nomeLoja, setNomeLoja] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [sessaoEmail, setSessaoEmail] = useState<string | null>(null);
@@ -34,17 +38,67 @@ export default function LoginPage() {
     setSenha("");
     setSenha2("");
     setNome("");
+    setNomeLoja("");
     setErro("");
     setAviso("");
   }
 
-  // Vindo da landing com "?novo=1" abre já no modo criar conta (e pré-preenche o e-mail).
+  // A landing abre o formulário de solicitação e pode pré-preencher o e-mail.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("novo") === "1") setModo("criar");
     const em = p.get("email");
     if (em) setEmail(em);
+    const status = p.get("status");
+    if (status === "pendente" || status === "rejeitado") {
+      setAviso(mensagemStatusAcesso(status));
+    }
   }, []);
+
+  async function encaminharUsuario(userId: string) {
+    const [pedidoRes, adminRes] = await Promise.all([
+      supabase
+        .from("access_requests")
+        .select("status")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabase.rpc("is_platform_admin"),
+    ]);
+    const pedido = pedidoRes.data;
+
+    // Administradores da plataforma não são clientes e não precisam criar uma
+    // organização só para analisar/decidir solicitações de acesso.
+    if (adminRes.data === true) {
+      router.replace("/dashboard/acessos");
+      return;
+    }
+
+    if (pedidoRes.error || !acessoPermiteEntrada(pedido?.status)) {
+      await supabase.auth.signOut();
+      setSessaoEmail(null);
+      const status = pedido?.status === "rejeitado" ? "rejeitado" : "pendente";
+      setAviso(mensagemStatusAcesso(status));
+      return;
+    }
+
+    const { data: membro } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    router.replace(membro?.organization_id ? "/dashboard" : "/onboarding");
+  }
+
+  async function continuarSessaoAtual() {
+    setCarregando(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) await encaminharUsuario(user.id);
+    setCarregando(false);
+  }
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -60,8 +114,8 @@ export default function LoginPage() {
       return;
     }
     if (modo === "criar") {
-      if (senha.length < 6) {
-        setErro("A senha deve ter pelo menos 6 caracteres.");
+      if (senha.length < 8 || !/[a-zA-Z]/.test(senha) || !/\d/.test(senha)) {
+        setErro("Use pelo menos 8 caracteres, com letras e números.");
         return;
       }
       if (senha !== senha2) {
@@ -73,41 +127,79 @@ export default function LoginPage() {
     setCarregando(true);
 
     if (modo === "entrar") {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: senha,
       });
-      setCarregando(false);
       if (error) {
+        setCarregando(false);
         setErro(traduzErro(error.message));
         return;
       }
-      router.replace("/dashboard");
+      if (data.user) await encaminharUsuario(data.user.id);
+      setCarregando(false);
     } else {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: senha,
-        options: { data: { nome: nome.trim() || email.trim() } },
+        options: {
+          data: {
+            nome: nome.trim(),
+            nome_loja: nomeLoja.trim(),
+          },
+        },
       });
       setCarregando(false);
       if (error) {
         setErro(traduzErro(error.message));
         return;
       }
-      if (data.session) {
-        router.replace("/onboarding");
-      } else {
-        setModo("entrar");
-        setAviso(
-          "Conta criada! Verifique seu e-mail para confirmar e depois entre."
-        );
-      }
+      if (data.session) await supabase.auth.signOut();
+      setModo("entrar");
+      setSenha("");
+      setSenha2("");
+      setAviso(
+        "Solicitação recebida! Agora nossa equipe vai analisar e liberar o acesso. Se a confirmação de e-mail estiver ativa, confirme também a mensagem recebida."
+      );
     }
   }
 
+  async function enviarRecuperacao() {
+    setErro("");
+    setAviso("");
+    const emailNormalizado = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      setErro("Informe seu e-mail acima para recuperar a senha.");
+      return;
+    }
+
+    setRecuperando(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      emailNormalizado,
+      { redirectTo: `${window.location.origin}/redefinir-senha` }
+    );
+    setRecuperando(false);
+    if (error) {
+      setErro(traduzErro(error.message));
+      return;
+    }
+    // Mensagem neutra: não revela se o e-mail existe na base.
+    setAviso(
+      "Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha."
+    );
+  }
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1e40af] to-[#2563eb] p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#07152f] p-4">
+      <div className="pointer-events-none absolute -left-32 top-1/4 h-80 w-80 rounded-full bg-[#2563eb]/30 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#06b6d4]/20 blur-3xl" />
+      <div className="relative w-full max-w-md rounded-[28px] border border-white/10 bg-white p-8 shadow-[0_30px_90px_rgba(2,8,23,0.45)]">
+        <Link
+          href="/"
+          className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-[#64748b] transition hover:text-[#2563eb]"
+        >
+          <ArrowLeft className="h-4 w-4" /> Voltar ao site
+        </Link>
         <div className="mb-6 text-center">
           <p className="text-[26px] font-black leading-none tracking-tight text-[#2563eb]">
             Nexo
@@ -132,10 +224,11 @@ export default function LoginPage() {
             </p>
             <button
               type="button"
-              onClick={() => router.replace("/dashboard")}
+              onClick={continuarSessaoAtual}
+              disabled={carregando}
               className="mt-6 w-full rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
             >
-              Continuar nesta conta
+              {carregando ? "Verificando acesso..." : "Continuar nesta conta"}
             </button>
             <button
               type="button"
@@ -150,12 +243,12 @@ export default function LoginPage() {
         ) : (
           <>
         <h1 className="text-center text-xl font-black text-[#0f172a]">
-          {modo === "entrar" ? "Entrar na sua conta" : "Criar sua conta"}
+          {modo === "entrar" ? "Entrar na sua conta" : "Solicitar acesso"}
         </h1>
         <p className="mt-1 text-center text-sm text-[#64748b]">
           {modo === "entrar"
             ? "Acesse o painel da sua empresa."
-            : "Comece a gerenciar sua empresa."}
+            : "Conte quem é você. O acesso só é liberado após análise da equipe Nexo."}
         </p>
 
         {aviso && (
@@ -171,15 +264,26 @@ export default function LoginPage() {
 
         <form onSubmit={enviar} className="mt-5 space-y-3">
           {modo === "criar" && (
-            <Campo icon={Building2}>
-              <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Nome da empresa / seu nome"
-                required
-                className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
-              />
-            </Campo>
+            <>
+              <Campo icon={UserRound}>
+                <input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Seu nome"
+                  required
+                  className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
+                />
+              </Campo>
+              <Campo icon={Building2}>
+                <input
+                  value={nomeLoja}
+                  onChange={(e) => setNomeLoja(e.target.value)}
+                  placeholder="Nome da loja"
+                  required
+                  className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
+                />
+              </Campo>
+            </>
           )}
 
           <Campo icon={Mail}>
@@ -202,7 +306,7 @@ export default function LoginPage() {
               placeholder="Senha"
               autoComplete={modo === "entrar" ? "current-password" : "new-password"}
               required
-              minLength={6}
+              minLength={modo === "criar" ? 8 : undefined}
               className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
             />
           </Campo>
@@ -223,8 +327,8 @@ export default function LoginPage() {
                   {senha.length >= 8 && /\d/.test(senha) && /[a-zA-Z]/.test(senha)
                     ? "forte"
                     : senha.length >= 6
-                      ? "média (use letras + números)"
-                      : "fraca (mínimo 6)"}
+                        ? "média (use letras + números)"
+                        : "fraca (mínimo 8)"}
                 </p>
               )}
               <Campo icon={Lock}>
@@ -235,7 +339,7 @@ export default function LoginPage() {
                   placeholder="Confirmar senha"
                   autoComplete="new-password"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
                 />
               </Campo>
@@ -244,16 +348,27 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={carregando}
+            disabled={carregando || recuperando}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
           >
             {carregando && <Loader2 className="h-4 w-4 animate-spin" />}
-            {modo === "entrar" ? "Entrar" : "Criar conta"}
+            {modo === "entrar" ? "Entrar" : "Enviar solicitação"}
           </button>
+
+          {modo === "entrar" && (
+            <button
+              type="button"
+              onClick={enviarRecuperacao}
+              disabled={carregando || recuperando}
+              className="w-full py-1 text-sm font-semibold text-[#2563eb] hover:underline disabled:opacity-60"
+            >
+              {recuperando ? "Enviando link..." : "Esqueci minha senha"}
+            </button>
+          )}
         </form>
 
         <p className="mt-5 text-center text-sm text-[#64748b]">
-          {modo === "entrar" ? "Ainda não tem conta?" : "Já tem conta?"}{" "}
+          {modo === "entrar" ? "Quer usar o Nexo?" : "Já possui acesso?"}{" "}
           <button
             onClick={() => {
               setModo(modo === "entrar" ? "criar" : "entrar");
@@ -262,8 +377,12 @@ export default function LoginPage() {
             }}
             className="font-bold text-[#2563eb] hover:underline"
           >
-            {modo === "entrar" ? "Criar conta" : "Entrar"}
+            {modo === "entrar" ? "Solicitar acesso" : "Entrar"}
           </button>
+        </p>
+        <p className="mt-3 text-center text-xs leading-5 text-[#94a3b8]">
+          Nenhum cadastro novo entra automaticamente. A liberação é feita pela
+          equipe Nexo.
         </p>
           </>
         )}
@@ -295,6 +414,6 @@ function traduzErro(msg: string) {
   if (m.includes("user already registered"))
     return "Este e-mail já tem conta. Tente entrar.";
   if (m.includes("password"))
-    return "A senha deve ter pelo menos 6 caracteres.";
+    return "Use pelo menos 8 caracteres, com letras e números.";
   return msg;
 }

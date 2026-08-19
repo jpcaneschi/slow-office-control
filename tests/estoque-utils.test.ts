@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   agregarEstoqueVariacoes,
+  contarProdutosEstoqueBaixo,
   estoqueEfetivo,
 } from "@/lib/estoque-utils";
 
@@ -52,5 +53,23 @@ describe("estoqueEfetivo", () => {
     expect(
       estoqueEfetivo({ id: "s", estoque: 7, tem_variacoes: false }, soma)
     ).toBe(7);
+  });
+});
+
+describe("contarProdutosEstoqueBaixo", () => {
+  it("usa o estoque agregado da grade e ignora produtos sem estoque definido", () => {
+    const produtos = [
+      { id: "grade-ok", estoque: 0, tem_variacoes: true, status: "ativo" },
+      { id: "grade-baixa", estoque: 0, tem_variacoes: true, status: "ativo" },
+      { id: "simples", estoque: 2, tem_variacoes: false, status: "ativo" },
+      { id: "sem-grade", estoque: 0, tem_variacoes: true, status: "ativo" },
+      { id: "inativo", estoque: 0, tem_variacoes: false, status: "inativo" },
+    ];
+    const variacoes = [
+      { produto_id: "grade-ok", estoque: 10 },
+      { produto_id: "grade-ok", estoque: 8 },
+      { produto_id: "grade-baixa", estoque: 3 },
+    ];
+    expect(contarProdutosEstoqueBaixo(produtos, variacoes, 5)).toBe(2);
   });
 });

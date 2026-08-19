@@ -88,6 +88,7 @@ describe("planejarSincronizacao — estados ativa/resolvida", () => {
   it("condição nova → inserir", () => {
     const plano = planejarSincronizacao([], [alerta]);
     expect(plano.inserir).toHaveLength(1);
+    expect(plano.atualizar).toHaveLength(0);
     expect(plano.reativar).toHaveLength(0);
     expect(plano.resolver).toHaveLength(0);
   });
@@ -99,6 +100,7 @@ describe("planejarSincronizacao — estados ativa/resolvida", () => {
     );
     expect(plano.resolver).toEqual(["estoque_baixo:P"]);
     expect(plano.inserir).toHaveLength(0);
+    expect(plano.atualizar).toHaveLength(0);
   });
 
   it("condição voltou → reativar a resolvida", () => {
@@ -108,17 +110,49 @@ describe("planejarSincronizacao — estados ativa/resolvida", () => {
     );
     expect(plano.reativar).toEqual(["estoque_baixo:P"]);
     expect(plano.inserir).toHaveLength(0);
+    expect(plano.atualizar).toHaveLength(0);
     expect(plano.resolver).toHaveLength(0);
   });
 
   it("condição ativa que continua valendo → não faz nada", () => {
     const plano = planejarSincronizacao(
-      [{ chave: "estoque_baixo:P", resolvida: false, lida: false }],
+      [
+        {
+          chave: "estoque_baixo:P",
+          resolvida: false,
+          lida: false,
+          tipo: alerta.tipo,
+          titulo: alerta.titulo,
+          descricao: alerta.descricao,
+          href: alerta.href,
+        },
+      ],
       [alerta]
     );
     expect(plano.inserir).toHaveLength(0);
+    expect(plano.atualizar).toHaveLength(0);
     expect(plano.reativar).toHaveLength(0);
     expect(plano.resolver).toHaveLength(0);
+  });
+
+  it("condição continua, mas o valor mudou → atualiza o texto", () => {
+    const plano = planejarSincronizacao(
+      [
+        {
+          chave: "estoque_baixo:P",
+          resolvida: false,
+          lida: false,
+          tipo: alerta.tipo,
+          titulo: alerta.titulo,
+          descricao: "Produto está com 0 em estoque.",
+          href: alerta.href,
+        },
+      ],
+      [{ ...alerta, descricao: "Produto está com 5 em estoque." }]
+    );
+    expect(plano.atualizar).toEqual([
+      { ...alerta, descricao: "Produto está com 5 em estoque." },
+    ]);
   });
 
   it("já resolvida e ainda sem condição → não re-resolver", () => {
