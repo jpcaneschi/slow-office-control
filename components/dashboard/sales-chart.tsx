@@ -22,13 +22,17 @@ export type SalesPoint = {
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+const brlSemCentavos = (v: number) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+
 // Gera uma escala "redonda" (0, passo, 2·passo…) que se ajusta ao maior valor,
-// em vez de um teto fixo. Ex.: max ~600 → passo 200; max ~80k → passo 20k.
+// em vez de um teto fixo. Mantém cerca de 8–10 divisões: até R$ 900 usa
+// passo de R$ 100, sem abreviar valores como 0,9K.
 function escalaBonita(max: number, permitir25 = true) {
   if (!Number.isFinite(max) || max <= 0) {
     return { max: 100, ticks: [0, 25, 50, 75, 100] };
   }
-  const bruto = max / 4;
+  const bruto = max / 9;
   const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
   const norm = bruto / mag;
   let passo: number;
@@ -113,13 +117,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             tickLine={false}
             axisLine={false}
             tick={{ fill: "#94a3b8", fontSize: 11 }}
-            tickFormatter={(v: number) =>
-              v === 0
-                ? "R$ 0"
-                : v >= 1000
-                ? `R$ ${(v / 1000).toLocaleString("pt-BR")}k`
-                : `R$ ${v.toLocaleString("pt-BR")}`
-            }
+            tickFormatter={brlSemCentavos}
             domain={[0, escalaFat.max]}
             ticks={escalaFat.ticks}
           />
@@ -158,7 +156,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
               <LabelList
                 dataKey="faturamento"
                 position="top"
-                formatter={(v) => `R$ ${(Number(v) / 1000).toFixed(2).replace(".", ",")}k`}
+                formatter={(v) => brl(Number(v))}
                 style={{ fill: "#475569", fontSize: 10, fontWeight: 600 }}
               />
             )}

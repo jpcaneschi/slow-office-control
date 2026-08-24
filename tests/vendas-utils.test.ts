@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularDescontoPix,
+  calcularDescontoManual,
   calcularTotal,
   formatCurrency,
+  rotuloFormaPagamento,
 } from "@/lib/vendas-utils";
 
 describe("calcularDescontoPix", () => {
@@ -12,6 +14,18 @@ describe("calcularDescontoPix", () => {
   });
   it("retorna 0 quando o percentual é 0", () => {
     expect(calcularDescontoPix(100, 0)).toBe(0);
+  });
+});
+
+describe("calcularDescontoManual", () => {
+  it("aceita desconto em reais", () => {
+    expect(calcularDescontoManual(900, 80, "valor")).toBe(80);
+  });
+
+  it("converte percentual em valor monetário e respeita o limite", () => {
+    expect(calcularDescontoManual(900, 10, "percentual")).toBe(90);
+    expect(calcularDescontoManual(900, 150, "percentual")).toBe(900);
+    expect(calcularDescontoManual(50, 80, "valor")).toBe(50);
   });
 });
 
@@ -31,5 +45,11 @@ describe("formatCurrency", () => {
   it("formata em BRL", () => {
     // NBSP entre R$ e o número no locale pt-BR.
     expect(formatCurrency(1234.5).replace(/\s/g, " ")).toBe("R$ 1.234,50");
+  });
+});
+
+describe("rotuloFormaPagamento", () => {
+  it("exibe o pagamento dividido com rótulo amigável", () => {
+    expect(rotuloFormaPagamento("multiplo")).toBe("Pagamento dividido");
   });
 });

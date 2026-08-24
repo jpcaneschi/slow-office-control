@@ -7,22 +7,27 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import { montarFolha } from "@/lib/folha-utils";
+import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modelos de PDF em PRETO & BRANCO (para impressão em folha branca).
 // Fundo branco, texto preto, bordas pretas. Layout de documento oficial:
 // cabeçalho, caixas de informação, tabelas, cláusulas e assinaturas.
 //
-// Tipografia (Área #11): usamos as fontes-padrão do PDF (Helvetica/-Bold), que
-// são embutidas e confiáveis. O que quebrava o recibo da folha ("letras
-// sobrepostas / espaçamento irregular") era o `letterSpacing` combinado com a
-// fonte-padrão no @react-pdf v4 — por isso ele foi removido. A hifenização
-// automática também é desligada para não cortar palavras no meio.
+// Tipografia incorporada ao arquivo: evita diferenças de espaçamento entre os
+// leitores de PDF do navegador, celular e impressão.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Não hifenizar: retorna a palavra inteira (evita quebras estranhas como "sa-
 // lário"). Precisa rodar só uma vez no carregamento do módulo.
 Font.registerHyphenationCallback((word) => [word]);
+Font.register({
+  family: "DejaVuPDF",
+  fonts: [
+    { src: PDF_FONT_REGULAR, fontWeight: 400 },
+    { src: PDF_FONT_BOLD, fontWeight: 700 },
+  ],
+});
 
 function brl(n: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -64,7 +69,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 46,
     paddingBottom: 64,
-    fontFamily: "Helvetica",
+    fontFamily: "DejaVuPDF",
     fontSize: 10.5,
     lineHeight: 1.5,
   },
@@ -76,19 +81,21 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000000",
     paddingBottom: 12,
   },
-  loja: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
+  loja: { fontSize: 18, fontFamily: "DejaVuPDF", fontWeight: 700, color: "#000000" },
   lojaSub: { fontSize: 8, color: "#555555", marginTop: 3 },
   headRight: { alignItems: "flex-end" },
   docTitle: {
     fontSize: 12,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuPDF",
+    fontWeight: 700,
     textTransform: "uppercase",
     color: "#000000",
   },
   docMeta: { fontSize: 8.5, color: "#555555", marginTop: 4 },
   sectionTitle: {
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuPDF",
+    fontWeight: 700,
     textTransform: "uppercase",
     color: "#000000",
     marginTop: 18,
@@ -117,7 +124,7 @@ const styles = StyleSheet.create({
     color: "#555555",
     textTransform: "uppercase",
   },
-  valorForte: { fontSize: 18, fontFamily: "Helvetica-Bold", color: "#000000" },
+  valorForte: { fontSize: 18, fontFamily: "DejaVuPDF", fontWeight: 700, color: "#000000" },
   // Grade de informações (caixas)
   infoGrid: {
     flexDirection: "row",
@@ -137,14 +144,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 4,
   },
-  infoValue: { fontSize: 11, color: "#000000", fontFamily: "Helvetica-Bold" },
+  infoValue: { fontSize: 11, color: "#000000", fontFamily: "DejaVuPDF", fontWeight: 700 },
   // Tabela
   table: { borderWidth: 1, borderColor: "#000000", marginTop: 8 },
   tHead: { flexDirection: "row", backgroundColor: "#000000" },
   tHeadCell: {
     color: "#ffffff",
     fontSize: 8.5,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuPDF",
+    fontWeight: 700,
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
@@ -162,10 +170,11 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 11,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuPDF",
+    fontWeight: 700,
     textTransform: "uppercase",
   },
-  totalValue: { fontSize: 15, fontFamily: "Helvetica-Bold" },
+  totalValue: { fontSize: 15, fontFamily: "DejaVuPDF", fontWeight: 700 },
   // Cláusulas
   clauseBox: {
     marginTop: 14,
@@ -295,6 +304,7 @@ export type PromissoriaProps = {
   cidade?: string;
   dataEmissao: string;
   referencia?: string;
+  parcelas?: { numero: number; vencimento: string; valor: number }[];
 };
 
 export function PromissoriaPdf({
@@ -306,7 +316,9 @@ export function PromissoriaPdf({
   cidade,
   dataEmissao,
   referencia,
+  parcelas = [],
 }: PromissoriaProps) {
+  const parcelada = parcelas.length > 1;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -318,10 +330,12 @@ export function PromissoriaPdf({
         </View>
 
         <Text style={styles.paragraph}>
-          No dia {fmtData(vencimento)}, pagarei por esta única via de NOTA
-          PROMISSÓRIA a {loja || "Sua Empresa"}, ou à sua ordem, a quantia de{" "}
-          {brl(valor)} em moeda corrente deste país, pagável em{" "}
-          {cidade || "praça do credor"}.
+          Reconheço dever a {loja || "Sua Empresa"}, ou à sua ordem, a quantia
+          total de {brl(valor)} em moeda corrente deste país, pagável em{" "}
+          {cidade || "praça do credor"}
+          {parcelada
+            ? ` conforme o plano de ${parcelas.length} parcelas mensais abaixo.`
+            : ` com vencimento em ${fmtData(vencimento)}.`}
           {referencia ? ` Referente a: ${referencia}.` : ""}
         </Text>
 
@@ -334,14 +348,45 @@ export function PromissoriaPdf({
               label: "Local e data de emissão",
               value: `${cidade ? cidade + ", " : ""}${fmtData(dataEmissao)}`,
             },
-            { label: "Vencimento", value: fmtData(vencimento) },
+            {
+              label: parcelada ? "Primeira parcela" : "Vencimento",
+              value: fmtData(vencimento),
+            },
           ]}
         />
 
+        {parcelas.length > 0 ? (
+          <>
+            <Text style={styles.sectionTitle}>Plano de pagamento</Text>
+            <View style={styles.table}>
+              <View style={styles.tHead}>
+                <Text style={[styles.tHeadCell, { width: "20%" }]}>Parcela</Text>
+                <Text style={[styles.tHeadCell, { width: "40%" }]}>Vencimento</Text>
+                <Text style={[styles.tHeadCell, { width: "40%", textAlign: "right" }]}>Valor</Text>
+              </View>
+              {parcelas.map((parcela) => (
+                <View key={parcela.numero} style={styles.tRow} wrap={false}>
+                  <Text style={[styles.tCell, { width: "20%" }]}>
+                    {parcela.numero}/{parcelas.length}
+                  </Text>
+                  <Text style={[styles.tCell, { width: "40%" }]}>
+                    {fmtData(parcela.vencimento)}
+                  </Text>
+                  <Text style={[styles.tCell, { width: "40%", textAlign: "right" }]}>
+                    {brl(parcela.valor)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
         <Clausulas
           itens={[
-            "Esta nota promissória é líquida, certa e exigível na data de vencimento.",
-            "O não pagamento no vencimento sujeita o emitente aos acréscimos legais (juros e correção).",
+            parcelada
+              ? "Cada parcela torna-se exigível na respectiva data indicada no plano de pagamento."
+              : "Esta nota promissória é líquida, certa e exigível na data de vencimento.",
+            "O não pagamento na data combinada sujeita o emitente aos acréscimos legais aplicáveis.",
             "O foro da praça de pagamento fica eleito para dirimir eventuais dúvidas.",
           ]}
         />
@@ -432,6 +477,9 @@ export type FolhaProps = {
   vales: number;
   outrosDescontos?: number;
   outrosDescontosLabel?: string;
+  comissaoBaseLabel?: string;
+  baseComissaoValor?: number;
+  dataPagamento?: string;
 };
 
 export function FolhaSalarialPdf({
@@ -450,6 +498,9 @@ export function FolhaSalarialPdf({
   vales,
   outrosDescontos,
   outrosDescontosLabel,
+  comissaoBaseLabel = "Vendas do funcionário",
+  baseComissaoValor,
+  dataPagamento,
 }: FolhaProps) {
   const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({
     salarioBase,
@@ -459,6 +510,7 @@ export function FolhaSalarialPdf({
     vales,
     outrosDescontos,
     outrosDescontosLabel,
+    comissaoDescricao: `Comissão sobre ${comissaoBaseLabel.toLowerCase()}`,
   });
 
   const periodo =
@@ -478,6 +530,7 @@ export function FolhaSalarialPdf({
             { label: "Cargo", value: cargo || "—" },
             { label: "Referência", value: referencia },
             { label: "Período apurado", value: periodo },
+            { label: "Data do pagamento", value: dataPagamento ? fmtData(dataPagamento) : "—" },
           ]}
         />
 
@@ -485,7 +538,7 @@ export function FolhaSalarialPdf({
         <InfoGrid
           itens={[
             { label: "Vendas concluídas", value: String(qtdVendas) },
-            { label: "Total vendido", value: brl(totalVendido) },
+            { label: comissaoBaseLabel, value: brl(baseComissaoValor ?? totalVendido) },
             { label: "Percentual de comissão", value: `${comissaoPct}%` },
             { label: "Emissão", value: fmtData(hojeISO()) },
           ]}

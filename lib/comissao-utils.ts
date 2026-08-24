@@ -13,6 +13,7 @@ export type FuncionarioComissao = {
   id: string;
   comissao_percentual: number | null;
   salario_fixo: number | null;
+  comissao_base?: "vendas_funcionario" | "faturamento_loja" | "lucro_loja" | null;
 };
 
 export type VendaComissao = {
@@ -43,6 +44,8 @@ export type Acerto = {
   vales: number;
   salario: number;
   aPagar: number;
+  baseComissao: number;
+  baseTipo: "vendas_funcionario" | "faturamento_loja" | "lucro_loja";
 };
 
 /** Comissão em R$ = base vendida × percentual. */
@@ -65,6 +68,7 @@ export function calcularAcerto(
     vendas: VendaComissao[];
     servicos: ServicoComissao[];
     vales: ValeComissao[];
+    resultadoLoja?: { faturamento: number; lucro: number };
   },
   filtros: {
     vendaNoPeriodo: (v: VendaComissao) => boolean;
@@ -78,7 +82,14 @@ export function calcularAcerto(
       filtros.vendaNoPeriodo(v)
   );
   const vendido = vendasFunc.reduce((s, v) => s + Number(v.total || 0), 0);
-  const comissao = comissaoDeVendas(vendido, Number(func.comissao_percentual || 0));
+  const baseTipo = func.comissao_base || "vendas_funcionario";
+  const baseComissao =
+    baseTipo === "faturamento_loja"
+      ? Number(dados.resultadoLoja?.faturamento || 0)
+      : baseTipo === "lucro_loja"
+        ? Math.max(0, Number(dados.resultadoLoja?.lucro || 0))
+        : vendido;
+  const comissao = comissaoDeVendas(baseComissao, Number(func.comissao_percentual || 0));
 
   const repasse = dados.servicos
     .filter(
@@ -104,5 +115,13 @@ export function calcularAcerto(
     vales,
     salario,
     aPagar,
+    baseComissao,
+    baseTipo,
   };
+}
+
+export function rotuloBaseComissao(base: Acerto["baseTipo"]) {
+  if (base === "lucro_loja") return "lucro total da loja";
+  if (base === "faturamento_loja") return "faturamento da loja";
+  return "vendas do funcionário";
 }

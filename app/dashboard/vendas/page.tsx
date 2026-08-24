@@ -11,9 +11,11 @@ import { validarPagamento } from "@/lib/pdv-regras";
 import { carregarFuncionariosResponsaveis } from "@/lib/responsaveis";
 import {
   calcularDescontoPix,
+  calcularDescontoManual,
   calcularTotal,
   formatCurrency,
   obterCorFormaPagamento,
+  rotuloFormaPagamento,
 } from "@/lib/vendas-utils";
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
@@ -69,6 +71,19 @@ type VendaItem = {
   total_item: number;
 };
 
+type PagamentoVenda = {
+  venda_id: string;
+  forma: "pix" | "dinheiro" | "cartao";
+  valor: number;
+};
+
+type PagamentoRascunho = {
+  forma: "pix" | "dinheiro" | "cartao";
+  valor: string;
+  parcelas: string;
+  taxa: string;
+};
+
 type ItemRascunho = {
   produto_id: string;
   variacao_id: string | null;
@@ -83,6 +98,7 @@ export default function VendasPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [itensVenda, setItensVenda] = useState<VendaItem[]>([]);
+  const [pagamentosVenda, setPagamentosVenda] = useState<PagamentoVenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -113,6 +129,11 @@ export default function VendasPage() {
   const [venctoPromissoria, setVenctoPromissoria] = useState("");
   const [entradaMisto, setEntradaMisto] = useState("");
   const [descontoManual, setDescontoManual] = useState("0");
+  const [tipoDesconto, setTipoDesconto] = useState<"valor" | "percentual">("valor");
+  const [pagamentosMultiplos, setPagamentosMultiplos] = useState<PagamentoRascunho[]>([
+    { forma: "pix", valor: "", parcelas: "1", taxa: "0" },
+    { forma: "dinheiro", valor: "", parcelas: "1", taxa: "0" },
+  ]);
   const [observacao, setObservacao] = useState("");
 
   // Devolução parcial de venda
@@ -135,7 +156,7 @@ export default function VendasPage() {
     setLoading(true);
     setErro("");
 
-    const [clientesRes, produtosRes, vendasRes, itensRes] = await Promise.all([
+    const [clientesRes, produtosRes, vendasRes, itensRes, pagamentosRes] = await Promise.all([
       supabase
         .from("clientes")
         .select("id, nome")
@@ -151,17 +172,24 @@ export default function VendasPage() {
       supabase
         .from("venda_itens")
         .select("id, venda_id, produto_id, variacao_id, quantidade, preco_unitario, total_item"),
+      supabase.from("venda_pagamentos").select("venda_id, forma, valor"),
     ]);
 
     if (clientesRes.error) setErro(clientesRes.error.message);
     if (produtosRes.error) setErro(produtosRes.error.message);
     if (vendasRes.error) setErro(vendasRes.error.message);
     if (itensRes.error) setErro(itensRes.error.message);
+    // A tabela nasce na migration 0056. Em uma atualização gradual, a tela
+    // continua utilizável mesmo antes dela chegar ao ambiente.
+    if (pagamentosRes.error && pagamentosRes.error.code !== "42P01") {
+      setErro(pagamentosRes.error.message);
+    }
 
     setClientes(clientesRes.data || []);
     setProdutos((produtosRes.data || []).filter((produto) => (produto.status || "ativo") === "ativo"));
     setVendas(vendasRes.data || []);
     setItensVenda(itensRes.data || []);
+    setPagamentosVenda((pagamentosRes.data as PagamentoVenda[] | null) || []);
 
     // Variações ativas de todos os produtos (para a grade na venda).
     const { data: varData } = await supabase
@@ -237,10 +265,17 @@ export default function VendasPage() {
   }, [vendasNoPeriodo]);
 
   const totalPix = useMemo(() => {
-    return vendasNoPeriodo
+    const concluidas = new Set(
+      vendasNoPeriodo.filter((item) => item.status === "concluida").map((item) => item.id)
+    );
+    const vendasPixIntegrais = vendasNoPeriodo
       .filter((item) => item.forma_pagamento === "pix" && item.status === "concluida")
       .reduce((acc, item) => acc + Number(item.total || 0), 0);
-  }, [vendasNoPeriodo]);
+    const partesPix = pagamentosVenda
+      .filter((item) => concluidas.has(item.venda_id) && item.forma === "pix")
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+    return vendasPixIntegrais + partesPix;
+  }, [vendasNoPeriodo, pagamentosVenda]);
 
   const subtotalRascunho = useMemo(() => {
     return itensRascunho.reduce(
@@ -249,7 +284,12 @@ export default function VendasPage() {
     );
   }, [itensRascunho]);
 
-  const descontoManualNumero = Number(descontoManual || 0);
+  const descontoDigitado = Math.max(0, Number(descontoManual || 0));
+  const descontoManualNumero = calcularDescontoManual(
+    subtotalRascunho,
+    descontoDigitado,
+    tipoDesconto
+  );
   const descontoPixNumero =
     formaPagamento === "pix"
       ? calcularDescontoPix(subtotalRascunho, pixDesconto)
@@ -271,6 +311,11 @@ export default function VendasPage() {
     formaPagamento === "cartao"
       ? totalRascunho * (1 - taxaNum / 100)
       : totalRascunho;
+  const totalPagamentosMultiplos = pagamentosMultiplos.reduce(
+    (total, pagamento) => total + Number(pagamento.valor || 0),
+    0
+  );
+  const diferencaPagamentosMultiplos = totalRascunho - totalPagamentosMultiplos;
 
   // Regra de taxa aplicável (por tipo crédito + faixa de parcelas). Quando existe,
   // o PDV auto-preenche a taxa; só permite editar se a regra autorizar.
@@ -435,6 +480,11 @@ export default function VendasPage() {
     setEntradaFormaMisto("pix");
     setIdempKey(crypto.randomUUID());
     setDescontoManual("0");
+    setTipoDesconto("valor");
+    setPagamentosMultiplos([
+      { forma: "pix", valor: "", parcelas: "1", taxa: "0" },
+      { forma: "dinheiro", valor: "", parcelas: "1", taxa: "0" },
+    ]);
     setObservacao("");
     setProdutoId("");
     setVariacaoId("");
@@ -458,6 +508,37 @@ export default function VendasPage() {
     if (geraPromissoria && !clienteId) {
       setErro("Selecione um cliente para venda no fiado/promissória.");
       return;
+    }
+    if (geraPromissoria && !venctoPromissoria) {
+      setErro("Informe a data da primeira parcela da promissória.");
+      return;
+    }
+    if (tipoDesconto === "percentual" && descontoDigitado > 100) {
+      setErro("O desconto percentual deve ficar entre 0% e 100%.");
+      return;
+    }
+    if (descontoManualNumero > subtotalRascunho) {
+      setErro("O desconto não pode ser maior que o subtotal da venda.");
+      return;
+    }
+    if (formaPagamento === "multiplo") {
+      const invalidos = pagamentosMultiplos.some(
+        (pagamento) => !Number.isFinite(Number(pagamento.valor)) || Number(pagamento.valor) <= 0
+      );
+      if (pagamentosMultiplos.length < 2 || invalidos) {
+        setErro("Informe pelo menos duas formas de pagamento com valores válidos.");
+        return;
+      }
+      if (new Set(pagamentosMultiplos.map((pagamento) => pagamento.forma)).size < 2) {
+        setErro("Escolha pelo menos duas formas de pagamento diferentes.");
+        return;
+      }
+      if (Math.abs(diferencaPagamentosMultiplos) > 0.009) {
+        setErro(
+          `A soma dos pagamentos precisa fechar em ${formatCurrency(totalRascunho)}. Diferença: ${formatCurrency(Math.abs(diferencaPagamentosMultiplos))}.`
+        );
+        return;
+      }
     }
 
     // Validações locais (o backend valida de novo — aqui é só UX amigável).
@@ -497,7 +578,23 @@ export default function VendasPage() {
     try {
       // Venda ATÔMICA + idempotente: o backend recalcula total/regras e a
       // mesma chave impede venda duplicada em clique/retry.
-      const { error: rpcError } = await supabase.rpc("criar_venda", {
+      const chamada = formaPagamento === "multiplo"
+        ? supabase.rpc("criar_venda_multiforma", {
+            p_cliente_id: clienteId || null,
+            p_responsavel: responsavel,
+            p_funcionario_id: funcMatch ? funcMatch.id : null,
+            p_desconto: descontoManualNumero,
+            p_observacao: observacao.trim() || null,
+            p_itens: itensPayload,
+            p_pagamentos: pagamentosMultiplos.map((pagamento) => ({
+              forma: pagamento.forma,
+              valor: Number(pagamento.valor),
+              parcelas: pagamento.forma === "cartao" ? Number(pagamento.parcelas || 1) : 1,
+              taxa_percentual: pagamento.forma === "cartao" ? Number(pagamento.taxa || 0) : 0,
+            })),
+            p_idempotency_key: idempKey,
+          })
+        : supabase.rpc("criar_venda", {
         p_cliente_id: clienteId || null,
         p_responsavel: responsavel,
         p_funcionario_id: funcMatch ? funcMatch.id : null,
@@ -523,6 +620,7 @@ export default function VendasPage() {
         p_entrada_forma: formaPagamento === "misto" ? entradaFormaMisto : null,
         p_idempotency_key: idempKey,
       });
+      const { error: rpcError } = await chamada;
 
       if (rpcError) {
         throw new Error(rpcError.message);
@@ -717,8 +815,146 @@ export default function VendasPage() {
                   <option value="cartao">Cartão</option>
                   <option value="promissoria">Promissória</option>
                   <option value="misto">Misto</option>
+                  <option value="multiplo">Pagamento dividido</option>
                 </select>
               </div>
+
+              {formaPagamento === "multiplo" && (
+                <div className="rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-[#1e40af]">Dividir pagamento</p>
+                      <p className="text-xs text-[#64748b]">Ex.: parte no dinheiro e parte no Pix.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPagamentosMultiplos((atual) => [
+                          ...atual,
+                          { forma: "pix", valor: "", parcelas: "1", taxa: "0" },
+                        ])
+                      }
+                      className="rounded-xl border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-bold text-[#1d4ed8]"
+                    >
+                      + Adicionar forma
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {pagamentosMultiplos.map((pagamento, indice) => (
+                      <div key={indice} className="rounded-xl border border-[#dbeafe] bg-white p-3">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+                          <select
+                            value={pagamento.forma}
+                            onChange={(event) =>
+                              setPagamentosMultiplos((atual) =>
+                                atual.map((item, i) =>
+                                  i === indice
+                                    ? { ...item, forma: event.target.value as PagamentoRascunho["forma"] }
+                                    : item
+                                )
+                              )
+                            }
+                            className="rounded-xl border border-[#e8ecf4] px-3 py-2.5 text-sm outline-none"
+                          >
+                            <option value="pix">Pix</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="cartao">Cartão</option>
+                          </select>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={pagamento.valor}
+                            onChange={(event) =>
+                              setPagamentosMultiplos((atual) =>
+                                atual.map((item, i) =>
+                                  i === indice ? { ...item, valor: event.target.value } : item
+                                )
+                              )
+                            }
+                            placeholder="Valor"
+                            className="rounded-xl border border-[#e8ecf4] px-3 py-2.5 text-sm outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const outros = pagamentosMultiplos.reduce(
+                                (soma, item, i) =>
+                                  i === indice ? soma : soma + Number(item.valor || 0),
+                                0
+                              );
+                              const restante = Math.max(0, totalRascunho - outros);
+                              setPagamentosMultiplos((atual) =>
+                                atual.map((item, i) =>
+                                  i === indice
+                                    ? { ...item, valor: restante.toFixed(2) }
+                                    : item
+                                )
+                              );
+                            }}
+                            className="rounded-xl border border-[#bfdbfe] px-3 py-2 text-xs font-bold text-[#1d4ed8] hover:bg-[#eff6ff]"
+                          >
+                            Usar restante
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pagamentosMultiplos.length <= 2}
+                            onClick={() =>
+                              setPagamentosMultiplos((atual) => atual.filter((_, i) => i !== indice))
+                            }
+                            className="rounded-xl px-3 py-2 text-xs font-bold text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-30"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                        {pagamento.forma === "cartao" && (
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max={maxParcelasCfg}
+                              value={pagamento.parcelas}
+                              onChange={(event) =>
+                                setPagamentosMultiplos((atual) =>
+                                  atual.map((item, i) =>
+                                    i === indice ? { ...item, parcelas: event.target.value } : item
+                                  )
+                                )
+                              }
+                              placeholder="Parcelas"
+                              className="rounded-xl border border-[#e8ecf4] px-3 py-2 text-sm outline-none"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={pagamento.taxa}
+                              onChange={(event) =>
+                                setPagamentosMultiplos((atual) =>
+                                  atual.map((item, i) =>
+                                    i === indice ? { ...item, taxa: event.target.value } : item
+                                  )
+                                )
+                              }
+                              placeholder="Taxa (%)"
+                              className="rounded-xl border border-[#e8ecf4] px-3 py-2 text-sm outline-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs font-bold">
+                    <span className="text-[#334155]">Total informado: {formatCurrency(totalPagamentosMultiplos)}</span>
+                    <span className={Math.abs(diferencaPagamentosMultiplos) <= 0.009 ? "text-[#15803d]" : "text-[#b45309]"}>
+                      {Math.abs(diferencaPagamentosMultiplos) <= 0.009
+                        ? "Pagamento fechado ✓"
+                        : `${diferencaPagamentosMultiplos > 0 ? "Falta" : "Excede"} ${formatCurrency(Math.abs(diferencaPagamentosMultiplos))}`}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {formaPagamento === "dinheiro" && (
                 <div>
@@ -848,7 +1084,7 @@ export default function VendasPage() {
                     </div>
                     <div>
                       <label className="mb-2 block text-sm text-[#92400e]">
-                        1º vencimento
+                        Data da primeira parcela
                       </label>
                       <input
                         type="date"
@@ -868,13 +1104,29 @@ export default function VendasPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Desconto manual</label>
-                <input
-                  type="number"
-                  value={descontoManual}
-                  onChange={(e) => setDescontoManual(e.target.value)}
-                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  placeholder="0"
-                />
+                <div className="grid grid-cols-[130px_1fr] gap-2">
+                  <select
+                    value={tipoDesconto}
+                    onChange={(e) => setTipoDesconto(e.target.value as "valor" | "percentual")}
+                    className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-3 py-3 text-sm font-semibold text-[#334155] outline-none"
+                  >
+                    <option value="valor">Em R$</option>
+                    <option value="percentual">Em %</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={tipoDesconto === "percentual" ? 100 : undefined}
+                    value={descontoManual}
+                    onChange={(e) => setDescontoManual(e.target.value)}
+                    className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                    placeholder="0"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-[#64748b]">
+                  Desconto calculado: <b>{formatCurrency(descontoManualNumero)}</b>
+                </p>
               </div>
 
               <div>
@@ -1013,7 +1265,7 @@ export default function VendasPage() {
             <div className="mt-5 grid gap-3 text-sm text-[#475569]">
               <p>Cliente: {getClienteNome(clienteId || null)}</p>
               <p>Responsável: {responsavel}</p>
-              <p>Pagamento: {formaPagamento}</p>
+              <p>Pagamento: {rotuloFormaPagamento(formaPagamento)}</p>
               <p>Subtotal: {formatCurrency(subtotalRascunho)}</p>
               <p>Desconto manual: {formatCurrency(descontoManualNumero)}</p>
               <p>Desconto Pix: {formatCurrency(descontoPixNumero)}</p>
@@ -1073,7 +1325,7 @@ export default function VendasPage() {
                                 venda.forma_pagamento
                               )}`}
                             >
-                              {venda.forma_pagamento}
+                              {rotuloFormaPagamento(venda.forma_pagamento)}
                             </span>
 
                             <span className="inline-flex rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-bold text-[#475569]">

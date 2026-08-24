@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
+  gerarCronogramaPromissoria,
   calcularParcelaSugerida,
   calcularSaldoPromissoria,
   formatCurrency,
@@ -11,10 +12,15 @@ import {
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import { PromissoriaPdf } from "@/components/pdf/relatorios-pdf";
+import { compartilharPdfWhatsApp } from "@/lib/whatsapp-utils";
+import { Download, MessageCircle } from "lucide-react";
 
 type Cliente = {
   id: string;
   nome: string;
+  cpf: string | null;
+  telefone: string | null;
 };
 
 type Promissoria = {
@@ -24,8 +30,25 @@ type Promissoria = {
   parcelas: number;
   status: string;
   observacao: string | null;
+  data_vencimento: string | null;
+  data_primeira_parcela: string | null;
   created_at: string;
 };
+
+function formatarData(data: string | null) {
+  if (!data) return "Não informada";
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
+function slug(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
 export default function PromissoriasPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -33,6 +56,8 @@ export default function PromissoriasPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [baixandoPdf, setBaixandoPdf] = useState<string | null>(null);
+  const [nomeLoja, setNomeLoja] = useState("");
 
   const [clienteId, setClienteId] = useState("");
   const [valorTotal, setValorTotal] = useState("");
@@ -56,17 +81,18 @@ export default function PromissoriasPage() {
     setErro("");
 
     const cfg = await carregarConfigEmpresa();
+    setNomeLoja(cfg.nome_operacao);
     setPrazoMaxMeses(cfg.promissoria_prazo_meses);
     setParcelaMinima(cfg.parcela_minima);
 
     const [clientesRes, promissoriasRes, pagamentosRes] = await Promise.all([
       supabase
         .from("clientes")
-        .select("id, nome")
+        .select("id, nome, cpf, telefone")
         .order("created_at", { ascending: false }),
       supabase
         .from("promissorias")
-        .select("id, cliente_id, valor_total, parcelas, status, observacao, created_at")
+        .select("id, cliente_id, valor_total, parcelas, status, observacao, data_vencimento, data_primeira_parcela, created_at")
         .order("created_at", { ascending: false }),
       supabase.from("promissoria_pagamentos").select("promissoria_id, valor"),
     ]);
@@ -181,6 +207,11 @@ export default function PromissoriasPage() {
       return;
     }
 
+    if (!dataVencimento) {
+      setErro("Informe a data da primeira parcela.");
+      return;
+    }
+
     setSalvando(true);
 
     try {
@@ -191,6 +222,7 @@ export default function PromissoriasPage() {
         status: "em_aberto",
         observacao: observacao.trim() || null,
         data_vencimento: dataVencimento || null,
+        data_primeira_parcela: dataVencimento || null,
       });
 
       if (error) {
@@ -260,6 +292,82 @@ export default function PromissoriasPage() {
     }
 
     await carregarDados();
+  }
+
+  async function gerarArquivoPromissoria(item: Promissoria, cliente: Cliente) {
+    const primeiraParcela = item.data_primeira_parcela || item.data_vencimento || "";
+    const cronograma = gerarCronogramaPromissoria(
+      Number(item.valor_total || 0),
+      Number(item.parcelas || 0),
+      primeiraParcela
+    );
+    const { pdf } = await import("@react-pdf/renderer");
+    const documento = (
+      <PromissoriaPdf
+        loja={nomeLoja}
+        devedor={cliente.nome}
+        cpf={cliente.cpf || undefined}
+        valor={Number(item.valor_total || 0)}
+        vencimento={primeiraParcela}
+        dataEmissao={item.created_at.slice(0, 10)}
+        referencia={item.observacao || undefined}
+        parcelas={cronograma}
+      />
+    );
+    return {
+      blob: await pdf(documento as Parameters<typeof pdf>[0]).toBlob(),
+      nome: `promissoria-${slug(cliente.nome) || item.id}.pdf`,
+      primeiraParcela,
+    };
+  }
+
+  async function baixarPromissoria(item: Promissoria, cliente?: Cliente) {
+    if (!cliente) {
+      setErro("Não foi possível localizar o cliente desta promissória.");
+      return;
+    }
+
+    setErro("");
+    setBaixandoPdf(item.id);
+    try {
+      const arquivo = await gerarArquivoPromissoria(item, cliente);
+      const url = URL.createObjectURL(arquivo.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = arquivo.nome;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErro("Não foi possível gerar o PDF desta promissória. Tente novamente.");
+    } finally {
+      setBaixandoPdf(null);
+    }
+  }
+
+  async function enviarPromissoria(item: Promissoria, cliente?: Cliente) {
+    if (!cliente?.telefone) {
+      setErro("Cadastre o telefone do cliente para abrir a conversa no WhatsApp.");
+      return;
+    }
+    setErro("");
+    setBaixandoPdf(item.id);
+    try {
+      const arquivo = await gerarArquivoPromissoria(item, cliente);
+      const mensagem = `Olá, ${cliente.nome}! 👋\n\nSegue a sua promissória da ${nomeLoja || "loja"}, no valor de ${formatCurrency(Number(item.valor_total || 0))}, com a primeira parcela em ${formatarData(arquivo.primeiraParcela)}. 📄✅\n\nQualquer dúvida, estamos à disposição!`;
+      await compartilharPdfWhatsApp({
+        blob: arquivo.blob,
+        nomeArquivo: arquivo.nome,
+        telefone: cliente.telefone,
+        mensagem,
+      });
+    } catch (erroCompartilhar) {
+      if (erroCompartilhar instanceof DOMException && erroCompartilhar.name === "AbortError") return;
+      setErro("Não foi possível compartilhar o PDF. Tente novamente.");
+    } finally {
+      setBaixandoPdf(null);
+    }
   }
 
   return (
@@ -355,7 +463,7 @@ export default function PromissoriasPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">
-                  Data de vencimento
+                  Data da primeira parcela
                 </label>
                 <input
                   type="date"
@@ -363,6 +471,9 @@ export default function PromissoriasPage() {
                   onChange={(e) => setDataVencimento(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
+                <p className="mt-1.5 text-xs text-[#94a3b8]">
+                  As próximas parcelas vencerão mensalmente no mesmo dia.
+                </p>
               </div>
 
               <div>
@@ -491,6 +602,17 @@ export default function PromissoriasPage() {
                           Parcela mensal: {formatCurrency(parcelaMensal)}
                         </p>
 
+                        <p className="text-sm text-[#64748b]">
+                          Primeira parcela: {formatarData(
+                            item.data_primeira_parcela || item.data_vencimento
+                          )}
+                          {(item.data_primeira_parcela || item.data_vencimento) && (
+                            <> · pagamento mensal todo dia {Number(
+                              (item.data_primeira_parcela || item.data_vencimento)?.slice(8, 10)
+                            )}</>
+                          )}
+                        </p>
+
                         <p className="text-sm">
                           <span className="text-[#15803d]">
                             Pago: {formatCurrency(pagoPorPromissoria[item.id] || 0)}
@@ -507,6 +629,24 @@ export default function PromissoriasPage() {
                       </div>
 
                       <div className="flex min-w-[210px] flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => baixarPromissoria(item, cliente)}
+                          disabled={baixandoPdf === item.id}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#bfdbfe] bg-white px-4 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#eff6ff] disabled:opacity-60"
+                        >
+                          <Download className="h-4 w-4" />
+                          {baixandoPdf === item.id ? "Gerando..." : "Baixar PDF"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => enviarPromissoria(item, cliente)}
+                          disabled={baixandoPdf === item.id || !cliente?.telefone}
+                          title={!cliente?.telefone ? "Cliente sem telefone cadastrado" : undefined}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16a34a] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#15803d] disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
+                        </button>
                         {item.status === "pago" ? (
                           <span className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-center text-sm font-bold text-[#15803d]">
                             Quitada ✓

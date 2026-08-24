@@ -18,6 +18,7 @@ export type FolhaDados = {
   vales: number;
   outrosDescontos?: number;
   outrosDescontosLabel?: string;
+  comissaoDescricao?: string;
 };
 
 export type ResumoFolha = {
@@ -50,7 +51,11 @@ export function montarFolha(d: FolhaDados): ResumoFolha {
   ];
   if (comissao > 0 || qtdVendas > 0) {
     const suf = qtdVendas > 0 ? ` (${qtdVendas} venda${qtdVendas === 1 ? "" : "s"})` : "";
-    linhas.push({ tipo: "Provento", desc: `Comissão sobre vendas${suf}`, valor: comissao });
+    linhas.push({
+      tipo: "Provento",
+      desc: `${d.comissaoDescricao?.trim() || "Comissão sobre vendas"}${suf}`,
+      valor: comissao,
+    });
   }
   if (repasse > 0) {
     linhas.push({ tipo: "Provento", desc: "Repasse de serviços", valor: repasse });

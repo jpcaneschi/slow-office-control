@@ -4,8 +4,31 @@ import {
   calcularParcelaSugerida,
   calcularSaldoPromissoria,
   calcularSaldoTotalPromissorias,
+  adicionarMesesDataCalendario,
+  gerarCronogramaPromissoria,
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
+
+describe("cronograma mensal da promissória", () => {
+  it("preserva o dia da primeira parcela nos meses seguintes", () => {
+    expect(gerarCronogramaPromissoria(900, 3, "2026-09-10")).toEqual([
+      { numero: 1, vencimento: "2026-09-10", valor: 300 },
+      { numero: 2, vencimento: "2026-10-10", valor: 300 },
+      { numero: 3, vencimento: "2026-11-10", valor: 300 },
+    ]);
+  });
+
+  it("ajusta dia 31 para o último dia válido do mês", () => {
+    expect(adicionarMesesDataCalendario("2026-01-31", 1)).toBe("2026-02-28");
+    expect(adicionarMesesDataCalendario("2028-01-31", 1)).toBe("2028-02-29");
+  });
+
+  it("distribui centavos e preserva exatamente o total", () => {
+    const plano = gerarCronogramaPromissoria(100, 3, "2026-09-05");
+    expect(plano.map((p) => p.valor)).toEqual([33.34, 33.33, 33.33]);
+    expect(plano.reduce((total, p) => total + p.valor, 0)).toBeCloseTo(100, 2);
+  });
+});
 
 // Config de exemplo (fonte única): prazo 4 meses, parcela mínima R$300.
 const CFG = { prazoMaxMeses: 4, parcelaMinima: 300 };

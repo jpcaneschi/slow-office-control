@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2, ShoppingBag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatCurrency } from "@/lib/vendas-utils";
+import { formatCurrency, rotuloFormaPagamento } from "@/lib/vendas-utils";
 import { formatDataHoraBR } from "@/lib/datas";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 
@@ -43,12 +43,22 @@ type Item = {
   total_item: number;
 };
 
+type Pagamento = {
+  id: string;
+  forma: string;
+  valor: number;
+  parcelas: number;
+  taxa_percentual: number;
+  taxa_valor: number;
+};
+
 const PAGAMENTO: Record<string, string> = {
   pix: "PIX",
   dinheiro: "Dinheiro",
   cartao: "Cartão",
   promissoria: "Promissória",
   misto: "Misto",
+  multiplo: "Pagamento dividido",
 };
 
 const cardClass =
@@ -60,6 +70,7 @@ export default function VendaDetalhePage() {
 
   const [venda, setVenda] = useState<Venda | null>(null);
   const [itens, setItens] = useState<Item[]>([]);
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [clienteNome, setClienteNome] = useState<string>("");
   const [produtoNome, setProdutoNome] = useState<Map<string, string>>(new Map());
   const [variacaoNome, setVariacaoNome] = useState<Map<string, string>>(new Map());
@@ -85,7 +96,7 @@ export default function VendaDetalhePage() {
     }
     setVenda(v as Venda);
 
-    const [itensRes, cliRes] = await Promise.all([
+    const [itensRes, cliRes, pagamentosRes] = await Promise.all([
       supabase
         .from("venda_itens")
         .select("id, produto_id, variacao_id, quantidade, preco_unitario, total_item")
@@ -93,10 +104,18 @@ export default function VendaDetalhePage() {
       v.cliente_id
         ? supabase.from("clientes").select("nome").eq("id", v.cliente_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      v.forma_pagamento === "multiplo"
+        ? supabase
+            .from("venda_pagamentos")
+            .select("id, forma, valor, parcelas, taxa_percentual, taxa_valor")
+            .eq("venda_id", id)
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [] }),
     ]);
 
     const itensData = (itensRes.data as Item[]) || [];
     setItens(itensData);
+    setPagamentos((pagamentosRes.data as Pagamento[] | null) || []);
     setClienteNome((cliRes.data as { nome?: string } | null)?.nome || "Sem cliente");
 
     const produtoIds = [...new Set(itensData.map((i) => i.produto_id))];
@@ -249,6 +268,30 @@ export default function VendaDetalhePage() {
                     valor={PAGAMENTO[venda.entrada_forma || ""] || venda.entrada_forma || "—"}
                   />
                 </>
+              )}
+              {venda.forma_pagamento === "multiplo" && (
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <p className="mb-2 text-xs font-semibold text-[#94a3b8]">
+                    Composição do pagamento
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {pagamentos.map((pagamento) => (
+                      <div
+                        key={pagamento.id}
+                        className="rounded-2xl border border-[#e0f2fe] bg-[#f0f9ff] px-3 py-2.5"
+                      >
+                        <p className="text-sm font-bold text-[#0f172a]">
+                          {rotuloFormaPagamento(pagamento.forma)} · {formatCurrency(Number(pagamento.valor))}
+                        </p>
+                        {pagamento.forma === "cartao" && (
+                          <p className="mt-0.5 text-xs text-[#64748b]">
+                            {pagamento.parcelas || 1}x · taxa {Number(pagamento.taxa_percentual || 0)}% ({formatCurrency(Number(pagamento.taxa_valor || 0))})
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 

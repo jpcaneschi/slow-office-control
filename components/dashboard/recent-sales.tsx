@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/vendas-utils";
 export type VendaRow = {
   id: string;
   cliente: string;
-  pagamento: string; // forma_pagamento cru: pix | dinheiro | cartao | promissoria | misto
+  pagamento: string; // forma_pagamento cru, inclusive multiplo
   valor: number;
   status: string; // concluida | cancelada | ...
   data: string; // já formatado (dd/mm hh:mm)
@@ -33,6 +33,7 @@ const PAGAMENTO: Record<string, { label: string; icon: LucideIcon; color: string
   cartao: { label: "Cartão", icon: CreditCard, color: "#7c3aed" },
   promissoria: { label: "Promissória", icon: FileText, color: "#d97706" },
   misto: { label: "Misto", icon: Wallet, color: "#64748b" },
+  multiplo: { label: "Dividido", icon: Wallet, color: "#0284c7" },
 };
 
 function iniciais(nome: string) {

@@ -31,6 +31,9 @@ describe("relatorios-pdf — render", () => {
         qtdVendas: 6,
         totalVendido: 595,
         comissaoPct: 5,
+        comissaoBaseLabel: "Lucro total da loja",
+        baseComissaoValor: 595,
+        dataPagamento: "2026-08-31",
         repasseServicos: 56,
         vales: 200,
         outrosDescontos: 0,
@@ -63,6 +66,10 @@ describe("relatorios-pdf — render", () => {
         valor: 400,
         vencimento: "2026-09-10",
         dataEmissao: "2026-08-18",
+        parcelas: [
+          { numero: 1, vencimento: "2026-09-10", valor: 200 },
+          { numero: 2, vencimento: "2026-10-10", valor: 200 },
+        ],
       })
     );
     await pdfOk(

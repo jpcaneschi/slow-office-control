@@ -190,6 +190,9 @@ export default function ClientesPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <p className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
+              Somente o nome é obrigatório. Telefone, CPF e nascimento são opcionais.
+            </p>
             <div>
               <label className={labelClass}>Nome</label>
               <input
@@ -201,7 +204,7 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Telefone</label>
+              <label className={labelClass}>Telefone <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
@@ -211,7 +214,7 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>CPF</label>
+              <label className={labelClass}>CPF <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
@@ -221,7 +224,7 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Data de nascimento</label>
+              <label className={labelClass}>Data de nascimento <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
                 type="date"
                 value={dataNascimento}

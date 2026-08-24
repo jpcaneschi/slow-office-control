@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { formatCurrency } from "@/lib/vendas-utils";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
-import { calcularAcerto } from "@/lib/comissao-utils";
+import { calcularAcerto, rotuloBaseComissao } from "@/lib/comissao-utils";
+import { calcularResultadoLoja } from "@/lib/resultado-loja-utils";
 
 type Funcionario = {
   id: string;
@@ -14,6 +15,13 @@ type Funcionario = {
   salario_fixo: number | null;
   ativo: boolean | null;
   observacao: string | null;
+  telefone: string | null;
+  comissao_base: "vendas_funcionario" | "faturamento_loja" | "lucro_loja";
+  frequencia_pagamento: "mensal" | "quinzenal" | "semanal";
+  dia_pagamento: number;
+  vale_recorrente_valor: number;
+  vale_recorrente_dia: number;
+  vale_recorrente_ativo: boolean;
 };
 
 type Vale = {
@@ -32,6 +40,9 @@ type VendaLite = {
   created_at: string;
 };
 
+type ItemCusto = { venda_id: string; quantidade: number; custo_unitario: number | null };
+type DespesaLite = { valor: number; data: string };
+
 export default function FuncionariosPage() {
   const { period } = usePeriod();
   const janela = useMemo(() => {
@@ -49,6 +60,8 @@ export default function FuncionariosPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [vales, setVales] = useState<Vale[]>([]);
   const [vendas, setVendas] = useState<VendaLite[]>([]);
+  const [itensCusto, setItensCusto] = useState<ItemCusto[]>([]);
+  const [despesas, setDespesas] = useState<DespesaLite[]>([]);
   const [atendServico, setAtendServico] = useState<
     { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
   >([]);
@@ -62,6 +75,13 @@ export default function FuncionariosPage() {
   const [comissao, setComissao] = useState("0");
   const [salario, setSalario] = useState("0");
   const [ativo, setAtivo] = useState(true);
+  const [telefone, setTelefone] = useState("");
+  const [comissaoBase, setComissaoBase] = useState<Funcionario["comissao_base"]>("vendas_funcionario");
+  const [frequenciaPagamento, setFrequenciaPagamento] = useState<Funcionario["frequencia_pagamento"]>("mensal");
+  const [diaPagamento, setDiaPagamento] = useState("5");
+  const [valeRecorrenteAtivo, setValeRecorrenteAtivo] = useState(false);
+  const [valeRecorrenteValor, setValeRecorrenteValor] = useState("0");
+  const [valeRecorrenteDia, setValeRecorrenteDia] = useState("5");
 
   // Formulário vale
   const [valeFuncId, setValeFuncId] = useState("");
@@ -72,10 +92,11 @@ export default function FuncionariosPage() {
   async function carregar() {
     setLoading(true);
     setErro("");
-    const [funcRes, valesRes, vendasRes, servRes] = await Promise.all([
+    await supabase.rpc("gerar_vales_recorrentes", { p_competencia: period.inicio });
+    const [funcRes, valesRes, vendasRes, servRes, itensRes, despesasRes] = await Promise.all([
       supabase
         .from("funcionarios")
-        .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao")
+        .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao, telefone, comissao_base, frequencia_pagamento, dia_pagamento, vale_recorrente_valor, vale_recorrente_dia, vale_recorrente_ativo")
         .order("created_at", { ascending: true }),
       supabase.from("vales").select("id, funcionario_id, valor, data, observacao"),
       supabase
@@ -84,12 +105,16 @@ export default function FuncionariosPage() {
       supabase
         .from("atendimentos_servico")
         .select("funcionario_id, valor, percentual_loja, data"),
+      supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
+      supabase.from("despesas").select("valor, data"),
     ]);
     if (funcRes.error) setErro(funcRes.error.message);
     setFuncionarios(funcRes.data || []);
     setVales(valesRes.data || []);
     setVendas(vendasRes.data || []);
     setAtendServico(servRes.data || []);
+    setItensCusto((itensRes.data as ItemCusto[] | null) || []);
+    setDespesas((despesasRes.data as DespesaLite[] | null) || []);
     setLoading(false);
   }
 
@@ -103,6 +128,13 @@ export default function FuncionariosPage() {
     setComissao("0");
     setSalario("0");
     setAtivo(true);
+    setTelefone("");
+    setComissaoBase("vendas_funcionario");
+    setFrequenciaPagamento("mensal");
+    setDiaPagamento("5");
+    setValeRecorrenteAtivo(false);
+    setValeRecorrenteValor("0");
+    setValeRecorrenteDia("5");
   }
 
   function editar(f: Funcionario) {
@@ -111,6 +143,13 @@ export default function FuncionariosPage() {
     setComissao(String(f.comissao_percentual ?? 0));
     setSalario(String(f.salario_fixo ?? 0));
     setAtivo(f.ativo !== false);
+    setTelefone(f.telefone || "");
+    setComissaoBase(f.comissao_base || "vendas_funcionario");
+    setFrequenciaPagamento(f.frequencia_pagamento || "mensal");
+    setDiaPagamento(String(f.dia_pagamento || 5));
+    setValeRecorrenteAtivo(Boolean(f.vale_recorrente_ativo));
+    setValeRecorrenteValor(String(f.vale_recorrente_valor || 0));
+    setValeRecorrenteDia(String(f.vale_recorrente_dia || 5));
     setErro("");
   }
 
@@ -131,6 +170,13 @@ export default function FuncionariosPage() {
       comissao_percentual: pct,
       salario_fixo: Number(salario || 0),
       ativo,
+      telefone: telefone.trim() || null,
+      comissao_base: comissaoBase,
+      frequencia_pagamento: frequenciaPagamento,
+      dia_pagamento: Math.min(31, Math.max(1, Number(diaPagamento) || 5)),
+      vale_recorrente_ativo: valeRecorrenteAtivo,
+      vale_recorrente_valor: Math.max(0, Number(valeRecorrenteValor) || 0),
+      vale_recorrente_dia: Math.min(31, Math.max(1, Number(valeRecorrenteDia) || 5)),
     };
     const { error } = editandoId
       ? await supabase.from("funcionarios").update(payload).eq("id", editandoId)
@@ -195,10 +241,19 @@ export default function FuncionariosPage() {
       const t = isoToDate(d).getTime();
       return t >= janela.ini && t < janela.fim;
     };
+    const resultadoLoja = calcularResultadoLoja(
+      {
+        vendas,
+        itens: itensCusto,
+        despesas,
+        servicos: atendServico,
+      },
+      { vendaNoPeriodo, dataNoPeriodo }
+    );
     return funcionarios.map((f) => {
       const a = calcularAcerto(
         f,
-        { vendas, servicos: atendServico, vales },
+        { vendas, servicos: atendServico, vales, resultadoLoja },
         { vendaNoPeriodo, dataNoPeriodo }
       );
       return {
@@ -210,9 +265,11 @@ export default function FuncionariosPage() {
         valesPeriodo: a.vales,
         salarioFixo: a.salario,
         aPagar: a.aPagar,
+        baseComissao: a.baseComissao,
+        baseTipo: a.baseTipo,
       };
     });
-  }, [funcionarios, vendas, vales, atendServico, janela]);
+  }, [funcionarios, vendas, vales, atendServico, itensCusto, despesas, janela]);
 
   const inputCls =
     "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none";
@@ -247,6 +304,15 @@ export default function FuncionariosPage() {
                 placeholder="Nome do funcionário"
               />
             </div>
+            <div>
+              <label className="mb-2 block text-sm text-[#475569]">WhatsApp (opcional)</label>
+              <input
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                className={inputCls}
+                placeholder="(31) 99999-9999"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">
@@ -274,6 +340,57 @@ export default function FuncionariosPage() {
                   className={inputCls}
                 />
               </div>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-[#475569]">Base da comissão</label>
+              <select
+                value={comissaoBase}
+                onChange={(e) => setComissaoBase(e.target.value as Funcionario["comissao_base"])}
+                className={inputCls}
+              >
+                <option value="vendas_funcionario">Vendas do funcionário</option>
+                <option value="faturamento_loja">Faturamento total da loja</option>
+                <option value="lucro_loja">Lucro total da loja</option>
+              </select>
+              <p className="mt-1.5 text-xs text-[#64748b]">
+                Para a regra da Slow Office, selecione “Lucro total da loja” e 3%.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">Frequência</label>
+                <select
+                  value={frequenciaPagamento}
+                  onChange={(e) => setFrequenciaPagamento(e.target.value as Funcionario["frequencia_pagamento"])}
+                  className={inputCls}
+                >
+                  <option value="mensal">Mensal</option>
+                  <option value="quinzenal">Quinzenal</option>
+                  <option value="semanal">Semanal</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">Dia do pagamento</label>
+                <input type="number" min="1" max="31" value={diaPagamento} onChange={(e) => setDiaPagamento(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-3">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input type="checkbox" checked={valeRecorrenteAtivo} onChange={(e) => setValeRecorrenteAtivo(e.target.checked)} className="h-4 w-4 accent-[#b45309]" />
+                <span className="text-sm font-semibold text-[#92400e]">Vale mensal automático</span>
+              </label>
+              {valeRecorrenteAtivo && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-[#92400e]">Valor mensal</label>
+                    <input type="number" min="0" step="0.01" value={valeRecorrenteValor} onChange={(e) => setValeRecorrenteValor(e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#92400e]">Dia do vale</label>
+                    <input type="number" min="1" max="31" value={valeRecorrenteDia} onChange={(e) => setValeRecorrenteDia(e.target.value)} className={inputCls} />
+                  </div>
+                </div>
+              )}
             </div>
             <label className="flex cursor-pointer items-center gap-3">
               <input
@@ -361,7 +478,7 @@ export default function FuncionariosPage() {
               Acerto do período
             </h2>
             <p className="mt-1 text-sm text-[#64748b]">
-              Comissão sobre vendas concluídas no período selecionado, menos vales.
+              Comissão conforme a base configurada, somada ao salário e serviços, menos vales.
             </p>
 
             {loading ? (
@@ -388,7 +505,7 @@ export default function FuncionariosPage() {
                           </span>
                         )}
                         <span className="text-xs text-[#94a3b8]">
-                          {Number(a.funcionario.comissao_percentual || 0)}% comissão
+                          {Number(a.funcionario.comissao_percentual || 0)}% sobre {rotuloBaseComissao(a.baseTipo)}
                         </span>
                       </div>
                       <div className="flex gap-1.5">
@@ -421,6 +538,12 @@ export default function FuncionariosPage() {
                         Comissão:{" "}
                         <span className="font-bold text-[#15803d]">
                           {formatCurrency(a.comissaoValor)}
+                        </span>
+                      </p>
+                      <p className="text-[#64748b]">
+                        Base da comissão:{" "}
+                        <span className="font-bold text-[#0f172a]">
+                          {formatCurrency(a.baseComissao)}
                         </span>
                       </p>
                       <p className="text-[#64748b]">

@@ -12,6 +12,8 @@ import { TasksAlerts } from "@/components/dashboard/tasks-alerts";
 import { usePeriod, presetRange, isoToDate } from "@/components/dashboard/period-context";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeAcessar } from "@/lib/permissoes";
+import { TopProducts } from "@/components/dashboard/top-products";
+import { rankearProdutosMaisVendidos } from "@/lib/mais-vendidos-utils";
 
 type Venda = {
   id: string;
@@ -108,6 +110,10 @@ export default function DashboardPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [itensVenda, setItensVenda] = useState<
+    { venda_id: string; produto_id: string; quantidade: number; total_item: number }[]
+  >([]);
+  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -121,6 +127,8 @@ export default function DashboardPage() {
       atendRes,
       servRes,
       pagamentosRes,
+      itensRes,
+      produtosRes,
     ] = await Promise.all([
       supabase
         .from("vendas")
@@ -132,6 +140,8 @@ export default function DashboardPage() {
       supabase.from("tatuagem_atendimentos").select("data, valor, percentual"),
       supabase.from("atendimentos_servico").select("valor, percentual_loja, data"),
       supabase.from("promissoria_pagamentos").select("promissoria_id, valor"),
+      supabase.from("venda_itens").select("venda_id, produto_id, quantidade, total_item"),
+      supabase.from("produtos").select("id, nome"),
     ]);
 
     const primeiroErro =
@@ -149,6 +159,8 @@ export default function DashboardPage() {
     setCondicionais(condicionaisRes.data || []);
     setAtendimentos(atendRes.data || []);
     setAtendServico(servRes.data || []);
+    setItensVenda(itensRes.data || []);
+    setProdutos(produtosRes.data || []);
     setLoading(false);
   }, []);
 
@@ -285,6 +297,18 @@ export default function DashboardPage() {
     [vendas]
   );
 
+  const maisVendidos = useMemo(
+    () =>
+      rankearProdutosMaisVendidos(
+        vendas,
+        itensVenda,
+        produtos,
+        janela.inicio.getTime(),
+        janela.fim.getTime()
+      ),
+    [vendas, itensVenda, produtos, janela]
+  );
+
   return (
     <div className="space-y-6">
       {erro && (
@@ -339,6 +363,8 @@ export default function DashboardPage() {
           ariaLabel="Ver condicionais em aberto"
         />
       </section>
+
+      <TopProducts produtos={maisVendidos} loading={loading} />
 
       {/* ─── Calendário · Últimas vendas · Tarefas ─────────────────────── */}
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[0.95fr_1.2fr_1fr]">

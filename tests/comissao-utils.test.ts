@@ -90,3 +90,32 @@ describe("calcularAcerto — exclusões e período", () => {
     expect(a.comissao).toBe(10);
   });
 });
+
+describe("calcularAcerto — bases configuráveis", () => {
+  const dados = {
+    vendas: [] as VendaComissao[],
+    servicos: [] as ServicoComissao[],
+    vales: [] as ValeComissao[],
+    resultadoLoja: { faturamento: 10_000, lucro: 3_000 },
+  };
+  const filtros = { vendaNoPeriodo: () => true, dataNoPeriodo: () => true };
+
+  it("calcula 3% sobre o lucro total da loja", () => {
+    const a = calcularAcerto(
+      { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
+      dados,
+      filtros
+    );
+    expect(a.baseComissao).toBe(3000);
+    expect(a.comissao).toBe(90);
+  });
+
+  it("nunca gera comissão negativa quando a loja tem prejuízo", () => {
+    const a = calcularAcerto(
+      { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
+      { ...dados, resultadoLoja: { faturamento: 1000, lucro: -200 } },
+      filtros
+    );
+    expect(a.comissao).toBe(0);
+  });
+});

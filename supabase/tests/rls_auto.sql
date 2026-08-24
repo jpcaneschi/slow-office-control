@@ -67,7 +67,7 @@ select
 do $$
 declare
   v_tabelas text[] := array[
-    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','parcelas',
+    'clientes','produtos','produto_variacoes','produto_opcoes','vendas','venda_pagamentos','parcelas',
     'venda_itens','venda_devolucoes','condicionais','condicional_itens',
     'promissorias','promissoria_pagamentos','despesas','despesas_recorrentes',
     'estoque_movimentacoes','eventos','notificacoes','configuracoes',

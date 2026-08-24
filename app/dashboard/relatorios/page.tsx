@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Receipt, Wallet, Sparkles, Download } from "lucide-react";
+import { FileText, Receipt, Wallet, Sparkles, Download, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
-import { calcularAcerto } from "@/lib/comissao-utils";
+import { calcularAcerto, rotuloBaseComissao } from "@/lib/comissao-utils";
+import { calcularResultadoLoja } from "@/lib/resultado-loja-utils";
+import { compartilharPdfWhatsApp } from "@/lib/whatsapp-utils";
 import { montarFolha } from "@/lib/folha-utils";
 import {
   PromissoriaPdf,
@@ -78,14 +80,16 @@ export default function RelatoriosPage() {
 
   // Dados reais para Vale / Folha
   const [funcionarios, setFuncionarios] = useState<
-    { id: string; nome: string; comissao_percentual: number; salario_fixo: number }[]
+    { id: string; nome: string; telefone: string | null; comissao_percentual: number; salario_fixo: number; comissao_base: "vendas_funcionario" | "faturamento_loja" | "lucro_loja" }[]
   >([]);
   const [valesReais, setValesReais] = useState<
     { funcionario_id: string; valor: number; data: string }[]
   >([]);
   const [vendasFolha, setVendasFolha] = useState<
-    { funcionario_id: string | null; total: number; status: string; created_at: string }[]
+    { id: string; funcionario_id: string | null; total: number; status: string; created_at: string }[]
   >([]);
+  const [itensFolha, setItensFolha] = useState<{ venda_id: string; quantidade: number; custo_unitario: number | null }[]>([]);
+  const [despesasFolha, setDespesasFolha] = useState<{ valor: number; data: string }[]>([]);
   const [servFolha, setServFolha] = useState<
     { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
   >([]);
@@ -118,6 +122,7 @@ export default function RelatoriosPage() {
   // registros reais (fonte única), não de digitação manual desconectada.
   const [fOutros, setFOutros] = useState("");
   const [fOutrosLabel, setFOutrosLabel] = useState("");
+  const [fDataPagamento, setFDataPagamento] = useState(hoje());
 
   // Repasse
   const [rProfissional, setRProfissional] = useState("");
@@ -126,7 +131,7 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     (async () => {
-      const [confRes, funcRes, clientesRes, valesRes, vendasRes, servRes] =
+      const [confRes, funcRes, clientesRes, valesRes, vendasRes, servRes, itensRes, despesasRes] =
         await Promise.all([
           supabase
             .from("configuracoes")
@@ -136,18 +141,20 @@ export default function RelatoriosPage() {
             .maybeSingle(),
           supabase
             .from("funcionarios")
-            .select("id, nome, comissao_percentual, salario_fixo, ativo")
+            .select("id, nome, telefone, comissao_percentual, salario_fixo, ativo, comissao_base")
             .order("nome"),
           supabase.from("clientes").select("id, nome"),
           supabase.from("vales").select("funcionario_id, valor, data"),
           supabase
             .from("vendas")
-            .select("funcionario_id, total, status, created_at"),
+            .select("id, funcionario_id, total, status, created_at"),
           supabase
             .from("atendimentos_servico")
             .select(
               "funcionario_id, cliente_id, profissional_nome, valor, percentual_loja, data"
             ),
+          supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
+          supabase.from("despesas").select("valor, data"),
         ]);
       if (confRes.data?.nome_operacao) setLoja(confRes.data.nome_operacao);
       const nomesFuncionarios = new Map(
@@ -175,12 +182,16 @@ export default function RelatoriosPage() {
           .map((f) => ({
             id: f.id as string,
             nome: f.nome as string,
+            telefone: (f.telefone as string | null) || null,
             comissao_percentual: Number(f.comissao_percentual || 0),
             salario_fixo: Number(f.salario_fixo || 0),
+            comissao_base: (f.comissao_base || "vendas_funcionario") as "vendas_funcionario" | "faturamento_loja" | "lucro_loja",
           }))
       );
       setValesReais(valesRes.data || []);
       setVendasFolha(vendasRes.data || []);
+      setItensFolha(itensRes.data || []);
+      setDespesasFolha(despesasRes.data || []);
       setServFolha(
         (servRes.data || []).map((a) => ({
           funcionario_id: a.funcionario_id,
@@ -228,10 +239,17 @@ export default function RelatoriosPage() {
     if (!f) return null;
     const noPeriodo = (d: string) =>
       (!fInicio || d >= fInicio) && (!fFim || d <= fFim);
+    const resultadoLoja = calcularResultadoLoja(
+      { vendas: vendasFolha, itens: itensFolha, despesas: despesasFolha, servicos: servFolha },
+      {
+        vendaNoPeriodo: (v) => noPeriodo((v.created_at || "").slice(0, 10)),
+        dataNoPeriodo: noPeriodo,
+      }
+    );
     // Fonte única (mesma fórmula/exclusões da tela de Funcionários e do PDF).
     const a = calcularAcerto(
       f,
-      { vendas: vendasFolha, servicos: servFolha, vales: valesReais },
+      { vendas: vendasFolha, servicos: servFolha, vales: valesReais, resultadoLoja },
       {
         vendaNoPeriodo: (v) => noPeriodo((v.created_at || "").slice(0, 10)),
         dataNoPeriodo: (d) => noPeriodo(d),
@@ -246,8 +264,10 @@ export default function RelatoriosPage() {
       comissaoVendas: a.comissao,
       repasseServicos: a.repasse,
       vales: a.vales,
+      baseComissao: a.baseComissao,
+      baseTipo: a.baseTipo,
     };
-  }, [funcionarios, fFuncId, fInicio, fFim, vendasFolha, servFolha, valesReais]);
+  }, [funcionarios, fFuncId, fInicio, fFim, vendasFolha, itensFolha, despesasFolha, servFolha, valesReais]);
 
   // Ao trocar de funcionário/período, preenche nome/salário com dados reais.
   useEffect(() => {
@@ -320,6 +340,9 @@ export default function RelatoriosPage() {
             vales={folhaCalc?.vales || 0}
             outrosDescontos={Number(fOutros) || 0}
             outrosDescontosLabel={fOutrosLabel.trim()}
+            comissaoBaseLabel={folhaCalc ? rotuloBaseComissao(folhaCalc.baseTipo) : undefined}
+            baseComissaoValor={folhaCalc?.baseComissao}
+            dataPagamento={fDataPagamento}
           />
         ),
         nome: `recibo-${slug(fFunc)}.pdf`,
@@ -369,6 +392,35 @@ export default function RelatoriosPage() {
       URL.revokeObjectURL(url);
     } catch {
       setErro("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setBaixando(false);
+    }
+  }
+
+  async function enviarWhatsApp() {
+    setErro("");
+    const resultado = construirDocumento();
+    if (!resultado) return;
+    const nome = tipo === "folha" ? fFunc : tipo === "vale" ? vFunc : "";
+    const funcionario = funcionarios.find(
+      (item) => item.nome.trim().toLowerCase() === nome.trim().toLowerCase()
+    );
+    if (!funcionario?.telefone) {
+      setErro("Cadastre o WhatsApp do funcionário antes de enviar o PDF.");
+      return;
+    }
+    setBaixando(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const blob = await pdf(resultado.doc as Parameters<typeof pdf>[0]).toBlob();
+      await compartilharPdfWhatsApp({
+        blob,
+        nomeArquivo: resultado.nome,
+        telefone: funcionario.telefone,
+        mensagem: `Olá, ${funcionario.nome}! Segue o seu ${tipo === "folha" ? "recibo de pagamento" : "vale"} da ${loja}. 📄✅`,
+      });
+    } catch {
+      setErro("Não foi possível preparar o PDF para o WhatsApp.");
     } finally {
       setBaixando(false);
     }
@@ -629,15 +681,22 @@ export default function RelatoriosPage() {
             </div>
             {folhaCalc && (
               <div className="rounded-xl border border-[#e8ecf4] bg-[#f8fafc] p-4 text-sm text-[#475569] md:col-span-2">
-                Dados reais do período ({folhaCalc.qtdVendas} venda
-                {folhaCalc.qtdVendas === 1 ? "" : "s"} · {brl(folhaCalc.vendido)}{" "}
-                a {folhaCalc.comissaoPct}%): comissão{" "}
+                Dados reais do período: {folhaCalc.comissaoPct}% sobre {rotuloBaseComissao(folhaCalc.baseTipo)} ({brl(folhaCalc.baseComissao)}): comissão{" "}
                 <b>{brl(folhaCalc.comissaoVendas)}</b> · serviços{" "}
                 <b>{brl(folhaCalc.repasseServicos)}</b> · vales{" "}
                 <b>{brl(folhaCalc.vales)}</b>. Esses valores entram no recibo
                 automaticamente.
               </div>
             )}
+            <div>
+              <label className={labelClass}>Data em que recebeu</label>
+              <input
+                type="date"
+                value={fDataPagamento}
+                onChange={(e) => setFDataPagamento(e.target.value)}
+                className={inputClass}
+              />
+            </div>
             <div>
               <label className={labelClass}>Salário base (R$)</label>
               <input
@@ -761,15 +820,28 @@ export default function RelatoriosPage() {
         )}
 
         {/* Baixar */}
-        <button
-          type="button"
-          onClick={baixar}
-          disabled={baixando}
-          className="mt-6 flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-        >
-          <Download className="h-4 w-4" />
-          {baixando ? "Gerando PDF..." : "Baixar PDF"}
-        </button>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={baixar}
+            disabled={baixando}
+            className="flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {baixando ? "Gerando PDF..." : "Baixar PDF"}
+          </button>
+          {(tipo === "folha" || tipo === "vale") && (
+            <button
+              type="button"
+              onClick={enviarWhatsApp}
+              disabled={baixando}
+              className="flex items-center gap-2 rounded-xl bg-[#16a34a] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#15803d] disabled:opacity-60"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Enviar no WhatsApp
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
