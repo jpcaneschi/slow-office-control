@@ -171,7 +171,7 @@ export default function AssinaturaPage() {
                 "Financeiro com lucro e COGS",
                 "Promissórias e fiado",
                 "Funcionários, comissões e vales",
-                "Serviços e tatuagem",
+                "Serviços e atendimentos",
                 "Papéis e permissões da equipe",
                 "Relatórios e documentos em PDF",
               ].map((item) => (

@@ -5,7 +5,7 @@ import {
   FolhaSalarialPdf,
   PromissoriaPdf,
   ValePdf,
-  RepasseTatuadorPdf,
+  RepasseProfissionalPdf,
 } from "@/components/pdf/relatorios-pdf";
 
 // Render de verdade (Área #11): garante que os PDFs geram sem erro depois de
@@ -75,9 +75,9 @@ describe("relatorios-pdf — render", () => {
       })
     );
     await pdfOk(
-      React.createElement(RepasseTatuadorPdf, {
+      React.createElement(RepasseProfissionalPdf, {
         loja: "Slow Office",
-        tatuador: "Ana",
+        profissional: "Leonardo",
         periodoInicio: "2026-08-01",
         periodoFim: "2026-08-31",
         itens: [

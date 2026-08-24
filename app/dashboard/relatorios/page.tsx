@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Receipt, Wallet, PenTool, Download } from "lucide-react";
+import { FileText, Receipt, Wallet, Sparkles, Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
@@ -12,7 +12,7 @@ import {
   PromissoriaPdf,
   ValePdf,
   FolhaSalarialPdf,
-  RepasseTatuadorPdf,
+  RepasseProfissionalPdf,
   type RepasseItem,
 } from "@/components/pdf/relatorios-pdf";
 
@@ -20,7 +20,7 @@ type Tipo = "promissoria" | "vale" | "folha" | "repasse";
 
 type AtendimentoRef = {
   cliente_nome: string;
-  tatuador: string | null;
+  profissional: string | null;
   data: string;
   valor: number;
   percentual: number;
@@ -66,7 +66,7 @@ const tipos: { key: Tipo; label: string; icon: typeof FileText }[] = [
   { key: "promissoria", label: "Promissória", icon: FileText },
   { key: "vale", label: "Vale", icon: Receipt },
   { key: "folha", label: "Folha salarial", icon: Wallet },
-  { key: "repasse", label: "Repasse tatuador", icon: PenTool },
+  { key: "repasse", label: "Repasse de serviços", icon: Sparkles },
 ];
 
 export default function RelatoriosPage() {
@@ -120,13 +120,13 @@ export default function RelatoriosPage() {
   const [fOutrosLabel, setFOutrosLabel] = useState("");
 
   // Repasse
-  const [rTatuador, setRTatuador] = useState("");
+  const [rProfissional, setRProfissional] = useState("");
   const [rInicio, setRInicio] = useState(primeiroDiaMes());
   const [rFim, setRFim] = useState(hoje());
 
   useEffect(() => {
     (async () => {
-      const [confRes, atendRes, funcRes, valesRes, vendasRes, servRes] =
+      const [confRes, funcRes, clientesRes, valesRes, vendasRes, servRes] =
         await Promise.all([
           supabase
             .from("configuracoes")
@@ -135,23 +135,40 @@ export default function RelatoriosPage() {
             .limit(1)
             .maybeSingle(),
           supabase
-            .from("tatuagem_atendimentos")
-            .select("cliente_nome, tatuador, data, valor, percentual")
-            .order("data", { ascending: true }),
-          supabase
             .from("funcionarios")
             .select("id, nome, comissao_percentual, salario_fixo, ativo")
             .order("nome"),
+          supabase.from("clientes").select("id, nome"),
           supabase.from("vales").select("funcionario_id, valor, data"),
           supabase
             .from("vendas")
             .select("funcionario_id, total, status, created_at"),
           supabase
             .from("atendimentos_servico")
-            .select("funcionario_id, valor, percentual_loja, data"),
+            .select(
+              "funcionario_id, cliente_id, profissional_nome, valor, percentual_loja, data"
+            ),
         ]);
       if (confRes.data?.nome_operacao) setLoja(confRes.data.nome_operacao);
-      setAtendimentos(atendRes.data || []);
+      const nomesFuncionarios = new Map(
+        (funcRes.data || []).map((f) => [f.id as string, f.nome as string])
+      );
+      const nomesClientes = new Map(
+        (clientesRes.data || []).map((c) => [c.id as string, c.nome as string])
+      );
+      setAtendimentos(
+        (servRes.data || []).map((a) => ({
+          cliente_nome:
+            nomesClientes.get(a.cliente_id as string) || "Cliente não informado",
+          profissional:
+            a.profissional_nome ||
+            nomesFuncionarios.get(a.funcionario_id as string) ||
+            null,
+          data: a.data,
+          valor: Number(a.valor || 0),
+          percentual: Number(a.percentual_loja || 0),
+        }))
+      );
       setFuncionarios(
         (funcRes.data || [])
           .filter((f) => f.ativo !== false)
@@ -164,19 +181,26 @@ export default function RelatoriosPage() {
       );
       setValesReais(valesRes.data || []);
       setVendasFolha(vendasRes.data || []);
-      setServFolha(servRes.data || []);
+      setServFolha(
+        (servRes.data || []).map((a) => ({
+          funcionario_id: a.funcionario_id,
+          valor: Number(a.valor || 0),
+          percentual_loja: Number(a.percentual_loja || 0),
+          data: a.data,
+        }))
+      );
     })();
   }, []);
 
-  const tatuadores = useMemo(() => {
+  const profissionais = useMemo(() => {
     const set = new Set<string>();
-    atendimentos.forEach((a) => a.tatuador && set.add(a.tatuador));
+    atendimentos.forEach((a) => a.profissional && set.add(a.profissional));
     return Array.from(set).sort();
   }, [atendimentos]);
 
   const repasseItens = useMemo<RepasseItem[]>(() => {
     return atendimentos
-      .filter((a) => a.tatuador && a.tatuador === rTatuador)
+      .filter((a) => a.profissional && a.profissional === rProfissional)
       .filter(
         (a) =>
           (!rInicio || a.data >= rInicio) && (!rFim || a.data <= rFim)
@@ -187,7 +211,7 @@ export default function RelatoriosPage() {
         valor: Number(a.valor) || 0,
         percentual: Number(a.percentual) || 0,
       }));
-  }, [atendimentos, rTatuador, rInicio, rFim]);
+  }, [atendimentos, rProfissional, rInicio, rFim]);
 
   const repasseTotalLoja = useMemo(
     () =>
@@ -302,25 +326,25 @@ export default function RelatoriosPage() {
       };
     }
     // repasse
-    if (!rTatuador) {
-      setErro("Selecione um tatuador.");
+    if (!rProfissional) {
+      setErro("Selecione um profissional.");
       return null;
     }
     if (repasseItens.length === 0) {
-      setErro("Nenhum atendimento desse tatuador no período selecionado.");
+      setErro("Nenhum atendimento desse profissional no período selecionado.");
       return null;
     }
     return {
       doc: (
-        <RepasseTatuadorPdf
+        <RepasseProfissionalPdf
           loja={loja}
-          tatuador={rTatuador}
+          profissional={rProfissional}
           periodoInicio={rInicio}
           periodoFim={rFim}
           itens={repasseItens}
         />
       ),
-      nome: `repasse-${slug(rTatuador)}.pdf`,
+      nome: `repasse-${slug(rProfissional)}.pdf`,
     };
   }
 
@@ -670,18 +694,18 @@ export default function RelatoriosPage() {
           </div>
         )}
 
-        {/* ── Repasse tatuador ── */}
+        {/* ── Repasse de serviços ── */}
         {tipo === "repasse" && (
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className={labelClass}>Tatuador</label>
+              <label className={labelClass}>Profissional</label>
               <select
-                value={rTatuador}
-                onChange={(e) => setRTatuador(e.target.value)}
+                value={rProfissional}
+                onChange={(e) => setRProfissional(e.target.value)}
                 className={inputClass}
               >
                 <option value="">Selecione…</option>
-                {tatuadores.map((t) => (
+                {profissionais.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -708,11 +732,11 @@ export default function RelatoriosPage() {
             </div>
 
             <div className="rounded-xl border border-[#e8ecf4] bg-[#f8fafc] p-4 md:col-span-3">
-              {tatuadores.length === 0 ? (
+              {profissionais.length === 0 ? (
                 <p className="text-sm text-[#64748b]">
-                  Nenhum atendimento de tatuagem cadastrado ainda. Registre em{" "}
-                  <Link href="/dashboard/tatuagem" className="font-semibold text-[#2563eb]">
-                    Tatuagem
+                  Nenhum atendimento de serviço cadastrado ainda. Registre em{" "}
+                  <Link href="/dashboard/servicos" className="font-semibold text-[#2563eb]">
+                    Serviços
                   </Link>
                   .
                 </p>

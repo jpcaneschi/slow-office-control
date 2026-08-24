@@ -541,7 +541,7 @@ export function FolhaSalarialPdf({
   );
 }
 
-// ── 4) Repasse do tatuador ───────────────────────────────────────────────────
+// ── 4) Repasse de serviços ───────────────────────────────────────────────────
 export type RepasseItem = {
   data: string;
   cliente: string;
@@ -551,15 +551,15 @@ export type RepasseItem = {
 
 export type RepasseProps = {
   loja: string;
-  tatuador: string;
+  profissional: string;
   periodoInicio: string;
   periodoFim: string;
   itens: RepasseItem[];
 };
 
-export function RepasseTatuadorPdf({
+export function RepasseProfissionalPdf({
   loja,
-  tatuador,
+  profissional,
   periodoInicio,
   periodoFim,
   itens,
@@ -570,17 +570,17 @@ export function RepasseTatuadorPdf({
     faturado += it.valor || 0;
     aLoja += ((it.valor || 0) * (it.percentual || 0)) / 100;
   }
-  const ficaTatuador = faturado - aLoja;
+  const ficaProfissional = faturado - aLoja;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Repasse — Tatuagem" numero={gerarNumero("REP")} />
+        <Header loja={loja} titulo="Repasse — Serviços" numero={gerarNumero("REP")} />
 
         <Text style={styles.sectionTitle}>Referência</Text>
         <InfoGrid
           itens={[
-            { label: "Tatuador", value: tatuador },
+            { label: "Profissional", value: profissional },
             {
               label: "Período",
               value: `${fmtData(periodoInicio)} a ${fmtData(periodoFim)}`,
@@ -626,7 +626,7 @@ export function RepasseTatuadorPdf({
           <InfoGrid
             itens={[
               { label: "Total faturado", value: brl(faturado) },
-              { label: "Fica com o tatuador", value: brl(ficaTatuador) },
+              { label: "Fica com o profissional", value: brl(ficaProfissional) },
             ]}
           />
         </View>
@@ -637,7 +637,7 @@ export function RepasseTatuadorPdf({
         </View>
 
         <Assinaturas
-          esquerda="Assinatura do tatuador"
+          esquerda="Assinatura do profissional"
           direita="Responsável pela loja"
         />
         <Rodape loja={loja} />

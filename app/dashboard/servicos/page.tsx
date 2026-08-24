@@ -21,6 +21,7 @@ type Atendimento = {
   descricao: string | null;
   cliente_id: string | null;
   funcionario_id: string | null;
+  profissional_nome: string | null;
   valor: number;
   percentual_loja: number;
   data: string;
@@ -61,7 +62,7 @@ export default function ServicosPage() {
   const [aServicoId, setAServicoId] = useState("");
   const [aDescricao, setADescricao] = useState("");
   const [aClienteId, setAClienteId] = useState("");
-  const [aFuncId, setAFuncId] = useState("");
+  const [aProfissional, setAProfissional] = useState("");
   const [aValor, setAValor] = useState("");
   const [aPct, setAPct] = useState("100");
   const [salvandoAt, setSalvandoAt] = useState(false);
@@ -77,7 +78,7 @@ export default function ServicosPage() {
       supabase
         .from("atendimentos_servico")
         .select(
-          "id, servico_id, descricao, cliente_id, funcionario_id, valor, percentual_loja, data"
+          "id, servico_id, descricao, cliente_id, funcionario_id, profissional_nome, valor, percentual_loja, data"
         )
         .order("data", { ascending: false }),
       supabase.from("clientes").select("id, nome").order("nome"),
@@ -183,11 +184,16 @@ export default function ServicosPage() {
       return;
     }
     setSalvandoAt(true);
+    const profissional = aProfissional.trim();
+    const funcionario = funcionarios.find(
+      (f) => f.nome.toLocaleLowerCase("pt-BR") === profissional.toLocaleLowerCase("pt-BR")
+    );
     const { error } = await supabase.from("atendimentos_servico").insert({
       servico_id: aServicoId || null,
       descricao: aDescricao.trim() || null,
       cliente_id: aClienteId || null,
-      funcionario_id: aFuncId || null,
+      funcionario_id: funcionario?.id || null,
+      profissional_nome: profissional || null,
       valor,
       percentual_loja: Number(aPct || 100),
     });
@@ -199,7 +205,7 @@ export default function ServicosPage() {
     setAServicoId("");
     setADescricao("");
     setAClienteId("");
-    setAFuncId("");
+    setAProfissional("");
     setAValor("");
     setAPct("100");
     await carregar();
@@ -249,6 +255,10 @@ export default function ServicosPage() {
   function nomeFunc(id: string | null) {
     if (!id) return "—";
     return funcionarios.find((f) => f.id === id)?.nome || "—";
+  }
+
+  function nomeProfissional(atendimento: Atendimento) {
+    return atendimento.profissional_nome || nomeFunc(atendimento.funcionario_id);
   }
 
   const inputCls =
@@ -381,18 +391,21 @@ export default function ServicosPage() {
                   <label className="mb-2 block text-sm text-[#475569]">
                     Profissional
                   </label>
-                  <select
-                    value={aFuncId}
-                    onChange={(e) => setAFuncId(e.target.value)}
+                  <input
+                    list="servicos-profissionais"
+                    value={aProfissional}
+                    onChange={(e) => setAProfissional(e.target.value)}
                     className={inputCls}
-                  >
-                    <option value="">—</option>
+                    placeholder="Funcionário ou parceiro"
+                  />
+                  <datalist id="servicos-profissionais">
                     {funcionarios.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.nome}
-                      </option>
+                      <option key={f.id} value={f.nome} />
                     ))}
-                  </select>
+                  </datalist>
+                  <p className="mt-1 text-xs text-[#94a3b8]">
+                    Pode ser funcionário ou profissional externo, sem criar vínculo de funcionário.
+                  </p>
                 </div>
               </div>
               <button
@@ -530,7 +543,7 @@ export default function ServicosPage() {
                     <p className="mt-1 text-xs text-[#64748b]">
                       {formatDataBR(a.data)} ·
                       Cliente: {nomeCliente(a.cliente_id)} · Prof.:{" "}
-                      {nomeFunc(a.funcionario_id)}
+                      {nomeProfissional(a)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
