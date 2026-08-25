@@ -104,7 +104,9 @@ const resumoVazio: Resumo = {
 
 export function FinanceiroSimplificado() {
   const { period } = usePeriod();
-  const competencia = `${period.inicio.slice(0, 7)}-01`;
+  // O Financeiro é mensal. Se o filtro global atravessar dois meses (ex.: 30 dias),
+  // usamos o mês da DATA FINAL, que é o mês que o usuário está olhando agora.
+  const competencia = `${period.fim.slice(0, 7)}-01`;
 
   const [resumo, setResumo] = useState<Resumo>(resumoVazio);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
