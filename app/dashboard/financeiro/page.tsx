@@ -1,713 +1,140 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, ReceiptText, WalletCards } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
-import { hojeISO, formatDataBR, dataLocalMs } from "@/lib/datas";
+import { hojeISO } from "@/lib/datas";
 import { carregarNomesResponsaveis } from "@/lib/responsaveis";
 
-type Venda = {
-  id: string;
-  created_at: string;
-  total: number;
-  desconto: number;
-  forma_pagamento: string;
-  observacao: string | null;
-  responsavel: string | null;
-  cliente_id: string | null;
-  status: string | null;
-};
+type Venda = { id:string; created_at:string; total:number; status:string|null };
+type Item = { venda_id:string; produto_id:string; variacao_id:string|null; quantidade:number; custo_unitario:number|null };
+type Produto = { id:string; custo:number };
+type Variacao = { id:string; custo:number|null };
+type Despesa = { id:string; despesa_recorrente_id:string|null; competencia:string|null; descricao:string; categoria:string; valor:number; data:string; responsavel:string|null; observacao:string|null };
+type Recorrente = { id:string; descricao:string; categoria:string; valor:number; dia_vencimento:number; ativo:boolean };
+type Funcionario = { id:string; nome:string; salario_fixo:number; frequencia_pagamento:"mensal"|"quinzenal"|"semanal"; ativo:boolean|null };
+type Pagamento = { id:string; funcionario_id:string; data_pagamento:string; data_prevista:string|null; valor_liquido:number; parcela_numero:number; total_parcelas:number };
+type AgendaPag = { competencia:string; data_pagamento:string; parcela_numero:number; total_parcelas:number };
 
-type VendaItem = {
-  venda_id: string;
-  quantidade: number;
-  custo_unitario: number;
-};
+const categorias = ["Aluguel","Fornecedor","Compra de mercadoria","Marketing","Transporte","Embalagem","Sistema","Imposto","Funcionário","Outros"];
+const inputCls = "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] focus:bg-white";
+const brl = (v:number) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
+const dateBR = (s:string) => s ? s.slice(0,10).split("-").reverse().join("/") : "—";
 
-type Despesa = {
-  id: string;
-  despesa_recorrente_id: string | null;
-  competencia: string | null;
-  descricao: string;
-  categoria: string;
-  valor: number;
-  data: string;
-  responsavel: string | null;
-  observacao: string | null;
-  created_at: string;
-};
-
-type AtendimentoTat = {
-  valor: number | null;
-  percentual: number | null;
-  data: string | null;
-};
-
-type Recorrente = {
-  id: string;
-  descricao: string;
-  categoria: string;
-  valor: number;
-  dia_vencimento: number;
-  ativo: boolean;
-};
-
-const categoriasDespesa = [
-  "Aluguel",
-  "Fornecedor",
-  "Marketing",
-  "Transporte",
-  "Embalagem",
-  "Sistema",
-  "Imposto",
-  "Outros",
-];
-
-function formatCurrency(value: number) {
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
-const inputRec =
-  "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-sm text-[#0f172a] outline-none focus:border-[#2563eb] focus:bg-white";
-
-export default function FinanceiroPage() {
-  const [vendas, setVendas] = useState<Venda[]>([]);
-  const [itensVenda, setItensVenda] = useState<VendaItem[]>([]);
-  const [despesas, setDespesas] = useState<Despesa[]>([]);
-  const [atendimentos, setAtendimentos] = useState<AtendimentoTat[]>([]);
-  const [atendServico, setAtendServico] = useState<
-    { valor: number; percentual_loja: number; data: string }[]
-  >([]);
-  const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState("");
-  const [salvando, setSalvando] = useState(false);
-
-  const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState("Outros");
-  const [valor, setValor] = useState("");
-  const [dataDespesa, setDataDespesa] = useState("");
-  const [responsavel, setResponsavel] = useState("");
-  const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
-  const [observacao, setObservacao] = useState("");
-
-  const [rDescricao, setRDescricao] = useState("");
-  const [rCategoria, setRCategoria] = useState("Aluguel");
-  const [rValor, setRValor] = useState("");
-  const [rDia, setRDia] = useState("5");
-  const [salvandoRec, setSalvandoRec] = useState(false);
-
+export default function FinanceiroPage(){
   const { period } = usePeriod();
-  const janela = useMemo(() => {
-    const startOfDay = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-    const ini = startOfDay(isoToDate(period.inicio)).getTime();
-    const fimData = startOfDay(isoToDate(period.fim));
-    fimData.setDate(fimData.getDate() + 1);
-    return { ini, fim: fimData.getTime() };
-  }, [period]);
+  const [vendas,setVendas]=useState<Venda[]>([]);
+  const [itens,setItens]=useState<Item[]>([]);
+  const [produtos,setProdutos]=useState<Produto[]>([]);
+  const [variacoes,setVariacoes]=useState<Variacao[]>([]);
+  const [despesas,setDespesas]=useState<Despesa[]>([]);
+  const [recorrentes,setRecorrentes]=useState<Recorrente[]>([]);
+  const [funcionarios,setFuncionarios]=useState<Funcionario[]>([]);
+  const [pagamentos,setPagamentos]=useState<Pagamento[]>([]);
+  const [agendaFolha,setAgendaFolha]=useState<Record<string,AgendaPag[]>>({});
+  const [responsaveis,setResponsaveis]=useState<string[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [erro,setErro]=useState("");
+  const [detalhes,setDetalhes]=useState(true);
+  const [descricao,setDescricao]=useState(""); const [categoria,setCategoria]=useState("Outros"); const [valor,setValor]=useState(""); const [data,setData]=useState(""); const [responsavel,setResponsavel]=useState(""); const [obs,setObs]=useState("");
+  const [rDescricao,setRDescricao]=useState(""); const [rCategoria,setRCategoria]=useState("Aluguel"); const [rValor,setRValor]=useState(""); const [rDia,setRDia]=useState("5");
+  const [salvando,setSalvando]=useState(false);
 
-  async function carregarDados() {
-    setLoading(true);
-    setErro("");
+  const janela=useMemo(()=>{const a=isoToDate(period.inicio);a.setHours(0,0,0,0);const b=isoToDate(period.fim);b.setHours(0,0,0,0);b.setDate(b.getDate()+1);return {ini:a.getTime(),fim:b.getTime()};},[period]);
+  const noPeriodo=(s:string)=>{const t=isoToDate(s.slice(0,10)).getTime();return t>=janela.ini&&t<janela.fim;};
+  const competencia=`${period.inicio.slice(0,7)}-01`;
 
-    const [vendasRes, despesasRes, atendRes, recRes, itensRes, servRes] = await Promise.all([
-      supabase
-        .from("vendas")
-        .select("id, created_at, total, desconto, forma_pagamento, observacao, responsavel, cliente_id, status")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("despesas")
-        .select("id, despesa_recorrente_id, competencia, descricao, categoria, valor, data, responsavel, observacao, created_at")
-        .order("created_at", { ascending: false }),
-      supabase.from("tatuagem_atendimentos").select("valor, percentual, data"),
-      supabase
-        .from("despesas_recorrentes")
-        .select("id, descricao, categoria, valor, dia_vencimento, ativo")
-        .order("created_at", { ascending: true }),
-      supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
-      supabase.from("atendimentos_servico").select("valor, percentual_loja, data"),
+  async function carregar(){
+    setLoading(true);setErro("");
+    const [v,i,p,pv,d,r,f,pg]=await Promise.all([
+      supabase.from("vendas").select("id,created_at,total,status").order("created_at",{ascending:false}),
+      supabase.from("venda_itens").select("venda_id,produto_id,variacao_id,quantidade,custo_unitario"),
+      supabase.from("produtos").select("id,custo"),
+      supabase.from("produto_variacoes").select("id,custo"),
+      supabase.from("despesas").select("id,despesa_recorrente_id,competencia,descricao,categoria,valor,data,responsavel,observacao").order("data",{ascending:false}),
+      supabase.from("despesas_recorrentes").select("id,descricao,categoria,valor,dia_vencimento,ativo").order("dia_vencimento"),
+      supabase.from("funcionarios").select("id,nome,salario_fixo,frequencia_pagamento,ativo").order("nome"),
+      supabase.from("pagamentos_funcionario").select("id,funcionario_id,data_pagamento,data_prevista,valor_liquido,parcela_numero,total_parcelas").order("data_pagamento",{ascending:false}),
     ]);
-
-    if (vendasRes.error) setErro(vendasRes.error.message);
-    if (despesasRes.error) setErro(despesasRes.error.message);
-    if (atendRes.error) setErro(atendRes.error.message);
-    if (recRes.error) setErro(recRes.error.message);
-    if (itensRes.error) setErro(itensRes.error.message);
-
-    setVendas(vendasRes.data || []);
-    setItensVenda(itensRes.data || []);
-    setDespesas(despesasRes.data || []);
-    setAtendimentos(atendRes.data || []);
-    setAtendServico(servRes.data || []);
-    setRecorrentes(recRes.data || []);
-
-    setResponsaveisConfig(await carregarNomesResponsaveis());
-    setLoading(false);
+    const e=v.error||i.error||p.error||pv.error||d.error||r.error||f.error||pg.error; if(e)setErro(e.message);
+    setVendas((v.data as Venda[])||[]);setItens((i.data as Item[])||[]);setProdutos((p.data as Produto[])||[]);setVariacoes((pv.data as Variacao[])||[]);setDespesas((d.data as Despesa[])||[]);setRecorrentes((r.data as Recorrente[])||[]);setFuncionarios((f.data as Funcionario[])||[]);setPagamentos((pg.data as Pagamento[])||[]);
+    const funcs=((f.data as Funcionario[])||[]).filter(x=>x.ativo!==false); const agendas:Record<string,AgendaPag[]>={};
+    await Promise.all(funcs.map(async fn=>{const {data:a}=await supabase.rpc("agenda_pagamentos_funcionario",{p_funcionario_id:fn.id,p_competencia:competencia});agendas[fn.id]=(a as AgendaPag[])||[];})); setAgendaFolha(agendas);
+    setResponsaveis(await carregarNomesResponsaveis()); setLoading(false);
   }
+  useEffect(()=>{carregar();},[period.inicio,period.fim]);
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
+  const concluidas=useMemo(()=>vendas.filter(v=>v.status==="concluida"&&noPeriodo(v.created_at)),[vendas,janela]);
+  const ids=useMemo(()=>new Set(concluidas.map(v=>v.id)),[concluidas]);
+  const receita=useMemo(()=>concluidas.reduce((s,v)=>s+Number(v.total||0),0),[concluidas]);
+  const custoMap=useMemo(()=>new Map(produtos.map(p=>[p.id,Number(p.custo||0)])),[produtos]);
+  const custoVarMap=useMemo(()=>new Map(variacoes.map(v=>[v.id,Number(v.custo||0)])),[variacoes]);
+  const custoProdutos=useMemo(()=>itens.filter(i=>ids.has(i.venda_id)).reduce((s,i)=>{const snap=Number(i.custo_unitario||0);const fallback=i.variacao_id?Number(custoVarMap.get(i.variacao_id)||0):Number(custoMap.get(i.produto_id)||0);return s+(snap>0?snap:fallback)*Number(i.quantidade||0);},0),[itens,ids,custoMap,custoVarMap]);
+  const despPeriodo=useMemo(()=>despesas.filter(d=>noPeriodo(d.data)),[despesas,janela]);
+  const comprasEstoque=useMemo(()=>despPeriodo.filter(d=>d.categoria.toLowerCase().includes("mercadoria")).reduce((s,d)=>s+Number(d.valor||0),0),[despPeriodo]);
+  const fixas=useMemo(()=>despPeriodo.filter(d=>!!d.despesa_recorrente_id).reduce((s,d)=>s+Number(d.valor||0),0),[despPeriodo]);
+  const outras=useMemo(()=>despPeriodo.filter(d=>!d.despesa_recorrente_id&&!d.categoria.toLowerCase().includes("mercadoria")).reduce((s,d)=>s+Number(d.valor||0),0),[despPeriodo]);
+  const folhaPaga=useMemo(()=>pagamentos.filter(p=>noPeriodo(p.data_pagamento)).reduce((s,p)=>s+Number(p.valor_liquido||0),0),[pagamentos,janela]);
+  const despesasOperacionais=fixas+outras+folhaPaga;
+  const lucroLiquido=receita-custoProdutos-despesasOperacionais;
+  const saidaCaixa=fixas+outras+comprasEstoque+folhaPaga;
+  const caixaPeriodo=receita-saidaCaixa;
 
-  // Só vendas CONCLUÍDAS entram no financeiro (canceladas ficam de fora).
-  const idsConcluidas = useMemo(
-    () =>
-      new Set(
-        vendas
-          .filter((v) => (v.status || "") === "concluida")
-          .filter((v) => {
-            const t = new Date(v.created_at).getTime();
-            return t >= janela.ini && t < janela.fim;
-          })
-          .map((v) => v.id)
-      ),
-    [vendas, janela]
-  );
+  const folhaPrevista=useMemo(()=>funcionarios.filter(f=>f.ativo!==false).flatMap(f=>{const ag=agendaFolha[f.id]||[];return ag.map(a=>({funcionario:f,data:a.data_pagamento,parcela:a.parcela_numero,total:a.total_parcelas,valor:Number(f.salario_fixo||0)/Math.max(1,a.total_parcelas),pago:pagamentos.some(p=>p.funcionario_id===f.id&&p.data_prevista===a.data_pagamento&&p.parcela_numero===a.parcela_numero)}));}),[funcionarios,agendaFolha,pagamentos]);
 
-  const receitaVendas = useMemo(() => {
-    return vendas
-      .filter((v) => idsConcluidas.has(v.id))
-      .reduce((acc, venda) => acc + Number(venda.total || 0), 0);
-  }, [vendas, idsConcluidas]);
+  async function addDespesa(){const n=Number(valor);if(!descricao.trim()||!Number.isFinite(n)||n<=0){setErro("Informe descrição e valor válidos.");return;}setSalvando(true);const {error}=await supabase.from("despesas").insert({descricao:descricao.trim(),categoria,valor:n,data:data||hojeISO(),responsavel:responsavel||null,observacao:obs||null});if(error)setErro(error.message);else{setDescricao("");setValor("");setData("");setResponsavel("");setObs("");await carregar();}setSalvando(false);}
+  async function addRec(){const n=Number(rValor),dia=Number(rDia);if(!rDescricao.trim()||!Number.isFinite(n)||n<=0){setErro("Informe a conta recorrente e o valor.");return;}setSalvando(true);const {error}=await supabase.from("despesas_recorrentes").insert({descricao:rDescricao.trim(),categoria:rCategoria,valor:n,dia_vencimento:Math.min(31,Math.max(1,dia||5)),ativo:true});if(error)setErro(error.message);else{setRDescricao("");setRValor("");await carregar();}setSalvando(false);}
+  async function lancarRec(r:Recorrente){const {error}=await supabase.rpc("lancar_despesa_recorrente",{p_recorrente_id:r.id,p_competencia:competencia});if(error)setErro(error.message);else await carregar();}
 
-  const receitaTatuagem = useMemo(() => {
-    return atendimentos
-      .filter((a) => {
-        if (!a.data) return false;
-        const t = dataLocalMs(a.data);
-        return t >= janela.ini && t < janela.fim;
-      })
-      .reduce(
-        (acc, a) =>
-          acc + ((Number(a.valor) || 0) * (Number(a.percentual) || 0)) / 100,
-        0
-      );
-  }, [atendimentos, janela]);
+  const recorrenteLancada=(r:Recorrente)=>despesas.some(d=>d.despesa_recorrente_id===r.id&&(d.competencia||"").startsWith(competencia.slice(0,7)));
 
-  const receitaServicos = useMemo(() => {
-    return atendServico
-      .filter((a) => {
-        if (!a.data) return false;
-        const t = isoToDate(a.data).getTime();
-        return t >= janela.ini && t < janela.fim;
-      })
-      .reduce(
-        (acc, a) =>
-          acc +
-          (Number(a.valor) || 0) * ((Number(a.percentual_loja) || 0) / 100),
-        0
-      );
-  }, [atendServico, janela]);
+  return <section className="space-y-6">
+    <PageHeader eyebrow="Gestão financeira" title="Financeiro" description="Resultado da operação e fluxo de caixa separados, sem contar a mesma mercadoria duas vezes." />
+    {erro&&<div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}</div>}
 
-  const receita = receitaVendas + receitaTatuagem + receitaServicos;
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {[
+        ["Faturamento",receita,"Vendas concluídas"],
+        ["Custo dos produtos",custoProdutos,"Calculado automaticamente pelas vendas"],
+        ["Despesas operacionais",despesasOperacionais,"Fixas + adicionadas + folha paga"],
+        ["Lucro líquido",lucroLiquido,"Faturamento − custo − despesas"],
+        ["Caixa do período",caixaPeriodo,"Considera também compras de estoque pagas"],
+      ].map(([l,v,s])=><div key={String(l)} className="rounded-[28px] border border-[#e8ecf4] bg-white p-5"><p className="text-sm font-bold text-[#475569]">{String(l)}</p><p className="mt-3 text-2xl font-black text-[#0f172a]">{brl(Number(v))}</p><p className="mt-2 text-xs text-[#94a3b8]">{String(s)}</p></div>)}
+    </div>
 
-  // Custo dos produtos vendidos (COGS) — custo histórico dos itens concluídos.
-  const custoProdutos = useMemo(() => {
-    return itensVenda
-      .filter((it) => idsConcluidas.has(it.venda_id))
-      .reduce(
-        (acc, it) =>
-          acc + (Number(it.custo_unitario) || 0) * (Number(it.quantidade) || 0),
-        0
-      );
-  }, [itensVenda, idsConcluidas]);
+    <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+      <button onClick={()=>setDetalhes(x=>!x)} className="flex w-full items-center justify-between text-left"><div><h2 className="text-xl font-black text-[#0f172a]">Despesas e custos</h2><p className="mt-1 text-sm text-[#64748b]">Clique para abrir a composição completa do período.</p></div>{detalhes?<ChevronUp/>:<ChevronDown/>}</button>
+      {detalhes&&<div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {[
+          ["Custo dos produtos vendidos",custoProdutos,"Entra no lucro quando a peça é vendida"],
+          ["Despesas fixas mensais",fixas,"Contas recorrentes já lançadas"],
+          ["Funcionários / folha",folhaPaga,"Pagamentos efetivamente registrados"],
+          ["Despesas acrescentadas",outras,"Taxas, marketing, impostos e outras"],
+          ["Compras de mercadoria",comprasEstoque,"Saída de caixa; não duplica o COGS no lucro"],
+        ].map(([l,v,s])=><div key={String(l)} className="rounded-2xl bg-[#f8fafc] p-4"><p className="text-xs font-bold uppercase tracking-wide text-[#64748b]">{String(l)}</p><p className="mt-2 text-xl font-black text-[#0f172a]">{brl(Number(v))}</p><p className="mt-1 text-xs text-[#94a3b8]">{String(s)}</p></div>)}
+      </div>}
+    </div>
 
-  const lucroBruto = receita - custoProdutos;
-
-  const despesasPeriodo = useMemo(
-    () =>
-      despesas.filter((d) => {
-        const t = dataLocalMs(d.data);
-        return t >= janela.ini && t < janela.fim;
-      }),
-    [despesas, janela]
-  );
-
-  const despesasTotal = useMemo(
-    () => despesasPeriodo.reduce((acc, d) => acc + Number(d.valor || 0), 0),
-    [despesasPeriodo]
-  );
-
-  // Taxas de cartão são lançadas como despesa (categoria "Taxa de cartão").
-  // Já entram em despesasTotal (por isso o resultado fica correto) — aqui só as
-  // destacamos para leitura separada (faturamento × taxas × resultado).
-  const taxasCartao = useMemo(
-    () =>
-      despesasPeriodo
-        .filter((d) => d.categoria === "Taxa de cartão")
-        .reduce((acc, d) => acc + Number(d.valor || 0), 0),
-    [despesasPeriodo]
-  );
-
-  const resultado = lucroBruto - despesasTotal;
-
-  const vendasPix = useMemo(() => {
-    return vendas.filter(
-      (v) => v.forma_pagamento === "pix" && idsConcluidas.has(v.id)
-    ).length;
-  }, [vendas, idsConcluidas]);
-
-  const mesPrefix = hojeISO().slice(0, 7); // "YYYY-MM" (fuso São Paulo)
-
-  const totalFixoMensal = useMemo(
-    () =>
-      recorrentes
-        .filter((r) => r.ativo)
-        .reduce((acc, r) => acc + Number(r.valor || 0), 0),
-    [recorrentes]
-  );
-
-  function lancadaEsteMes(rec: Recorrente) {
-    return despesas.some(
-      (d) =>
-        d.despesa_recorrente_id === rec.id &&
-        (d.competencia || "").startsWith(mesPrefix)
-    );
-  }
-
-  async function adicionarRecorrente() {
-    setErro("");
-    const v = Number(rValor);
-    const dia = Number(rDia);
-    if (!rDescricao.trim()) {
-      setErro("Informe a descrição da conta recorrente.");
-      return;
-    }
-    if (!Number.isFinite(v) || v <= 0) {
-      setErro("Informe um valor válido para a conta recorrente.");
-      return;
-    }
-    setSalvandoRec(true);
-    const { error } = await supabase.from("despesas_recorrentes").insert({
-      descricao: rDescricao.trim(),
-      categoria: rCategoria,
-      valor: v,
-      dia_vencimento:
-        Number.isFinite(dia) && dia >= 1 && dia <= 31 ? dia : 5,
-      ativo: true,
-    });
-    if (error) {
-      setErro(error.message);
-      setSalvandoRec(false);
-      return;
-    }
-    setRDescricao("");
-    setRValor("");
-    setRDia("5");
-    setRCategoria("Aluguel");
-    await carregarDados();
-    setSalvandoRec(false);
-  }
-
-  async function excluirRecorrente(id: string) {
-    if (!window.confirm("Excluir esta conta recorrente?")) return;
-    const { error } = await supabase
-      .from("despesas_recorrentes")
-      .delete()
-      .eq("id", id);
-    if (error) {
-      setErro(error.message);
-      return;
-    }
-    await carregarDados();
-  }
-
-  async function lancarRecorrente(rec: Recorrente) {
-    setErro("");
-    const { error } = await supabase.rpc("lancar_despesa_recorrente", {
-      p_recorrente_id: rec.id,
-      p_competencia: `${mesPrefix}-01`,
-    });
-    if (error) {
-      setErro(error.message);
-      return;
-    }
-    await carregarDados();
-  }
-
-  async function registrarDespesa() {
-    setErro("");
-
-    const valorNumero = Number(valor);
-
-    if (!descricao.trim()) {
-      setErro("Informe a descrição da despesa.");
-      return;
-    }
-
-    if (!Number.isFinite(valorNumero) || valorNumero <= 0) {
-      setErro("Informe um valor válido.");
-      return;
-    }
-
-    setSalvando(true);
-
-    const { error } = await supabase.from("despesas").insert({
-      descricao: descricao.trim(),
-      categoria,
-      valor: valorNumero,
-      data: dataDespesa || hojeISO(),
-      responsavel: responsavel.trim() || null,
-      observacao: observacao.trim() || null,
-    });
-
-    if (error) {
-      setErro(error.message);
-      setSalvando(false);
-      return;
-    }
-
-    setDescricao("");
-    setCategoria("Outros");
-    setValor("");
-    setDataDespesa("");
-    setResponsavel("");
-    setObservacao("");
-
-    await carregarDados();
-    setSalvando(false);
-  }
-
-  return (
-    <section className="space-y-6">
-      <PageHeader
-        eyebrow="Gestão financeira"
-        title="Financeiro"
-        description="Acompanhe receita, custo, lucro e resultado da operação — só vendas concluídas entram na conta."
-      />
-
-      {erro && (
-        <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
-          {erro}
-        </div>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-[28px] border border-[#e8ecf4] bg-[#f8fafc] p-5">
-          <p className="text-sm font-bold text-[#475569]">Receita</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(receita)}
-          </p>
-          <p className="mt-2 text-xs text-[#94a3b8]">
-            Vendas {formatCurrency(receitaVendas)} · Tatuagem{" "}
-            {formatCurrency(receitaTatuagem)} · Serviços{" "}
-            {formatCurrency(receitaServicos)}
-          </p>
-        </div>
-
-        <div className="rounded-[28px] border border-[#fed7aa] bg-[#fff7ed] p-5">
-          <p className="text-sm font-bold text-[#c2410c]">Custo dos produtos</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(custoProdutos)}
-          </p>
-          <p className="mt-2 text-xs text-[#94a3b8]">Custo das vendas (COGS)</p>
-        </div>
-
-        <div className="rounded-[28px] border border-[#bfdbfe] bg-[#eff6ff] p-5">
-          <p className="text-sm font-bold text-[#1d4ed8]">Lucro bruto</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(lucroBruto)}
-          </p>
-          <p className="mt-2 text-xs text-[#94a3b8]">Receita − custo</p>
-        </div>
-
-        <div className="rounded-[28px] border border-[#fecaca] bg-[#fef2f2] p-5">
-          <p className="text-sm font-bold text-[#b91c1c]">Despesas</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(despesasTotal)}
-          </p>
-          {taxasCartao > 0 && (
-            <p className="mt-2 text-xs text-[#94a3b8]">
-              Inclui {formatCurrency(taxasCartao)} de taxas de cartão
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
-          <p className="text-sm font-bold text-[#15803d]">Resultado</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(resultado)}
-          </p>
-          <p className="mt-2 text-xs text-[#94a3b8]">Lucro − despesas</p>
-        </div>
-      </div>
-
-      {/* ─── Contas recorrentes ─────────────────────────────────────────── */}
+    <div className="grid gap-6 xl:grid-cols-2">
       <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Contas recorrentes
-            </h2>
-            <p className="mt-1 text-sm text-[#64748b]">
-              Despesas fixas que se repetem todo mês (aluguel, internet…).
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-2 text-sm">
-            <span className="text-[#64748b]">Total fixo mensal: </span>
-            <span className="font-black text-[#0f172a]">
-              {formatCurrency(totalFixoMensal)}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_0.8fr_0.6fr_auto]">
-          <input
-            value={rDescricao}
-            onChange={(e) => setRDescricao(e.target.value)}
-            className={inputRec}
-            placeholder="Descrição (ex: Aluguel)"
-          />
-          <select
-            value={rCategoria}
-            onChange={(e) => setRCategoria(e.target.value)}
-            className={inputRec}
-          >
-            {categoriasDespesa.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={rValor}
-            onChange={(e) => setRValor(e.target.value)}
-            className={inputRec}
-            placeholder="Valor"
-          />
-          <input
-            type="number"
-            min="1"
-            max="31"
-            value={rDia}
-            onChange={(e) => setRDia(e.target.value)}
-            className={inputRec}
-            placeholder="Dia"
-            title="Dia do vencimento"
-          />
-          <button
-            type="button"
-            onClick={adicionarRecorrente}
-            disabled={salvandoRec}
-            className="rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-          >
-            {salvandoRec ? "..." : "Adicionar"}
-          </button>
-        </div>
-
-        {recorrentes.length === 0 ? (
-          <p className="mt-5 text-sm text-[#64748b]">
-            Nenhuma conta recorrente cadastrada ainda.
-          </p>
-        ) : (
-          <div className="mt-5 space-y-2.5">
-            {recorrentes.map((rec) => {
-              const lancada = lancadaEsteMes(rec);
-              return (
-                <div
-                  key={rec.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-[#eef2f7] bg-[#f8fafc] p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[#0f172a]">
-                      {rec.descricao}
-                    </p>
-                    <p className="mt-0.5 text-sm text-[#64748b]">
-                      {rec.categoria} · vence dia {rec.dia_vencimento} ·{" "}
-                      {formatCurrency(Number(rec.valor || 0))}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {lancada ? (
-                      <span className="rounded-full bg-[#f0fdf4] px-3 py-1.5 text-xs font-bold text-[#15803d]">
-                        Lançada este mês
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => lancarRecorrente(rec)}
-                        className="rounded-lg border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-[#2563eb]/20"
-                      >
-                        Lançar este mês
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => excluirRecorrente(rec.id)}
-                      className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm font-semibold text-[#dc2626] transition hover:bg-[#fee2e2]"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex items-center gap-2"><ReceiptText className="h-5 w-5 text-[#2563eb]"/><h2 className="text-xl font-black text-[#0f172a]">Contas recorrentes da loja</h2></div>
+        <p className="mt-1 text-sm text-[#64748b]">Aluguel, internet, sistemas e outras despesas fixas.</p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1.4fr_1fr_.8fr_.6fr_auto]"><input className={inputCls} value={rDescricao} onChange={e=>setRDescricao(e.target.value)} placeholder="Descrição"/><select className={inputCls} value={rCategoria} onChange={e=>setRCategoria(e.target.value)}>{categorias.map(c=><option key={c}>{c}</option>)}</select><input className={inputCls} type="number" value={rValor} onChange={e=>setRValor(e.target.value)} placeholder="Valor"/><input className={inputCls} type="number" min="1" max="31" value={rDia} onChange={e=>setRDia(e.target.value)}/><button onClick={addRec} disabled={salvando} className="rounded-2xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white">Adicionar</button></div>
+        <div className="mt-4 space-y-2">{recorrentes.filter(r=>r.ativo).map(r=><div key={r.id} className="flex items-center justify-between rounded-2xl border border-[#eef2f7] bg-[#f8fafc] p-4"><div><p className="font-bold text-[#0f172a]">{r.descricao}</p><p className="text-sm text-[#64748b]">{r.categoria} · dia {r.dia_vencimento} · {brl(Number(r.valor))}</p></div>{recorrenteLancada(r)?<span className="text-xs font-bold text-green-700">Lançada</span>:<button onClick={()=>lancarRec(r)} className="rounded-xl border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700">Lançar mês</button>}</div>)}</div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-          <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-            Nova despesa
-          </h2>
-
-          <div className="mt-5 space-y-4">
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Descrição</label>
-              <input
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                placeholder="Ex: pagamento de fornecedor"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Categoria</label>
-              <select
-                value={categoria}
-                onChange={(e) => setCategoria(e.target.value)}
-                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-              >
-                {categoriasDespesa.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Valor</label>
-              <input
-                type="number"
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
-                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                placeholder="0,00"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Data</label>
-              <input
-                type="date"
-                value={dataDespesa}
-                onChange={(e) => setDataDespesa(e.target.value)}
-                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
-              <select
-                value={responsavel}
-                onChange={(e) => setResponsavel(e.target.value)}
-                className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-              >
-                <option value="">Selecione…</option>
-                {responsaveisConfig.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[#475569]">Observação</label>
-              <textarea
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                className="min-h-[100px] w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                placeholder="Detalhes extras"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={registrarDespesa}
-              disabled={salvando}
-              className="w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-            >
-              {salvando ? "Salvando..." : "Registrar despesa"}
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Despesas registradas
-            </h2>
-
-            {loading ? (
-              <p className="mt-4 text-[#64748b]">Carregando dados...</p>
-            ) : despesasPeriodo.length === 0 ? (
-              <p className="mt-4 text-[#64748b]">
-                Nenhuma despesa no período selecionado.
-              </p>
-            ) : (
-              <div className="mt-5 space-y-3">
-                {despesasPeriodo.map((despesa) => (
-                  <div
-                    key={despesa.id}
-                    className="rounded-[22px] border border-[#e8ecf4] bg-[#f8fafc]/80 p-4"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-[#0f172a]">{despesa.descricao}</p>
-                        <p className="mt-1 text-sm text-[#64748b]">
-                          {despesa.categoria} · {formatDataBR(despesa.data)}
-                        </p>
-                        <p className="text-sm text-[#64748b]">
-                          Responsável: {despesa.responsavel || "-"}
-                        </p>
-                        <p className="text-sm text-[#94a3b8]">
-                          {despesa.observacao || "Sem observação"}
-                        </p>
-                      </div>
-
-                      <span className="text-lg font-black tracking-tight text-[#0f172a]">
-                        {formatCurrency(Number(despesa.valor || 0))}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Leitura rápida
-            </h2>
-
-            <div className="mt-4 space-y-3 text-sm text-[#475569]">
-              <p>• Receita total: {formatCurrency(receita)}</p>
-              <p>• Repasse de tatuagem: {formatCurrency(receitaTatuagem)}</p>
-              <p>• Custo dos produtos: {formatCurrency(custoProdutos)}</p>
-              <p>• Lucro bruto: {formatCurrency(lucroBruto)}</p>
-              <p>• Taxas de cartão: {formatCurrency(taxasCartao)}</p>
-              <p>• Total de despesas: {formatCurrency(despesasTotal)}</p>
-              <p>• Resultado líquido: {formatCurrency(resultado)}</p>
-              <p>• Vendas no Pix: {vendasPix}</p>
-            </div>
-          </div>
-        </div>
+      <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+        <div className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-[#7c3aed]"/><h2 className="text-xl font-black text-[#0f172a]">Funcionários — conta recorrente</h2></div>
+        <p className="mt-1 text-sm text-[#64748b]">Agenda de pagamentos da competência selecionada. O que foi pago entra automaticamente nas despesas.</p>
+        <div className="mt-4 space-y-2">{folhaPrevista.map(x=><div key={`${x.funcionario.id}-${x.data}`} className="flex items-center justify-between rounded-2xl border border-[#eee9ff] bg-[#faf8ff] p-4"><div><p className="font-bold text-[#0f172a]">{x.funcionario.nome} · {x.parcela}/{x.total}</p><p className="text-sm text-[#64748b]">Previsto {dateBR(x.data)} · base {brl(x.valor)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${x.pago?"bg-green-100 text-green-700":"bg-amber-100 text-amber-700"}`}>{x.pago?"Pago":"Pendente"}</span></div>)}</div>
       </div>
-    </section>
-  );
+    </div>
+
+    <div className="grid gap-6 xl:grid-cols-[400px_1fr]">
+      <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6"><h2 className="text-xl font-black text-[#0f172a]">Nova despesa</h2><div className="mt-4 space-y-3"><input className={inputCls} value={descricao} onChange={e=>setDescricao(e.target.value)} placeholder="Descrição"/><select className={inputCls} value={categoria} onChange={e=>setCategoria(e.target.value)}>{categorias.map(c=><option key={c}>{c}</option>)}</select><input className={inputCls} type="number" value={valor} onChange={e=>setValor(e.target.value)} placeholder="Valor"/><input className={inputCls} type="date" value={data} onChange={e=>setData(e.target.value)}/><select className={inputCls} value={responsavel} onChange={e=>setResponsavel(e.target.value)}><option value="">Responsável (opcional)</option>{responsaveis.map(r=><option key={r}>{r}</option>)}</select><textarea className={inputCls} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Observação"/><button onClick={addDespesa} disabled={salvando} className="w-full rounded-2xl bg-[#2563eb] px-4 py-3 font-bold text-white">Registrar despesa</button></div></div>
+      <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6"><h2 className="text-xl font-black text-[#0f172a]">Movimentações de despesa</h2>{loading?<p className="mt-4 text-sm text-[#64748b]">Carregando...</p>:<div className="mt-4 space-y-2">{despPeriodo.map(d=><div key={d.id} className="rounded-2xl border border-[#eef2f7] bg-[#f8fafc] p-4"><div className="flex items-start justify-between gap-4"><div><p className="font-bold text-[#0f172a]">{d.descricao}</p><p className="mt-1 text-sm text-[#64748b]">{d.categoria} · {dateBR(d.data)}{d.despesa_recorrente_id?" · recorrente":""}</p>{d.observacao&&<p className="mt-1 text-xs text-[#94a3b8]">{d.observacao}</p>}</div><p className="font-black text-[#b91c1c]">− {brl(Number(d.valor))}</p></div></div>)}</div>}</div>
+    </div>
+  </section>;
 }
