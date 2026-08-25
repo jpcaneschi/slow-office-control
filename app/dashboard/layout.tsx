@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   UserCheck,
   Gift,
+  ReceiptText,
   Menu,
   X,
   type LucideIcon,
@@ -69,6 +70,7 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
     itens: [
       { href: "/dashboard/financeiro", label: "Financeiro", icon: CircleDollarSign },
       { href: "/dashboard/funcionarios", label: "Funcionários", icon: UserCog },
+      { href: "/dashboard/folha", label: "Folha e PDFs", icon: ReceiptText },
       { href: "/dashboard/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/dashboard/servicos", label: "Serviços", icon: Sparkles },
       { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
