@@ -9,7 +9,7 @@ import {
 } from "@/lib/comissao-utils";
 
 describe("comissaoDeVendas", () => {
-  it("aplica o percentual sobre o vendido", () => {
+  it("aplica o percentual sobre a base", () => {
     expect(comissaoDeVendas(595, 5)).toBeCloseTo(29.75, 2);
     expect(comissaoDeVendas(1000, 0)).toBe(0);
   });
@@ -17,29 +17,22 @@ describe("comissaoDeVendas", () => {
 
 describe("repasseDeServico", () => {
   it("repassa a parte que não é da loja", () => {
-    // valor 100, loja fica com 30% → repasse 70.
     expect(repasseDeServico(100, 30)).toBe(70);
   });
 });
 
 describe("calcularAcerto — exemplo obrigatório do DoD (pagamento final R$1.385,75)", () => {
   const func = { id: "f1", comissao_percentual: 5, salario_fixo: 1500 };
-
-  // 6 vendas concluídas do f1 somando R$595 (uma delas convertida de condicional).
   const vendas: VendaComissao[] = [
     { funcionario_id: "f1", total: 100, status: "concluida", created_at: "2026-08-01" },
     { funcionario_id: "f1", total: 100, status: "concluida", created_at: "2026-08-02" },
     { funcionario_id: "f1", total: 100, status: "concluida", created_at: "2026-08-03" },
     { funcionario_id: "f1", total: 100, status: "concluida", created_at: "2026-08-04" },
     { funcionario_id: "f1", total: 100, status: "concluida", created_at: "2026-08-05" },
-    // Convertida de condicional — AGORA tem funcionario_id (correção da #3).
     { funcionario_id: "f1", total: 95, status: "concluida", created_at: "2026-08-06" },
-    // Cancelada NÃO conta:
     { funcionario_id: "f1", total: 500, status: "cancelada", created_at: "2026-08-06" },
-    // De outro funcionário NÃO conta:
     { funcionario_id: "f2", total: 999, status: "concluida", created_at: "2026-08-06" },
   ];
-  // Repasse de serviços = R$56 (valor 80, loja 30% → 56).
   const servicos: ServicoComissao[] = [
     { funcionario_id: "f1", valor: 80, percentual_loja: 30, data: "2026-08-03" },
   ];
@@ -53,11 +46,11 @@ describe("calcularAcerto — exemplo obrigatório do DoD (pagamento final R$1.38
     { vendaNoPeriodo: () => true, dataNoPeriodo: () => true }
   );
 
-  it("vendas elegíveis = 6 e vendido = R$595 (inclui a convertida, exclui cancelada e de outro)", () => {
+  it("vendas elegíveis = 6 e vendido = R$595", () => {
     expect(a.qtdVendas).toBe(6);
     expect(a.vendido).toBe(595);
   });
-  it("comissão = R$29,75 (5% de 595)", () => {
+  it("comissão = R$29,75", () => {
     expect(a.comissao).toBeCloseTo(29.75, 2);
   });
   it("repasse serviços = R$56 e vales = R$200 e salário = R$1500", () => {
@@ -92,28 +85,65 @@ describe("calcularAcerto — exclusões e período", () => {
 });
 
 describe("calcularAcerto — bases configuráveis", () => {
-  const dados = {
-    vendas: [] as VendaComissao[],
-    servicos: [] as ServicoComissao[],
-    vales: [] as ValeComissao[],
-    resultadoLoja: { faturamento: 10_000, lucro: 3_000 },
-  };
   const filtros = { vendaNoPeriodo: () => true, dataNoPeriodo: () => true };
 
-  it("calcula 3% sobre o lucro total da loja", () => {
+  it("calcula comissão sobre faturamento informado", () => {
     const a = calcularAcerto(
-      { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
-      dados,
+      {
+        id: "f1",
+        comissao_percentual: 3,
+        salario_fixo: 0,
+        comissao_base: "faturamento_loja",
+      },
+      {
+        vendas: [],
+        servicos: [],
+        vales: [],
+        resultadoLoja: { faturamento: 10_000, lucro: 3_000 },
+      },
       filtros
     );
-    expect(a.baseComissao).toBe(3000);
-    expect(a.comissao).toBe(90);
+    expect(a.baseComissao).toBe(10_000);
+    expect(a.comissao).toBe(300);
   });
 
-  it("nunca gera comissão negativa quando a loja tem prejuízo", () => {
+  it("só calcula lucro quando há snapshot mensal fechado", () => {
+    const semFechamento = calcularAcerto(
+      { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
+      {
+        vendas: [],
+        servicos: [],
+        vales: [],
+        resultadoLoja: { faturamento: 10_000, lucro: 3_000 },
+      },
+      filtros
+    );
+    expect(semFechamento.baseComissao).toBe(0);
+    expect(semFechamento.comissao).toBe(0);
+
+    const fechado = calcularAcerto(
+      { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
+      {
+        vendas: [],
+        servicos: [],
+        vales: [],
+        resultadoLoja: { faturamento: 10_000, lucro: 3_000, lucroFechado: 3_000 },
+      },
+      filtros
+    );
+    expect(fechado.baseComissao).toBe(3000);
+    expect(fechado.comissao).toBe(90);
+  });
+
+  it("nunca gera comissão negativa no fechamento", () => {
     const a = calcularAcerto(
       { id: "f1", comissao_percentual: 3, salario_fixo: 0, comissao_base: "lucro_loja" },
-      { ...dados, resultadoLoja: { faturamento: 1000, lucro: -200 } },
+      {
+        vendas: [],
+        servicos: [],
+        vales: [],
+        resultadoLoja: { faturamento: 1000, lucro: -200, lucroFechado: -200 },
+      },
       filtros
     );
     expect(a.comissao).toBe(0);
