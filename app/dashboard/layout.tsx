@@ -19,6 +19,7 @@ import {
   CreditCard,
   ShieldCheck,
   UserCheck,
+  Gift,
   Menu,
   X,
   type LucideIcon,
@@ -59,6 +60,7 @@ const navGroups: { titulo?: string; itens: NavItem[] }[] = [
     titulo: "Cadastros",
     itens: [
       { href: "/dashboard/clientes", label: "Clientes", icon: Users },
+      { href: "/dashboard/fidelidade", label: "Fidelidade", icon: Gift },
       { href: "/dashboard/produtos", label: "Produtos", icon: Package },
     ],
   },
