@@ -8,25 +8,24 @@ import {
 const TODOS = [...MODULOS_PADRAO];
 const SEM_TATUAGEM = TODOS.filter((m) => m !== "tatuagem");
 const SEM_CONDICIONAL = TODOS.filter((m) => m !== "condicional");
+const SEM_FIDELIDADE = TODOS.filter((m) => m !== "fidelidade");
 
 describe("rotaBloqueadaPorModulo", () => {
   it("não bloqueia quando o módulo da rota está ativo", () => {
     expect(rotaBloqueadaPorModulo("/dashboard/tatuagem", TODOS)).toBe(false);
     expect(rotaBloqueadaPorModulo("/dashboard/condicional", TODOS)).toBe(false);
     expect(rotaBloqueadaPorModulo("/dashboard/servicos", TODOS)).toBe(false);
+    expect(rotaBloqueadaPorModulo("/dashboard/fidelidade", TODOS)).toBe(false);
   });
 
-  it("bloqueia a rota (e subrotas) do módulo desligado", () => {
+  it("bloqueia a rota e subrotas do módulo desligado", () => {
     expect(rotaBloqueadaPorModulo("/dashboard/tatuagem", SEM_TATUAGEM)).toBe(true);
-    expect(
-      rotaBloqueadaPorModulo("/dashboard/tatuagem/123", SEM_TATUAGEM)
-    ).toBe(true);
-    expect(
-      rotaBloqueadaPorModulo("/dashboard/condicional", SEM_CONDICIONAL)
-    ).toBe(true);
+    expect(rotaBloqueadaPorModulo("/dashboard/tatuagem/123", SEM_TATUAGEM)).toBe(true);
+    expect(rotaBloqueadaPorModulo("/dashboard/condicional", SEM_CONDICIONAL)).toBe(true);
+    expect(rotaBloqueadaPorModulo("/dashboard/fidelidade", SEM_FIDELIDADE)).toBe(true);
   });
 
-  it("nunca bloqueia rotas do núcleo (não são de módulo opcional)", () => {
+  it("nunca bloqueia rotas do núcleo", () => {
     for (const rota of [
       "/dashboard",
       "/dashboard/vendas",
@@ -40,15 +39,13 @@ describe("rotaBloqueadaPorModulo", () => {
     }
   });
 
-  it("com nenhum módulo ativo, as 3 rotas opcionais ficam bloqueadas", () => {
+  it("com nenhum módulo ativo, todas as rotas opcionais ficam bloqueadas", () => {
     for (const m of MODULOS_OPCIONAIS) {
       expect(rotaBloqueadaPorModulo(`/dashboard/${m}`, [])).toBe(true);
     }
   });
 
-  it("não confunde prefixo parcial (ex.: /dashboard/servicos-x não é /servicos)", () => {
-    // A rota base exige match exato ou seguida de "/", então um prefixo
-    // coincidente mas de outra rota não é tratado como do módulo.
+  it("não confunde prefixo parcial", () => {
     expect(rotaBloqueadaPorModulo("/dashboard/servicos-extra", [])).toBe(false);
   });
 });
