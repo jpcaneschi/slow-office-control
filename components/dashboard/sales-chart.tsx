@@ -25,9 +25,6 @@ const brl = (v: number) =>
 const brlSemCentavos = (v: number) =>
   `R$ ${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
 
-// Gera uma escala "redonda" (0, passo, 2·passo…) que se ajusta ao maior valor,
-// em vez de um teto fixo. Mantém cerca de 8–10 divisões: até R$ 900 usa
-// passo de R$ 100, sem abreviar valores como 0,9K.
 function escalaBonita(max: number, permitir25 = true) {
   if (!Number.isFinite(max) || max <= 0) {
     return { max: 100, ticks: [0, 25, 50, 75, 100] };
@@ -66,7 +63,7 @@ function CustomTooltip({
     <div className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
       <p className="text-xs font-bold text-[#0f172a]">{label}</p>
       <p className="mt-1 text-xs text-[#64748b]">
-        Faturamento:{" "}
+        Vendas:{" "}
         <span className="font-semibold text-[#0f172a]">{brl(d.faturamento)}</span>
       </p>
       <p className="text-xs text-[#64748b]">
@@ -85,7 +82,6 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
   const maxPed = data.length ? Math.max(...data.map((d) => d.pedidos)) : 0;
   const escalaFat = escalaBonita(maxFat);
   const escalaPed = escalaBonita(maxPed, false);
-  // Com muitos dias as barras ficam finas e escondemos os rótulos pra não poluir.
   const many = data.length > 8;
   const barSize = data.length > 16 ? 10 : many ? 18 : 38;
 
@@ -101,7 +97,6 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
           </defs>
 
           <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
-
           <XAxis
             dataKey="dia"
             tickLine={false}
@@ -110,8 +105,6 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             minTickGap={12}
             dy={6}
           />
-
-          {/* Eixo esquerdo — faturamento */}
           <YAxis
             yAxisId="left"
             tickLine={false}
@@ -121,8 +114,6 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             domain={[0, escalaFat.max]}
             ticks={escalaFat.ticks}
           />
-
-          {/* Eixo direito — pedidos */}
           <YAxis
             yAxisId="right"
             orientation="right"
@@ -133,12 +124,10 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             ticks={escalaPed.ticks}
             allowDecimals={false}
           />
-
           <Tooltip
             cursor={{ fill: "rgba(37,99,235,0.05)" }}
             content={<CustomTooltip />}
           />
-
           <Bar
             yAxisId="left"
             dataKey="faturamento"
@@ -161,7 +150,6 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
               />
             )}
           </Bar>
-
           <Line
             yAxisId="right"
             type="monotone"

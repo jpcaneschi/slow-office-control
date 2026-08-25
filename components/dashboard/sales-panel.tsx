@@ -39,8 +39,18 @@ const PERIODS: { key: PresetKey; label: string }[] = [
 ];
 
 const MESES_ABREV = [
-  "jan", "fev", "mar", "abr", "mai", "jun",
-  "jul", "ago", "set", "out", "nov", "dez",
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
 ];
 
 const DAY = 86400000;
@@ -77,9 +87,7 @@ function buildSeries(vendas: VendaLite[], start: Date, end: Date): SalesPoint[] 
   };
 
   const points: SalesPoint[] = [];
-
   if (totalDays > 92) {
-    // Períodos longos (ex.: "Este ano") agrupam por mês.
     let cur = new Date(start.getFullYear(), start.getMonth(), 1);
     const last = new Date(end.getFullYear(), end.getMonth(), 1);
     while (cur <= last) {
@@ -140,16 +148,16 @@ export function SalesPanel({
     };
   }, []);
 
-  const data = useMemo(() => {
-    return buildSeries(vendas, isoToDate(period.inicio), isoToDate(period.fim));
-  }, [vendas, period]);
-
+  const data = useMemo(
+    () => buildSeries(vendas, isoToDate(period.inicio), isoToDate(period.fim)),
+    [vendas, period]
+  );
   const temDados = data.some((d) => d.pedidos > 0);
   const currentLabel = mounted ? labelForPeriod(period) : "Período";
 
   function exportarCSV() {
     const linhas = [
-      ["Periodo", "Faturamento (R$)", "Pedidos"],
+      ["Periodo", "Vendas (R$)", "Pedidos"],
       ...data.map((d) => [d.dia, String(d.faturamento).replace(".", ","), String(d.pedidos)]),
     ];
     const csv = linhas.map((l) => l.join(";")).join("\r\n");
@@ -171,7 +179,7 @@ export function SalesPanel({
           <div className="mt-2 flex items-center gap-4 text-xs text-[#64748b]">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[#3b82f6]" />
-              Faturamento (R$)
+              Vendas (R$)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded-full bg-[#2563eb]" />
@@ -181,7 +189,6 @@ export function SalesPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Seletor de período */}
           <div ref={menuRef} className="relative">
             <button
               onClick={() => {
@@ -231,7 +238,6 @@ export function SalesPanel({
             )}
           </div>
 
-          {/* Menu de 3 pontos */}
           <div ref={moreRef} className="relative">
             <button
               onClick={() => {
