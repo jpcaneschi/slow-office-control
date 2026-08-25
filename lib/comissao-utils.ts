@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Comissão / acerto de funcionário — FONTE ÚNICA.
-// Consumida pela tela de Funcionários, por Relatórios e pelo PDF da folha, para
-// que os três batam no centavo. Regras (mesmas exclusões em todo lugar):
-//   • Comissão = (soma das vendas CONCLUÍDAS elegíveis do funcionário) × %.
-//     Vendas canceladas NÃO entram (status != 'concluida'). A origem não importa
-//     (PDV, conversão de condicional, etc.) — o que vale é vendas.funcionario_id.
+// Regras:
+//   • Vendas do funcionário: vendas CONCLUÍDAS elegíveis × %.
+//   • Faturamento da loja: faturamento informado pelo chamador × %.
+//   • Lucro da loja: SOMENTE snapshot mensal fechado × %. Nunca estima lucro
+//     localmente; isso evita divergência entre Financeiro, Folha e PDF.
 //   • Repasse de serviços = soma de valor × (1 − %loja/100).
 //   • A pagar = salário fixo + comissão + repasse − vales.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,27 +48,28 @@ export type Acerto = {
   baseTipo: "vendas_funcionario" | "faturamento_loja" | "lucro_loja";
 };
 
-/** Comissão em R$ = base vendida × percentual. */
+/** Comissão em R$ = base × percentual. */
 export function comissaoDeVendas(totalVendido: number, percentual: number): number {
   return (Number(totalVendido) || 0) * ((Number(percentual) || 0) / 100);
 }
 
-/** Repasse de um serviço = valor × (1 − %loja/100) (parte que vai ao funcionário). */
+/** Repasse de um serviço = valor × (1 − %loja/100) (parte do funcionário). */
 export function repasseDeServico(valor: number, percentualLoja: number): number {
   return (Number(valor) || 0) * (1 - (Number(percentualLoja) || 0) / 100);
 }
 
-/**
- * Acerto do funcionário no período. Os filtros de período são injetados (cada
- * tela tem a sua semântica de janela), mas a FÓRMULA e as EXCLUSÕES são únicas.
- */
 export function calcularAcerto(
   func: FuncionarioComissao,
   dados: {
     vendas: VendaComissao[];
     servicos: ServicoComissao[];
     vales: ValeComissao[];
-    resultadoLoja?: { faturamento: number; lucro: number };
+    resultadoLoja?: {
+      faturamento: number;
+      lucro: number;
+      /** Snapshot aprovado/fechado da competência. Sem snapshot, lucro = R$0. */
+      lucroFechado?: number | null;
+    };
   },
   filtros: {
     vendaNoPeriodo: (v: VendaComissao) => boolean;
@@ -87,14 +88,12 @@ export function calcularAcerto(
     baseTipo === "faturamento_loja"
       ? Number(dados.resultadoLoja?.faturamento || 0)
       : baseTipo === "lucro_loja"
-        ? Math.max(0, Number(dados.resultadoLoja?.lucro || 0))
+        ? Math.max(0, Number(dados.resultadoLoja?.lucroFechado || 0))
         : vendido;
   const comissao = comissaoDeVendas(baseComissao, Number(func.comissao_percentual || 0));
 
   const repasse = dados.servicos
-    .filter(
-      (a) => a.funcionario_id === func.id && filtros.dataNoPeriodo(a.data)
-    )
+    .filter((a) => a.funcionario_id === func.id && filtros.dataNoPeriodo(a.data))
     .reduce(
       (s, a) => s + repasseDeServico(Number(a.valor || 0), Number(a.percentual_loja || 0)),
       0
@@ -121,7 +120,7 @@ export function calcularAcerto(
 }
 
 export function rotuloBaseComissao(base: Acerto["baseTipo"]) {
-  if (base === "lucro_loja") return "lucro total da loja";
+  if (base === "lucro_loja") return "lucro mensal fechado";
   if (base === "faturamento_loja") return "faturamento da loja";
   return "vendas do funcionário";
 }
