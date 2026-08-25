@@ -72,9 +72,20 @@ type Venda = {
   created_at: string;
 };
 
-type ItemCusto = { venda_id: string; quantidade: number; custo_unitario: number | null };
+type ItemCusto = {
+  venda_id: string;
+  quantidade: number;
+  custo_unitario: number | null;
+};
+
 type Despesa = { valor: number; data: string };
-type Servico = { funcionario_id: string | null; valor: number; percentual_loja: number; data: string };
+type Servico = {
+  funcionario_id: string | null;
+  valor: number;
+  percentual_loja: number;
+  data: string;
+};
+
 type Pagamento = {
   id: string;
   funcionario_id: string;
@@ -86,6 +97,7 @@ type Pagamento = {
   total_parcelas: number;
   valor_liquido: number;
 };
+
 type ComissaoFechada = {
   id: string;
   funcionario_id: string;
@@ -108,9 +120,12 @@ type ParcelaFolha = {
   comissao: number;
   repasse: number;
   vales: number;
-  bruto: number;
+  liquidoBase: number;
+  ajusteSaldo: number;
   liquido: number;
   ultima: boolean;
+  registrado?: Pagamento;
+  saldoTransportado: number;
 };
 
 function hojeISO() {
@@ -134,7 +149,9 @@ function slug(valor: string) {
 function ultimoDiaMes(competencia: string) {
   const [ano, mes] = competencia.slice(0, 7).split("-").map(Number);
   const d = new Date(ano, mes, 0);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function mesAnoPt(iso: string) {
@@ -209,7 +226,9 @@ export default function FolhaPage() {
       supabase.from("vendas").select("id, funcionario_id, total, status, created_at"),
       supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
       supabase.from("despesas").select("valor, data"),
-      supabase.from("atendimentos_servico").select("funcionario_id, valor, percentual_loja, data"),
+      supabase
+        .from("atendimentos_servico")
+        .select("funcionario_id, valor, percentual_loja, data"),
       supabase
         .from("pagamentos_funcionario")
         .select("id, funcionario_id, periodo_inicio, periodo_fim, data_prevista, data_pagamento, parcela_numero, total_parcelas, valor_liquido")
@@ -230,6 +249,7 @@ export default function FolhaPage() {
       servicosRes.error ||
       pagamentosRes.error ||
       comissoesRes.error;
+
     if (primeiroErro) setErro(primeiroErro.message);
 
     setFuncionarios((funcRes.data as Funcionario[] | null) || []);
@@ -267,7 +287,6 @@ export default function FolhaPage() {
 
   const acertosMes = useMemo(() => {
     return funcionarios.map((funcionario) => {
-      // Os vales são descontados por parcela abaixo, portanto não entram aqui.
       const calculado = calcularAcerto(
         funcionario,
         { vendas, servicos, vales: [], resultadoLoja },
@@ -285,9 +304,7 @@ export default function FolhaPage() {
           baseComissao: Number(snapshot?.base_valor || 0),
           comissao: Number(snapshot?.valor || 0),
           aPagar:
-            calculado.salario +
-            calculado.repasse +
-            Number(snapshot?.valor || 0),
+            calculado.salario + calculado.repasse + Number(snapshot?.valor || 0),
           comissaoFechada: Boolean(snapshot),
           competenciaOrigem: snapshot?.competencia_origem || competenciaOrigem,
           percentualAplicado: Number(
@@ -323,36 +340,9 @@ export default function FolhaPage() {
       (d) =>
         d.funcionario_id === funcionarioId &&
         d.competencia === competencia &&
-        d.parcela_pagamento === parcelaNumero &&
+        Number(d.parcela_pagamento) === Number(parcelaNumero) &&
         d.status !== "cancelado"
     );
-  }
-
-  function montarParcelas(funcionario: Funcionario, acerto: AcertoMes): ParcelaFolha[] {
-    const agenda = gerarDatasPagamentoMes(funcionario, competencia);
-    const salarios = distribuirValor(Number(acerto.salario || 0), agenda.length);
-
-    return agenda.map((item, indice) => {
-      const ultima = indice === agenda.length - 1;
-      // Comissão e repasses mensais ficam no último pagamento, pois dependem
-      // do fechamento da competência. O salário fixo é dividido pela frequência.
-      const comissao = ultima ? Number(acerto.comissao || 0) : 0;
-      const repasse = ultima ? Number(acerto.repasse || 0) : 0;
-      const valesParcela = descontosDaParcela(funcionario.id, item.parcela_numero);
-      const vales = valesParcela.reduce((s, d) => s + Number(d.valor || 0), 0);
-      const salario = salarios[indice] || 0;
-      const bruto = salario + comissao + repasse;
-      return {
-        agenda: item,
-        salario,
-        comissao,
-        repasse,
-        vales,
-        bruto,
-        liquido: bruto - vales,
-        ultima,
-      };
-    });
   }
 
   function pagamentoRegistrado(funcionarioId: string, parcelaNumero: number) {
@@ -361,8 +351,81 @@ export default function FolhaPage() {
         p.funcionario_id === funcionarioId &&
         p.periodo_inicio === periodoInicio &&
         p.periodo_fim === periodoFim &&
-        Number(p.parcela_numero || 1) === parcelaNumero
+        Number(p.parcela_numero || 1) === Number(parcelaNumero)
     );
+  }
+
+  function montarParcelas(funcionario: Funcionario, acerto: AcertoMes): ParcelaFolha[] {
+    const agenda = gerarDatasPagamentoMes(funcionario, competencia);
+    const salarios = distribuirValor(Number(acerto.salario || 0), agenda.length);
+    let saldoTransportado = 0;
+
+    return agenda.map((item, indice) => {
+      const ultima = indice === agenda.length - 1;
+      const comissao = ultima ? Number(acerto.comissao || 0) : 0;
+      const repasse = ultima ? Number(acerto.repasse || 0) : 0;
+      const vales = descontosDaParcela(funcionario.id, item.parcela_numero).reduce(
+        (s, d) => s + Number(d.valor || 0),
+        0
+      );
+      const salario = Number(salarios[indice] || 0);
+      const liquidoBase = salario + comissao + repasse - vales;
+      const ajusteSaldo = saldoTransportado;
+      const devidoComSaldo = Math.max(0, liquidoBase + ajusteSaldo);
+      const registrado = pagamentoRegistrado(funcionario.id, item.parcela_numero);
+
+      if (registrado) {
+        const valorPago = Number(registrado.valor_liquido || 0);
+        saldoTransportado = devidoComSaldo - valorPago;
+        return {
+          agenda: item,
+          salario,
+          comissao,
+          repasse,
+          vales,
+          liquidoBase,
+          ajusteSaldo,
+          liquido: valorPago,
+          ultima,
+          registrado,
+          saldoTransportado,
+        };
+      }
+
+      saldoTransportado = 0;
+      return {
+        agenda: item,
+        salario,
+        comissao,
+        repasse,
+        vales,
+        liquidoBase,
+        ajusteSaldo,
+        liquido: devidoComSaldo,
+        ultima,
+        saldoTransportado: 0,
+      };
+    });
+  }
+
+  function podeProcessarComissao(
+    funcionario: Funcionario,
+    acerto: AcertoMes,
+    parcela: ParcelaFolha
+  ) {
+    if (
+      parcela.ultima &&
+      funcionario.comissao_base === "lucro_loja" &&
+      !acerto.comissaoFechada
+    ) {
+      setErro(
+        `Feche primeiro a comissão de ${mesAnoPt(
+          competenciaOrigem
+        )} antes do último pagamento de ${mesAnoPt(competencia)}.`
+      );
+      return false;
+    }
+    return true;
   }
 
   async function fecharMesAnterior() {
@@ -378,27 +441,16 @@ export default function FolhaPage() {
       const qtd = Number(data || 0);
       setSucesso(
         qtd > 0
-          ? `Comissão de ${mesAnoPt(competenciaOrigem)} fechada e liberada para ${mesAnoPt(competencia)}.`
-          : `A comissão de ${mesAnoPt(competenciaOrigem)} já estava fechada ou não há funcionário nessa base.`
+          ? `Comissão de ${mesAnoPt(
+              competenciaOrigem
+            )} fechada e carregada para ${mesAnoPt(competencia)}.`
+          : `A comissão de ${mesAnoPt(
+              competenciaOrigem
+            )} já estava fechada ou não há funcionário configurado nessa base.`
       );
     }
     setProcessando(null);
     await carregar();
-  }
-
-  function podeProcessarComissao(funcionario: Funcionario, acerto: AcertoMes, parcela: ParcelaFolha) {
-    if (
-      funcionario.comissao_base === "lucro_loja" &&
-      parcela.ultima &&
-      Number(funcionario.comissao_percentual || 0) > 0 &&
-      !acerto.comissaoFechada
-    ) {
-      setErro(
-        `Feche primeiro a comissão de ${mesAnoPt(competenciaOrigem)} para processar o último pagamento de ${mesAnoPt(competencia)}.`
-      );
-      return false;
-    }
-    return true;
   }
 
   async function blobFolha(
@@ -408,21 +460,34 @@ export default function FolhaPage() {
     dataPagamento: string
   ) {
     const { pdf } = await import("@react-pdf/renderer");
-    const referencia = `${mesAnoPt(competencia)} · pagamento ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas}`;
+
+    let salarioPdf = parcela.salario + Math.max(0, parcela.ajusteSaldo);
+    let descontoAjuste = Math.max(0, -parcela.ajusteSaldo);
+    const natural =
+      salarioPdf + parcela.comissao + parcela.repasse - parcela.vales - descontoAjuste;
+
+    if (parcela.registrado) {
+      const diferenca = natural - parcela.liquido;
+      if (diferenca > 0) descontoAjuste += diferenca;
+      if (diferenca < 0) salarioPdf += Math.abs(diferenca);
+    }
+
     const documento = (
       <FolhaSalarialPdf
         loja={nomeLoja}
         funcionario={funcionario.nome}
-        referencia={referencia}
+        referencia={`${mesAnoPt(competencia)} · pagamento ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas}`}
         periodoInicio={periodoInicio}
         periodoFim={periodoFim}
-        salarioBase={parcela.salario}
+        salarioBase={salarioPdf}
         comissao={parcela.comissao}
         qtdVendas={parcela.ultima ? acerto.qtdVendas : 0}
         totalVendido={parcela.ultima ? acerto.vendido : 0}
         comissaoPct={parcela.ultima ? acerto.percentualAplicado : 0}
         repasseServicos={parcela.repasse}
         vales={parcela.vales}
+        outrosDescontos={descontoAjuste}
+        outrosDescontosLabel="Ajuste / saldo de pagamento anterior"
         comissaoBaseLabel={rotuloBaseComissao(acerto.baseTipo)}
         baseComissaoValor={parcela.ultima ? acerto.baseComissao : 0}
         dataPagamento={dataPagamento}
@@ -465,17 +530,14 @@ export default function FolhaPage() {
     setSucesso("");
     if (!podeProcessarComissao(funcionario, acerto, parcela)) return;
     if (parcela.liquido < -0.009) {
-      setErro(
-        `Os vales programados para ${dataBR(parcela.agenda.data_pagamento)} são maiores que esta parcela. Altere ou divida o vale antes de gerar o pagamento.`
-      );
+      setErro("O valor desta parcela ficou inválido. Revise os descontos antes de gerar o comprovante.");
       return;
     }
 
-    const registrado = pagamentoRegistrado(funcionario.id, parcela.agenda.parcela_numero);
     const chave = chaveParcela(funcionario.id, parcela.agenda.parcela_numero);
     const dataPagamento =
       datasPagamento[chave] ||
-      registrado?.data_pagamento ||
+      parcela.registrado?.data_pagamento ||
       parcela.agenda.data_pagamento;
     setProcessando(`folha-${chave}`);
 
@@ -486,7 +548,7 @@ export default function FolhaPage() {
         if (!funcionario.telefone) {
           throw new Error("Cadastre o WhatsApp do funcionário para compartilhar.");
         }
-        const mensagem = `Olá, ${funcionario.nome}! 👋\n\nSegue o seu comprovante da ${nomeLoja}, pagamento ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas} de ${mesAnoPt(competencia)}. 📄✅\n\nLíquido: ${formatCurrency(Math.max(0, parcela.liquido))}.\nData: ${dataBR(dataPagamento)}.`;
+        const mensagem = `Olá, ${funcionario.nome}! 👋\n\nSegue o seu comprovante da ${nomeLoja}, pagamento ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas} de ${mesAnoPt(competencia)}. 📄✅\n\nValor: ${formatCurrency(Math.max(0, parcela.liquido))}.\nData: ${dataBR(dataPagamento)}.`;
         await compartilharPdfWhatsApp({
           blob,
           nomeArquivo: nome,
@@ -511,18 +573,11 @@ export default function FolhaPage() {
     setErro("");
     setSucesso("");
     if (!podeProcessarComissao(funcionario, acerto, parcela)) return;
-    if (parcela.liquido < -0.009) {
-      setErro(
-        `O desconto de vale em ${dataBR(parcela.agenda.data_pagamento)} ultrapassa o valor desta parcela. Divida ou altere o pagamento do vale.`
-      );
-      return;
-    }
 
     const chave = chaveParcela(funcionario.id, parcela.agenda.parcela_numero);
-    const registrado = pagamentoRegistrado(funcionario.id, parcela.agenda.parcela_numero);
     const dataPagamento =
       datasPagamento[chave] ||
-      registrado?.data_pagamento ||
+      parcela.registrado?.data_pagamento ||
       parcela.agenda.data_pagamento;
 
     setProcessando(`pag-${chave}`);
@@ -561,7 +616,9 @@ export default function FolhaPage() {
         }
         const plano = descontosVale
           .filter((d) => d.vale_id === vale.id && d.status !== "cancelado")
-          .map((d) => `${dataBR(d.data_prevista)} (${formatCurrency(Number(d.valor || 0))})`)
+          .map(
+            (d) => `${dataBR(d.data_prevista)} (${formatCurrency(Number(d.valor || 0))})`
+          )
           .join(", ");
         const mensagem = `Olá, ${funcionario.nome}! 👋\n\nSegue o comprovante do seu vale/adiantamento da ${nomeLoja}. 📄\nValor: ${formatCurrency(Number(vale.valor || 0))}\nData: ${dataBR(vale.data)}.${plano ? `\nDesconto programado: ${plano}.` : ""}`;
         await compartilharPdfWhatsApp({
@@ -596,7 +653,7 @@ export default function FolhaPage() {
       <PageHeader
         eyebrow="Equipe e folha"
         title="Folha e pagamentos"
-        description="Visualize as datas de pagamento do mês, desconte vales na parcela correta e gere os comprovantes."
+        description="A folha usa o valor realmente pago. Diferenças de uma parcela são levadas automaticamente para a próxima."
       />
 
       {erro && (
@@ -677,15 +734,21 @@ export default function FolhaPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[26px] border border-[#e8ecf4] bg-white p-5">
           <p className="text-sm font-bold text-[#475569]">Lucro da competência</p>
-          <p className="mt-3 text-2xl font-black text-[#0f172a]">{formatCurrency(resultadoLoja.lucro)}</p>
+          <p className="mt-3 text-2xl font-black text-[#0f172a]">
+            {formatCurrency(resultadoLoja.lucro)}
+          </p>
         </div>
         <div className="rounded-[26px] border border-[#e8ecf4] bg-white p-5">
           <p className="text-sm font-bold text-[#475569]">Vales programados</p>
-          <p className="mt-3 text-2xl font-black text-[#0f172a]">{formatCurrency(valesCompetencia)}</p>
+          <p className="mt-3 text-2xl font-black text-[#0f172a]">
+            {formatCurrency(valesCompetencia)}
+          </p>
         </div>
         <div className="rounded-[26px] border border-[#e8ecf4] bg-white p-5">
           <p className="text-sm font-bold text-[#475569]">Pagamentos registrados</p>
-          <p className="mt-3 text-2xl font-black text-[#0f172a]">{pagamentosCompetencia.length}</p>
+          <p className="mt-3 text-2xl font-black text-[#0f172a]">
+            {pagamentosCompetencia.length}
+          </p>
         </div>
       </div>
 
@@ -693,9 +756,11 @@ export default function FolhaPage() {
         <div className="flex items-center gap-3">
           <ReceiptText className="h-5 w-5 text-[#2563eb]" />
           <div>
-            <h2 className="text-xl font-black text-[#0f172a]">Pagamentos de {mesAnoPt(competencia)}</h2>
+            <h2 className="text-xl font-black text-[#0f172a]">
+              Pagamentos de {mesAnoPt(competencia)}
+            </h2>
             <p className="text-sm text-[#64748b]">
-              O salário fixo é dividido pelas datas do mês. Comissão e repasse entram no último pagamento.
+              O sistema compara o previsto com o que foi realmente pago e transporta a diferença para o próximo pagamento.
             </p>
           </div>
         </div>
@@ -710,9 +775,16 @@ export default function FolhaPage() {
               .filter(({ funcionario }) => funcionario.ativo !== false)
               .map(({ funcionario, acerto }) => {
                 const parcelas = montarParcelas(funcionario, acerto);
+                const pagoMes = parcelas
+                  .filter((p) => p.registrado)
+                  .reduce((s, p) => s + p.liquido, 0);
+                const restanteMes = parcelas
+                  .filter((p) => !p.registrado)
+                  .reduce((s, p) => s + p.liquido, 0);
+
                 return (
                   <div key={funcionario.id} className="rounded-[26px] border border-[#e8ecf4] bg-[#f8fafc]/70 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <p className="text-lg font-black text-[#0f172a]">{funcionario.nome}</p>
                         <p className="mt-1 text-sm text-[#64748b]">
@@ -725,23 +797,29 @@ export default function FolhaPage() {
                           {Number(acerto.percentualAplicado || 0)}% sobre {rotuloBaseComissao(acerto.baseTipo)}
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {parcelas.map((p) => (
-                          <span key={p.agenda.data_pagamento} className="rounded-full border border-[#dbeafe] bg-white px-3 py-1 text-xs font-black text-[#1d4ed8]">
-                            {formatarDataCurta(p.agenda.data_pagamento)} · {p.agenda.parcela_numero}/{p.agenda.total_parcelas}
-                          </span>
-                        ))}
+                      <div className="grid grid-cols-2 gap-2 text-right">
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase text-[#94a3b8]">Já pago</p>
+                          <p className="mt-1 font-black text-[#15803d]">{formatCurrency(pagoMes)}</p>
+                        </div>
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase text-[#94a3b8]">Ainda falta</p>
+                          <p className="mt-1 font-black text-[#1d4ed8]">{formatCurrency(restanteMes)}</p>
+                        </div>
                       </div>
                     </div>
 
                     <div className="mt-5 grid gap-4 xl:grid-cols-2">
                       {parcelas.map((parcela) => {
-                        const registrado = pagamentoRegistrado(funcionario.id, parcela.agenda.parcela_numero);
                         const chave = chaveParcela(funcionario.id, parcela.agenda.parcela_numero);
-                        const descontos = descontosDaParcela(funcionario.id, parcela.agenda.parcela_numero);
-                        const excede = parcela.liquido < -0.009;
+                        const descontos = descontosDaParcela(
+                          funcionario.id,
+                          parcela.agenda.parcela_numero
+                        );
+                        const registrado = parcela.registrado;
+
                         return (
-                          <div key={chave} className={`rounded-2xl border bg-white p-4 ${excede ? "border-[#fecaca]" : "border-[#e8ecf4]"}`}>
+                          <div key={chave} className="rounded-2xl border border-[#e8ecf4] bg-white p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div>
                                 <p className="font-black text-[#0f172a]">
@@ -749,9 +827,13 @@ export default function FolhaPage() {
                                 </p>
                                 <p className="mt-1 text-xs text-[#64748b]">Data prevista</p>
                               </div>
-                              {registrado && (
+                              {registrado ? (
                                 <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">
-                                  pago em {dataBR(registrado.data_pagamento)}
+                                  pago {formatCurrency(parcela.liquido)} em {dataBR(registrado.data_pagamento)}
+                                </span>
+                              ) : (
+                                <span className="rounded-full border border-[#fed7aa] bg-[#fff7ed] px-2.5 py-1 text-[11px] font-bold text-[#c2410c]">
+                                  pendente
                                 </span>
                               )}
                             </div>
@@ -763,38 +845,65 @@ export default function FolhaPage() {
                               <p className="text-[#64748b]">Vales: <strong className="text-[#b45309]">− {formatCurrency(parcela.vales)}</strong></p>
                             </div>
 
+                            {Math.abs(parcela.ajusteSaldo) > 0.009 && (
+                              <div className="mt-3 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] p-3 text-xs text-[#1e40af]">
+                                Ajuste trazido do pagamento anterior: <strong>{parcela.ajusteSaldo > 0 ? "+" : "−"}{formatCurrency(Math.abs(parcela.ajusteSaldo))}</strong>.
+                              </div>
+                            )}
+
+                            {registrado && Math.abs(parcela.saldoTransportado) > 0.009 && (
+                              <div className="mt-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] p-3 text-xs text-[#92400e]">
+                                {parcela.saldoTransportado > 0
+                                  ? `${formatCurrency(parcela.saldoTransportado)} ficaram pendentes e foram levados para o próximo pagamento.`
+                                  : `${formatCurrency(Math.abs(parcela.saldoTransportado))} foram pagos a mais e serão compensados no próximo pagamento.`}
+                              </div>
+                            )}
+
                             {descontos.length > 0 && (
                               <div className="mt-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] p-3">
                                 <p className="text-xs font-black uppercase tracking-wide text-[#92400e]">Descontos de vale</p>
                                 <div className="mt-2 space-y-1">
                                   {descontos.map((d) => (
                                     <p key={d.id} className="text-xs text-[#a16207]">
-                                      {d.total_divisoes > 1 ? `${d.sequencia}/${d.total_divisoes} · ` : ""}{formatCurrency(Number(d.valor || 0))} · {d.status === "aplicado" ? "aplicado" : "pendente"}
+                                      {d.total_divisoes > 1 ? `${d.sequencia}/${d.total_divisoes} · ` : ""}
+                                      {formatCurrency(Number(d.valor || 0))} · {d.status === "aplicado" ? "aplicado" : "pendente"}
                                     </p>
                                   ))}
                                 </div>
                               </div>
                             )}
 
-                            <div className={`mt-4 rounded-xl p-3 ${excede ? "bg-[#fef2f2]" : "bg-[#eff6ff]"}`}>
+                            <div className="mt-4 rounded-xl bg-[#eff6ff] p-3">
                               <div className="flex items-center justify-between gap-3">
-                                <span className={`text-sm font-bold ${excede ? "text-[#b91c1c]" : "text-[#1e40af]"}`}>Líquido desta parcela</span>
-                                <strong className={`text-lg ${excede ? "text-[#b91c1c]" : "text-[#1d4ed8]"}`}>{formatCurrency(Math.max(0, parcela.liquido))}</strong>
+                                <span className="text-sm font-bold text-[#1e40af]">
+                                  {registrado ? "Valor realmente pago" : "Valor a pagar"}
+                                </span>
+                                <strong className="text-lg text-[#1d4ed8]">
+                                  {formatCurrency(Math.max(0, parcela.liquido))}
+                                </strong>
                               </div>
-                              {excede && <p className="mt-1 text-xs text-[#b91c1c]">O vale ultrapassa esta parcela. Altere ou divida o desconto antes de pagar.</p>}
                             </div>
 
                             <div className="mt-4 flex flex-wrap items-center gap-2">
                               <input
                                 type="date"
-                                value={datasPagamento[chave] || registrado?.data_pagamento || parcela.agenda.data_pagamento}
-                                onChange={(e) => setDatasPagamento((atual) => ({ ...atual, [chave]: e.target.value }))}
+                                value={
+                                  datasPagamento[chave] ||
+                                  registrado?.data_pagamento ||
+                                  parcela.agenda.data_pagamento
+                                }
+                                onChange={(e) =>
+                                  setDatasPagamento((atual) => ({
+                                    ...atual,
+                                    [chave]: e.target.value,
+                                  }))
+                                }
                                 className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm"
                               />
                               <button
                                 type="button"
                                 onClick={() => registrarPagamento(funcionario, acerto, parcela)}
-                                disabled={!!processando || excede}
+                                disabled={!!processando}
                                 className="rounded-xl bg-[#2563eb] px-3 py-2 text-xs font-black text-white disabled:opacity-40"
                               >
                                 {registrado ? "Atualizar pagamento" : "Registrar pagamento"}
@@ -802,7 +911,7 @@ export default function FolhaPage() {
                               <button
                                 type="button"
                                 onClick={() => gerarFolha(funcionario, acerto, parcela, false)}
-                                disabled={!!processando || excede}
+                                disabled={!!processando}
                                 className="flex items-center gap-1.5 rounded-xl border border-[#dbeafe] bg-white px-3 py-2 text-xs font-black text-[#1d4ed8] disabled:opacity-40"
                               >
                                 <Download className="h-4 w-4" /> PDF
@@ -810,7 +919,7 @@ export default function FolhaPage() {
                               <button
                                 type="button"
                                 onClick={() => gerarFolha(funcionario, acerto, parcela, true)}
-                                disabled={!!processando || excede}
+                                disabled={!!processando}
                                 className="flex items-center gap-1.5 rounded-xl border border-[#bbf7d0] bg-white px-3 py-2 text-xs font-black text-[#15803d] disabled:opacity-40"
                               >
                                 <MessageCircle className="h-4 w-4" /> WhatsApp
@@ -843,27 +952,50 @@ export default function FolhaPage() {
             {vales.slice(0, 30).map((vale) => {
               const funcionario = funcionarios.find((f) => f.id === vale.funcionario_id);
               if (!funcionario) return null;
-              const plano = descontosVale.filter((d) => d.vale_id === vale.id && d.status !== "cancelado");
+              const plano = descontosVale.filter(
+                (d) => d.vale_id === vale.id && d.status !== "cancelado"
+              );
               return (
                 <div key={vale.id} className="flex flex-col gap-3 rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="font-black text-[#92400e]">{funcionario.nome} · {formatCurrency(Number(vale.valor || 0))}</p>
-                    <p className="mt-1 text-sm text-[#a16207]">Emitido em {dataBR(vale.data)}{vale.observacao ? ` · ${vale.observacao}` : ""}</p>
+                    <p className="font-black text-[#92400e]">
+                      {funcionario.nome} · {formatCurrency(Number(vale.valor || 0))}
+                    </p>
+                    <p className="mt-1 text-sm text-[#a16207]">
+                      Emitido em {dataBR(vale.data)}{vale.observacao ? ` · ${vale.observacao}` : ""}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {plano.length === 0 ? (
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#a16207]">legado · sem plano novo</span>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#a16207]">
+                          legado · sem plano novo
+                        </span>
                       ) : (
                         plano.map((d) => (
                           <span key={d.id} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#92400e]">
-                            {dataBR(d.data_prevista)} · {formatCurrency(Number(d.valor || 0))}{d.total_divisoes > 1 ? ` · ${d.sequencia}/${d.total_divisoes}` : ""}
+                            {dataBR(d.data_prevista)} · {formatCurrency(Number(d.valor || 0))}
+                            {d.total_divisoes > 1 ? ` · ${d.sequencia}/${d.total_divisoes}` : ""}
                           </span>
                         ))
                       )}
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => gerarVale(vale, funcionario, false)} disabled={!!processando} className="flex items-center gap-1.5 rounded-xl border border-[#fde68a] bg-white px-3 py-2 text-xs font-black text-[#92400e]"><Download className="h-4 w-4" /> PDF</button>
-                    <button type="button" onClick={() => gerarVale(vale, funcionario, true)} disabled={!!processando} className="flex items-center gap-1.5 rounded-xl bg-[#16a34a] px-3 py-2 text-xs font-black text-white"><MessageCircle className="h-4 w-4" /> WhatsApp</button>
+                    <button
+                      type="button"
+                      onClick={() => gerarVale(vale, funcionario, false)}
+                      disabled={!!processando}
+                      className="flex items-center gap-1.5 rounded-xl border border-[#fde68a] bg-white px-3 py-2 text-xs font-black text-[#92400e]"
+                    >
+                      <Download className="h-4 w-4" /> PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => gerarVale(vale, funcionario, true)}
+                      disabled={!!processando}
+                      className="flex items-center gap-1.5 rounded-xl bg-[#16a34a] px-3 py-2 text-xs font-black text-white"
+                    >
+                      <MessageCircle className="h-4 w-4" /> WhatsApp
+                    </button>
                   </div>
                 </div>
               );
