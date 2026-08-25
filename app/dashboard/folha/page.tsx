@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, MessageCircle, ReceiptText, WalletCards } from "lucide-react";
+import { Download, MessageCircle, ReceiptText, WalletCards, LockKeyhole } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
 import { supabase } from "@/lib/supabase";
@@ -51,6 +51,21 @@ type Pagamento = {
   data_pagamento: string;
   valor_liquido: number;
 };
+type ComissaoFechada = {
+  id: string;
+  funcionario_id: string;
+  competencia_origem: string;
+  competencia_pagamento: string;
+  base_valor: number;
+  percentual: number;
+  valor: number;
+};
+
+type AcertoFolha = ReturnType<typeof calcularAcerto> & {
+  comissaoFechada: boolean;
+  competenciaOrigem?: string;
+  percentualAplicado: number;
+};
 
 function hojeISO() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -69,6 +84,28 @@ function referenciaPeriodo(inicio: string, fim: string) {
   return inicio.slice(0, 7) === fim.slice(0, 7) ? inicio.slice(0, 7) : `${inicio} a ${fim}`;
 }
 
+function primeiroDiaMes(iso: string) {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+function primeiroDiaMesAnterior(iso: string) {
+  const [ano, mes] = iso.slice(0, 7).split("-").map(Number);
+  const data = new Date(ano, mes - 2, 1);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function ultimoDiaMes(iso: string) {
+  const [ano, mes] = iso.slice(0, 7).split("-").map(Number);
+  const data = new Date(ano, mes, 0);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+function mesAnoPt(iso: string) {
+  const data = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  const texto = data.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export default function FolhaPage() {
   const { period } = usePeriod();
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -78,6 +115,7 @@ export default function FolhaPage() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [comissoesFechadas, setComissoesFechadas] = useState<ComissaoFechada[]>([]);
   const [datasPagamento, setDatasPagamento] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
@@ -94,12 +132,16 @@ export default function FolhaPage() {
     return { ini: ini.getTime(), fim: fim.getTime() };
   }, [period]);
 
+  const competenciaPagamento = primeiroDiaMes(period.inicio);
+  const competenciaOrigem = primeiroDiaMesAnterior(period.inicio);
+  const periodoEhMesCompleto = period.inicio === competenciaPagamento && period.fim === ultimoDiaMes(period.inicio);
+
   async function carregar() {
     setLoading(true);
     setErro("");
     const cfg = await carregarConfigEmpresa();
     setNomeLoja(cfg.nome_operacao || "Nexo");
-    const [funcRes, valesRes, vendasRes, itensRes, despesasRes, servicosRes, pagamentosRes] = await Promise.all([
+    const [funcRes, valesRes, vendasRes, itensRes, despesasRes, servicosRes, pagamentosRes, comissoesRes] = await Promise.all([
       supabase.from("funcionarios").select("id, nome, telefone, comissao_percentual, salario_fixo, comissao_base, frequencia_pagamento, dia_pagamento, ativo").order("nome"),
       supabase.from("vales").select("id, funcionario_id, valor, data, observacao").order("data", { ascending: false }),
       supabase.from("vendas").select("id, funcionario_id, total, status, created_at"),
@@ -107,10 +149,12 @@ export default function FolhaPage() {
       supabase.from("despesas").select("valor, data"),
       supabase.from("atendimentos_servico").select("funcionario_id, valor, percentual_loja, data"),
       supabase.from("pagamentos_funcionario").select("id, funcionario_id, periodo_inicio, periodo_fim, data_pagamento, valor_liquido").order("data_pagamento", { ascending: false }),
+      supabase.from("comissoes_fechadas").select("id, funcionario_id, competencia_origem, competencia_pagamento, base_valor, percentual, valor").order("competencia_origem", { ascending: false }),
     ]);
     const primeiroErro = funcRes.error || valesRes.error || vendasRes.error || itensRes.error || despesasRes.error || servicosRes.error;
     if (primeiroErro) setErro(primeiroErro.message);
     if (pagamentosRes.error && pagamentosRes.error.code !== "42P01") setErro(pagamentosRes.error.message);
+    if (comissoesRes.error && comissoesRes.error.code !== "42P01") setErro(comissoesRes.error.message);
     setFuncionarios((funcRes.data as Funcionario[] | null) || []);
     setVales((valesRes.data as Vale[] | null) || []);
     setVendas((vendasRes.data as Venda[] | null) || []);
@@ -118,6 +162,7 @@ export default function FolhaPage() {
     setDespesas((despesasRes.data as Despesa[] | null) || []);
     setServicos((servicosRes.data as Servico[] | null) || []);
     setPagamentos((pagamentosRes.data as Pagamento[] | null) || []);
+    setComissoesFechadas((comissoesRes.data as ComissaoFechada[] | null) || []);
     setLoading(false);
   }
 
@@ -140,20 +185,78 @@ export default function FolhaPage() {
   );
 
   const acertos = useMemo(
-    () => funcionarios.map((funcionario) => ({
-      funcionario,
-      acerto: calcularAcerto(funcionario, { vendas, servicos, vales, resultadoLoja }, { vendaNoPeriodo, dataNoPeriodo }),
-    })),
-    [funcionarios, vendas, servicos, vales, resultadoLoja, janela]
+    () => funcionarios.map((funcionario) => {
+      const calculado = calcularAcerto(funcionario, { vendas, servicos, vales, resultadoLoja }, { vendaNoPeriodo, dataNoPeriodo });
+      const snapshot = comissoesFechadas.find(
+        (item) => item.funcionario_id === funcionario.id && item.competencia_pagamento === competenciaPagamento
+      );
+
+      if (funcionario.comissao_base === "lucro_loja" && periodoEhMesCompleto) {
+        if (snapshot) {
+          const acerto: AcertoFolha = {
+            ...calculado,
+            baseComissao: Number(snapshot.base_valor || 0),
+            comissao: Number(snapshot.valor || 0),
+            aPagar: calculado.aPagar - calculado.comissao + Number(snapshot.valor || 0),
+            comissaoFechada: true,
+            competenciaOrigem: snapshot.competencia_origem,
+            percentualAplicado: Number(snapshot.percentual || 0),
+          };
+          return { funcionario, acerto };
+        }
+
+        const acerto: AcertoFolha = {
+          ...calculado,
+          baseComissao: 0,
+          comissao: 0,
+          aPagar: calculado.aPagar - calculado.comissao,
+          comissaoFechada: false,
+          competenciaOrigem,
+          percentualAplicado: Number(funcionario.comissao_percentual || 0),
+        };
+        return { funcionario, acerto };
+      }
+
+      const acerto: AcertoFolha = {
+        ...calculado,
+        comissaoFechada: funcionario.comissao_base !== "lucro_loja",
+        percentualAplicado: Number(funcionario.comissao_percentual || 0),
+      };
+      return { funcionario, acerto };
+    }),
+    [funcionarios, vendas, servicos, vales, resultadoLoja, janela, comissoesFechadas, competenciaPagamento, competenciaOrigem, periodoEhMesCompleto]
   );
 
   const valesPeriodo = useMemo(() => vales.filter((vale) => dataNoPeriodo(vale.data)), [vales, janela]);
+  const possuiComissaoLucro = funcionarios.some((f) => f.ativo !== false && f.comissao_base === "lucro_loja" && Number(f.comissao_percentual || 0) > 0);
+  const origemJaFechada = comissoesFechadas.some((item) => item.competencia_origem === competenciaOrigem);
 
   function pagamentoRegistrado(funcionarioId: string) {
     return pagamentos.find((p) => p.funcionario_id === funcionarioId && p.periodo_inicio === period.inicio && p.periodo_fim === period.fim);
   }
 
-  async function blobFolha(funcionario: Funcionario, acerto: ReturnType<typeof calcularAcerto>, dataPagamento: string) {
+  async function fecharMesAnterior() {
+    setErro("");
+    setSucesso("");
+    setProcessando("fechamento-comissao");
+    const { data, error } = await supabase.rpc("fechar_comissoes_lucro_mes", {
+      p_competencia: competenciaOrigem,
+    });
+    if (error) {
+      setErro(error.message);
+    } else {
+      const qtd = Number(data || 0);
+      setSucesso(
+        qtd > 0
+          ? `Comissão de ${mesAnoPt(competenciaOrigem)} fechada. O valor foi congelado e entrou na folha de ${mesAnoPt(competenciaPagamento)}.`
+          : `A comissão de ${mesAnoPt(competenciaOrigem)} já estava fechada ou não há funcionário configurado nessa base.`
+      );
+    }
+    setProcessando(null);
+    await carregar();
+  }
+
+  async function blobFolha(funcionario: Funcionario, acerto: AcertoFolha, dataPagamento: string) {
     const { pdf } = await import("@react-pdf/renderer");
     const documento = (
       <FolhaSalarialPdf
@@ -166,7 +269,7 @@ export default function FolhaPage() {
         comissao={acerto.comissao}
         qtdVendas={acerto.qtdVendas}
         totalVendido={acerto.vendido}
-        comissaoPct={Number(funcionario.comissao_percentual || 0)}
+        comissaoPct={acerto.percentualAplicado}
         repasseServicos={acerto.repasse}
         vales={acerto.vales}
         comissaoBaseLabel={rotuloBaseComissao(acerto.baseTipo)}
@@ -192,9 +295,13 @@ export default function FolhaPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function gerarFolha(funcionario: Funcionario, acerto: ReturnType<typeof calcularAcerto>, compartilhar: boolean) {
+  async function gerarFolha(funcionario: Funcionario, acerto: AcertoFolha, compartilhar: boolean) {
     setErro("");
     setSucesso("");
+    if (funcionario.comissao_base === "lucro_loja" && periodoEhMesCompleto && !acerto.comissaoFechada) {
+      setErro(`Feche primeiro a comissão de ${mesAnoPt(competenciaOrigem)} para gerar a folha de ${mesAnoPt(competenciaPagamento)}.`);
+      return;
+    }
     const dataPagamento = datasPagamento[funcionario.id] || pagamentoRegistrado(funcionario.id)?.data_pagamento || hojeISO();
     setProcessando(`folha-${funcionario.id}`);
     try {
@@ -212,9 +319,13 @@ export default function FolhaPage() {
     }
   }
 
-  async function registrarPagamento(funcionario: Funcionario, acerto: ReturnType<typeof calcularAcerto>) {
+  async function registrarPagamento(funcionario: Funcionario, acerto: AcertoFolha) {
     setErro("");
     setSucesso("");
+    if (funcionario.comissao_base === "lucro_loja" && periodoEhMesCompleto && !acerto.comissaoFechada) {
+      setErro(`Feche primeiro a comissão de ${mesAnoPt(competenciaOrigem)} antes de registrar o pagamento.`);
+      return;
+    }
     const dataPagamento = datasPagamento[funcionario.id] || hojeISO();
     setProcessando(`pag-${funcionario.id}`);
     const { error } = await supabase.rpc("registrar_pagamento_funcionario", {
@@ -257,6 +368,23 @@ export default function FolhaPage() {
       {erro && <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">{erro}</div>}
       {sucesso && <div className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm text-[#15803d]">{sucesso}</div>}
 
+      {possuiComissaoLucro && periodoEhMesCompleto && (
+        <div className={`rounded-[26px] border p-5 ${origemJaFechada ? "border-[#bbf7d0] bg-[#f0fdf4]" : "border-[#fde68a] bg-[#fffbeb]"}`}>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl ${origemJaFechada ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#fef3c7] text-[#b45309]"}`}><LockKeyhole className="h-5 w-5" /></span>
+              <div>
+                <p className={`font-black ${origemJaFechada ? "text-[#166534]" : "text-[#92400e]"}`}>Comissão sobre lucro: {mesAnoPt(competenciaOrigem)} → {mesAnoPt(competenciaPagamento)}</p>
+                <p className={`mt-1 text-sm ${origemJaFechada ? "text-[#15803d]" : "text-[#a16207]"}`}>{origemJaFechada ? "Fechamento concluído. A base e o percentual ficaram congelados para esta folha." : "O lucro do mês anterior precisa ser fechado antes do pagamento. Depois de fechado, alterações posteriores não mudam esse valor."}</p>
+              </div>
+            </div>
+            {!origemJaFechada && (
+              <button type="button" onClick={fecharMesAnterior} disabled={!!processando} className="rounded-xl bg-[#b45309] px-4 py-2.5 text-sm font-black text-white hover:bg-[#92400e] disabled:opacity-50">{processando === "fechamento-comissao" ? "Fechando..." : `Fechar ${mesAnoPt(competenciaOrigem)}`}</button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[26px] border border-[#e8ecf4] bg-white p-5"><p className="text-sm font-bold text-[#475569]">Lucro da loja no período</p><p className="mt-3 text-2xl font-black text-[#0f172a]">{formatCurrency(resultadoLoja.lucro)}</p></div>
         <div className="rounded-[26px] border border-[#e8ecf4] bg-white p-5"><p className="text-sm font-bold text-[#475569]">Vales no período</p><p className="mt-3 text-2xl font-black text-[#0f172a]">{formatCurrency(valesPeriodo.reduce((s, v) => s + Number(v.valor || 0), 0))}</p></div>
@@ -264,7 +392,7 @@ export default function FolhaPage() {
       </div>
 
       <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-        <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-[#2563eb]" /><div><h2 className="text-xl font-black text-[#0f172a]">Fechamento da equipe</h2><p className="text-sm text-[#64748b]">A comissão usa a base configurada para cada funcionário. Para a Slow Office, 3% sobre o lucro do período selecionado.</p></div></div>
+        <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-[#2563eb]" /><div><h2 className="text-xl font-black text-[#0f172a]">Fechamento da equipe</h2><p className="text-sm text-[#64748b]">Comissão sobre lucro é fechada no fim do mês e entra somente no mês seguinte. As demais bases seguem o período selecionado.</p></div></div>
         {loading ? <p className="mt-5 text-sm text-[#64748b]">Carregando...</p> : (
           <div className="mt-5 space-y-4">
             {acertos.map(({ funcionario, acerto }) => {
@@ -273,8 +401,8 @@ export default function FolhaPage() {
                 <div key={funcionario.id} className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-4">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <div>
-                      <div className="flex flex-wrap items-center gap-2"><p className="font-black text-[#0f172a]">{funcionario.nome}</p>{registrado && <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">pago em {registrado.data_pagamento.split("-").reverse().join("/")}</span>}</div>
-                      <p className="mt-1 text-sm text-[#64748b]">{Number(funcionario.comissao_percentual || 0)}% sobre {rotuloBaseComissao(acerto.baseTipo)} · base {formatCurrency(acerto.baseComissao)} · comissão {formatCurrency(acerto.comissao)}</p>
+                      <div className="flex flex-wrap items-center gap-2"><p className="font-black text-[#0f172a]">{funcionario.nome}</p>{registrado && <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[11px] font-bold text-[#15803d]">pago em {registrado.data_pagamento.split("-").reverse().join("/")}</span>}{funcionario.comissao_base === "lucro_loja" && periodoEhMesCompleto && <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${acerto.comissaoFechada ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]" : "border-[#fde68a] bg-[#fffbeb] text-[#b45309]"}`}>{acerto.comissaoFechada ? `comissão de ${mesAnoPt(acerto.competenciaOrigem || competenciaOrigem)}` : "aguardando fechamento"}</span>}</div>
+                      <p className="mt-1 text-sm text-[#64748b]">{acerto.percentualAplicado}% sobre {rotuloBaseComissao(acerto.baseTipo)} · base {formatCurrency(acerto.baseComissao)} · comissão {formatCurrency(acerto.comissao)}</p>
                       <p className="mt-1 text-sm text-[#64748b]">Salário {formatCurrency(acerto.salario)} + serviços {formatCurrency(acerto.repasse)} − vales {formatCurrency(acerto.vales)} = <strong className="text-[#0f172a]">{formatCurrency(acerto.aPagar)}</strong></p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
