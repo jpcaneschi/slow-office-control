@@ -17,14 +17,11 @@ type Ctx = {
   carregando: boolean;
   modulos: string[];
   adminPlataforma: boolean;
-  /** Recarrega papel + módulos (ex.: após ligar/desligar um módulo nas configs). */
   recarregar: () => Promise<void>;
 };
 const RoleContext = createContext<Ctx | null>(null);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  // Otimista como "owner" enquanto carrega (a maioria dos usuários é dona);
-  // a guarda de rota só age depois de `carregando` virar false.
   const [papel, setPapel] = useState<Papel>("owner");
   const [modulos, setModulos] = useState<string[]>(MODULOS_PADRAO);
   const [adminPlataforma, setAdminPlataforma] = useState(false);
@@ -38,6 +35,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       setCarregando(false);
       return;
     }
+
     const [membroRes, cfgRes, adminRes] = await Promise.all([
       supabase
         .from("organization_members")
@@ -53,9 +51,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         .maybeSingle(),
       supabase.rpc("is_platform_admin"),
     ]);
+
     setPapel(normalizarPapel(membroRes.data?.papel as string | undefined));
-    const mods = cfgRes.data?.modulos_ativos as string[] | null;
-    setModulos(mods && mods.length ? mods : MODULOS_PADRAO);
+    const mods = cfgRes.data?.modulos_ativos as string[] | null | undefined;
+    // null/undefined = configuração antiga → usa padrão.
+    // [] = usuário desligou TODOS os módulos opcionais → respeita lista vazia.
+    setModulos(Array.isArray(mods) ? mods : MODULOS_PADRAO);
     setAdminPlataforma(adminRes.data === true);
     setCarregando(false);
   }, []);
