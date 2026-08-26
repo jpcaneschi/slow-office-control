@@ -78,11 +78,16 @@ begin
 
   select coalesce(sum(valor) filter (where tipo='parcela'),0),
          coalesce(sum(valor) filter (where tipo='entrada'),0),
-         coalesce(sum(valor),0),
-         max(id) filter (where tipo='entrada')
-    into v_pago_parcelas, v_entrada_antiga, v_pago_total, v_entrada_id
+         coalesce(sum(valor),0)
+    into v_pago_parcelas, v_entrada_antiga, v_pago_total
     from public.promissoria_pagamentos
    where promissoria_id=v_id;
+
+  select id into v_entrada_id
+    from public.promissoria_pagamentos
+   where promissoria_id=v_id and tipo='entrada'
+   order by created_at
+   limit 1;
 
   if v_pago_parcelas > 0.005 and abs(v_entrada-v_entrada_antiga) > 0.005 then
     raise exception 'A entrada não pode ser alterada depois que parcelas já foram recebidas';
