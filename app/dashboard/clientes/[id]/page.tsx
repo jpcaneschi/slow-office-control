@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { EntityTimeline, type TimelineItem } from "@/components/dashboard/entity-timeline";
 import { formatCurrency } from "@/lib/vendas-utils";
 import {
   agregarPagamentosPromissoria,
@@ -75,6 +76,7 @@ export default function ClienteHistoricoPage() {
   const [condicionais, setCondicionais] = useState<Condicional[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [tatuagens, setTatuagens] = useState<Tatuagem[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function ClienteHistoricoPage() {
         .maybeSingle();
       setCliente(clienteRes.data);
 
-      const [vRes, pRes, cRes, sRes, tRes] = await Promise.all([
+      const [vRes, pRes, cRes, sRes, tRes, timelineRes] = await Promise.all([
         supabase
           .from("vendas")
           .select("id, total, forma_pagamento, status, created_at")
@@ -113,12 +115,14 @@ export default function ClienteHistoricoPage() {
           .select("id, descricao, tatuador, valor, data")
           .eq("cliente_id", clienteId)
           .order("data", { ascending: false }),
+        supabase.rpc("timeline_cliente", { p_cliente_id: clienteId }),
       ]);
       setVendas(vRes.data || []);
       setPromissorias(pRes.data || []);
       setCondicionais(cRes.data || []);
       setServicos(sRes.data || []);
       setTatuagens(tRes.data || []);
+      setTimeline((timelineRes.data as TimelineItem[] | null) || []);
 
       const ids = (pRes.data || []).map((p) => p.id);
       if (ids.length) {
@@ -208,6 +212,20 @@ export default function ClienteHistoricoPage() {
             {resumo.condAbertos}
           </p>
         </div>
+      </div>
+
+      <div>
+        <div className="mb-3">
+          <h2 className="text-lg font-black text-[#0f172a]">Linha do tempo</h2>
+          <p className="text-sm text-[#64748b]">
+            Compras, pagamentos, promissórias, condicionais e atendimentos em uma única sequência cronológica.
+          </p>
+        </div>
+        <EntityTimeline items={timeline} vazio="Este cliente ainda não possui movimentações." />
+      </div>
+
+      <div className="border-t border-[#e8ecf4] pt-2">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#94a3b8]">Detalhes por tipo</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
