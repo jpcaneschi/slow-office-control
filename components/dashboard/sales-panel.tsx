@@ -24,6 +24,7 @@ export type VendaLite = {
   total: number | null;
   status: string;
   created_at: string;
+  contarPedido?: boolean;
 };
 
 const PERIODS: { key: PresetKey; label: string }[] = [
@@ -64,7 +65,7 @@ function buildSeries(vendas: VendaLite[], start: Date, end: Date): SalesPoint[] 
       const vt = new Date(v.created_at).getTime();
       if (vt >= a && vt < b) {
         faturamento += Number(v.total || 0);
-        pedidos += 1;
+        pedidos += v.contarPedido === false ? 0 : 1;
       }
     }
     return { faturamento, pedidos };
@@ -117,7 +118,7 @@ export function SalesPanel({ vendas, loading, onRefresh }: { vendas: VendaLite[]
   }, []);
 
   const data = useMemo(() => buildSeries(vendas, isoToDate(period.inicio), isoToDate(period.fim)), [vendas, period]);
-  const temDados = data.some((d) => d.pedidos > 0);
+  const temDados = data.some((d) => d.pedidos > 0 || d.faturamento > 0);
   const currentLabel = mounted ? labelForPeriod(period) : "Período";
 
   function exportarCSV() {

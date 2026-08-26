@@ -98,7 +98,7 @@ export function PromissoriaAcordoPdf({
           <View style={styles.totalLine}><Text>Acréscimo / juros ({acrescimoPercentual.toFixed(2)}%)</Text><Text>{brl(acrescimoValor)}</Text></View>
           <View style={styles.totalLine}><Text style={styles.totalStrong}>Total do acordo</Text><Text style={styles.totalStrong}>{brl(valorTotal)}</Text></View>
           <View style={styles.totalLine}><Text>Entrada</Text><Text>- {brl(entrada)}</Text></View>
-          <View style={styles.totalLine}><Text>Total já recebido</Text><Text>{brl(totalPago)}</Text></View>
+          <View style={styles.totalLine}><Text>Total já recebido (inclui entrada)</Text><Text>{brl(totalPago)}</Text></View>
           <View style={[styles.totalLine, { marginBottom: 0 }]}><Text style={styles.totalStrong}>Saldo atual</Text><Text style={styles.totalStrong}>{brl(saldoAtual)}</Text></View>
         </View>
 

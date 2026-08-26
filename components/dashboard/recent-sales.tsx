@@ -180,7 +180,7 @@ export function RecentSales({
             Vendas no período: <span className="font-bold text-[#0f172a]">{totalQtd}</span>
           </span>
           <span className="text-[#64748b]">
-            Total:{" "}
+            Recebido:{" "}
             <span className="font-bold text-[#0f172a]">{formatCurrency(totalValor)}</span>
           </span>
         </div>

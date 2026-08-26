@@ -31,6 +31,7 @@ type Venda = {
   cliente_id: string | null;
   forma_pagamento: string;
   total: number | null;
+  valor_recebido: number | null;
   status: string;
   created_at: string;
 };
@@ -59,6 +60,7 @@ type Vale = {
   data: string;
   observacao: string | null;
 };
+type PagamentoPromissoria = { id: string; valor: number; data: string };
 type ResumoMes = {
   movimentacao_mes: number;
   contas_receber: number;
@@ -134,6 +136,7 @@ export function DashboardHome() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [pagamentosEquipe, setPagamentosEquipe] = useState<PagamentoFuncionario[]>([]);
   const [vales, setVales] = useState<Vale[]>([]);
+  const [pagamentosPromissoria, setPagamentosPromissoria] = useState<PagamentoPromissoria[]>([]);
   const [resumoMes, setResumoMes] = useState<ResumoMes>(resumoMesVazio);
   const [resumoPeriodo, setResumoPeriodo] = useState<ResumoPeriodo>(resumoPeriodoVazio);
   const [loading, setLoading] = useState(true);
@@ -149,10 +152,10 @@ export function DashboardHome() {
       "0"
     )}-01`;
 
-    const [v, c, cond, i, p, f, d, pg, vl, mes, periodoRes] = await Promise.all([
+    const [v, c, cond, i, p, f, d, pg, vl, pp, mes, periodoRes] = await Promise.all([
       supabase
         .from("vendas")
-        .select("id,cliente_id,forma_pagamento,total,status,created_at")
+        .select("id,cliente_id,forma_pagamento,total,valor_recebido,status,created_at")
         .order("created_at", { ascending: false }),
       supabase.from("clientes").select("id,nome"),
       supabase.from("condicionais").select("id,status"),
@@ -166,6 +169,10 @@ export function DashboardHome() {
         .from("pagamentos_funcionario")
         .select("id,funcionario_id,valor_liquido,data_pagamento"),
       supabase.from("vales").select("id,funcionario_id,valor,data,observacao"),
+      supabase
+        .from("promissoria_pagamentos")
+        .select("id,valor,data,promissorias!inner(status)")
+        .neq("promissorias.status", "cancelado"),
       supabase.rpc("resumo_financeiro_mes", { p_competencia: competencia }),
       supabase.rpc("resumo_operacao_periodo", {
         p_inicio: period.inicio,
@@ -183,6 +190,7 @@ export function DashboardHome() {
       d.error ||
       pg.error ||
       vl.error ||
+      pp.error ||
       mes.error ||
       periodoRes.error;
     if (err) setErro(err.message);
@@ -196,6 +204,7 @@ export function DashboardHome() {
     setDespesas((d.data as Despesa[] | null) || []);
     setPagamentosEquipe((pg.data as PagamentoFuncionario[] | null) || []);
     setVales((vl.data as Vale[] | null) || []);
+    setPagamentosPromissoria((pp.data as unknown as PagamentoPromissoria[] | null) || []);
 
     const linhaMes = Array.isArray(mes.data) ? mes.data[0] : mes.data;
     setResumoMes({
@@ -237,15 +246,32 @@ export function DashboardHome() {
     [funcionarios]
   );
 
-  const vendasPeriodoContratadas = somaConcluidas(vendas, janela.inicio, janela.fim);
   const qtdPeriodo = vendas.filter((v) => {
     const t = new Date(v.created_at).getTime();
     return v.status === "concluida" && t >= janela.inicio.getTime() && t < janela.fim.getTime();
   }).length;
 
   const vendasLite: VendaLite[] = useMemo(
-    () => vendas.map((v) => ({ total: v.total, status: v.status, created_at: v.created_at })),
-    [vendas]
+    () => [
+      ...vendas.map((v) => ({
+        total:
+          v.forma_pagamento === "promissoria"
+            ? 0
+            : v.forma_pagamento === "misto"
+              ? Math.max(0, Math.min(Number(v.total || 0), Number(v.valor_recebido || 0)))
+              : Number(v.total || 0),
+        status: v.status,
+        created_at: v.created_at,
+        contarPedido: true,
+      })),
+      ...pagamentosPromissoria.map((pg) => ({
+        total: Number(pg.valor || 0),
+        status: "concluida",
+        created_at: `${pg.data}T12:00:00`,
+        contarPedido: false,
+      })),
+    ],
+    [vendas, pagamentosPromissoria]
   );
 
   const maisVendidos = useMemo(
