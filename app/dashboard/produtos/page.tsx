@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Package } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -112,7 +113,8 @@ export default function ProdutosPage() {
 
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get("estoque");
-    if (e === "critico" || e === "baixo") setFiltroEstoque("baixo");
+    if (e === "critico") setFiltroEstoque("critico");
+    else if (e === "baixo") setFiltroEstoque("baixo");
     else if (e === "zerado") setFiltroEstoque("zerado");
   }, []);
 
@@ -795,6 +797,8 @@ export default function ProdutosPage() {
           ? true
           : filtroEstoque === "zerado"
           ? estoqueAtual === 0
+          : filtroEstoque === "critico"
+          ? estoqueAtual <= 2
           : filtroEstoque === "baixo"
           ? estoqueAtual > 0 && estoqueAtual <= 3
           : filtroEstoque === "normal"
@@ -870,7 +874,7 @@ export default function ProdutosPage() {
 
   const produtosCriticos = useMemo(() => {
     return produtos
-      .filter((produto) => estoqueEfetivo(produto) <= 3)
+      .filter((produto) => estoqueEfetivo(produto) <= 2)
       .sort((a, b) => estoqueEfetivo(a) - estoqueEfetivo(b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtos, somaVariacoes]);
@@ -1565,7 +1569,8 @@ export default function ProdutosPage() {
                 >
                   <option value="todos">Todos</option>
                   <option value="zerado">Estoque zerado</option>
-                  <option value="baixo">Estoque baixo</option>
+                  <option value="critico">Crítico (até 2)</option>
+                  <option value="baixo">Estoque baixo (até 3)</option>
                   <option value="normal">Estoque normal</option>
                 </select>
               </div>
@@ -1727,7 +1732,13 @@ export default function ProdutosPage() {
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/dashboard/produtos/${produto.id}`}
+                            className="rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#dbeafe]"
+                          >
+                            Histórico
+                          </Link>
                           <button
                             type="button"
                             onClick={() => editarProduto(produto)}
