@@ -37,7 +37,6 @@ type Produto = {
   id: string;
   nome: string;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
   tem_variacoes: boolean | null;
@@ -50,7 +49,6 @@ type Variacao = {
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
 };
@@ -92,7 +90,6 @@ type ItemRascunho = {
   nome: string;
   quantidade: number;
   preco_unitario: number;
-  custo_unitario: number;
 };
 
 function formatCurrency(value: number) {
@@ -153,7 +150,7 @@ export default function CondicionalPage() {
       supabase.from("clientes").select("id, nome").order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, custo, estoque, status, tem_variacoes")
+        .select("id, nome, preco, estoque, status, tem_variacoes")
         .order("created_at", { ascending: false }),
       supabase
         .from("condicionais")
@@ -245,7 +242,7 @@ export default function CondicionalPage() {
 
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -383,9 +380,6 @@ export default function CondicionalPage() {
     const precoUnit = variacao
       ? Number(variacao.preco ?? produto.preco ?? 0)
       : Number(produto.preco || 0);
-    const custoUnit = variacao
-      ? Number(variacao.custo ?? produto.custo ?? 0)
-      : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
       ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
@@ -422,7 +416,6 @@ export default function CondicionalPage() {
           nome: rotulo,
           quantidade: quantidadeNumero,
           preco_unitario: precoUnit,
-          custo_unitario: custoUnit,
         },
       ]);
     }
@@ -612,7 +605,6 @@ export default function CondicionalPage() {
       return {
         condicional_item_id: i.id,
         preco_unitario: Number(i.preco_unitario || 0),
-        custo_unitario: Number(prod?.custo || 0),
         quantidade_vendida: qv,
         quantidade_devolvida: i.quantidade - qv,
       };

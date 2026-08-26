@@ -540,7 +540,7 @@ export function FinanceiroSimplificado() {
       </div>
 
       <p className="text-center text-xs text-[#94a3b8]">
-        O custo unitário dos produtos continua salvo para estoque e análise, mas não é descontado novamente no Financeiro quando a compra já foi lançada como despesa.
+        Mercadoria é reconhecida no Financeiro pelos boletos e compras de fornecedor lançados como despesa. O preço do produto serve somente para registrar a venda ao cliente.
       </p>
     </section>
   );

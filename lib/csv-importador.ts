@@ -25,7 +25,6 @@ export const CAMPOS_CANONICOS = [
   "marca",
   "categoria",
   "preco",
-  "custo",
   "estoque",
   "status",
   "sku",
@@ -66,12 +65,6 @@ const SINONIMOS_CAMPO: Record<string, string> = {
   "valor de venda": "preco",
   valor: "preco",
   pv: "preco",
-
-  custo: "custo",
-  "preco custo": "custo",
-  "preco de custo": "custo",
-  "custo unitario": "custo",
-  pc: "custo",
 
   estoque: "estoque",
   quantidade: "estoque",
@@ -195,7 +188,6 @@ export function parseNumeroBR(valor: string | null | undefined): number | null {
 export type VariacaoImport = {
   atributos: Atributos;
   preco: number | null;
-  custo: number | null;
   estoque: number;
   sku: string | null;
   codigo_barras: string | null;
@@ -214,7 +206,6 @@ export type ProdutoImport = {
   categoria: string | null;
   status: string;
   preco: number;
-  custo: number;
   temVariacoes: boolean;
   estoque: number; // usado quando não tem variações
   opcoes: OpcaoImport[];
@@ -285,7 +276,6 @@ export function estruturarImportacao(
   for (const grupo of grupos.values()) {
     const primeira = grupo.linhas[0];
     const precoProd = parseNumeroBR(val(primeira.row, "preco")) ?? 0;
-    const custoProd = parseNumeroBR(val(primeira.row, "custo")) ?? 0;
     const statusBruto = normalizarTexto(val(primeira.row, "status"));
     const status = STATUS_VALIDOS.has(statusBruto) ? statusBruto : "ativo";
 
@@ -322,7 +312,6 @@ export function estruturarImportacao(
 
     if (!temVariacoes) {
       const preco = checarNum(val(primeira.row, "preco"), primeira.linha, "Preço") ?? 0;
-      const custo = checarNum(val(primeira.row, "custo"), primeira.linha, "Custo") ?? 0;
       const estoque = checarNum(val(primeira.row, "estoque"), primeira.linha, "Estoque") ?? 0;
       if (precoInvalido) continue;
       produtos.push({
@@ -331,7 +320,6 @@ export function estruturarImportacao(
         categoria: val(primeira.row, "categoria") || null,
         status,
         preco,
-        custo,
         temVariacoes: false,
         estoque,
         opcoes: [],
@@ -361,7 +349,6 @@ export function estruturarImportacao(
         continue;
       }
       const preco = checarNum((row[porCampo.get("preco") ?? ""] ?? "").trim(), linha, "Preço");
-      const custo = checarNum((row[porCampo.get("custo") ?? ""] ?? "").trim(), linha, "Custo");
       const estoque = checarNum((row[porCampo.get("estoque") ?? ""] ?? "").trim(), linha, "Estoque") ?? 0;
 
       assinaturas.add(assinatura);
@@ -372,7 +359,6 @@ export function estruturarImportacao(
       variacoes.push({
         atributos,
         preco,
-        custo,
         estoque,
         sku: (row[porCampo.get("sku") ?? ""] ?? "").trim() || null,
         codigo_barras: (row[porCampo.get("codigo_barras") ?? ""] ?? "").trim() || null,
@@ -404,7 +390,6 @@ export function estruturarImportacao(
       categoria: val(primeira.row, "categoria") || null,
       status,
       preco: precoProd,
-      custo: custoProd,
       temVariacoes: true,
       estoque: 0,
       opcoes,

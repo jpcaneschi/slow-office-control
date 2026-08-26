@@ -36,7 +36,6 @@ type Produto = {
   categoria: string | null;
   marca: string | null;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
   imagem_url: string | null;
@@ -52,7 +51,6 @@ type Variacao = {
   sku: string | null;
   codigo_barras: string | null;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
 };
@@ -92,8 +90,6 @@ function tipoInfo(t: string) {
 
 const statusOptions = ["ativo", "inativo"];
 
-// Markup padrão sugerido no cadastro: preço de venda = custo × MARKUP.
-const MARKUP = 2.2;
 
 export default function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -124,7 +120,6 @@ export default function ProdutosPage() {
   const [categoria, setCategoria] = useState("Camiseta");
   const [marca, setMarca] = useState("");
   const [preco, setPreco] = useState("");
-  const [custo, setCusto] = useState("");
   const [estoque, setEstoque] = useState("");
   const [status, setStatus] = useState("ativo");
   const [imagemUrl, setImagemUrl] = useState("");
@@ -149,7 +144,6 @@ export default function ProdutosPage() {
   const [varAtributos, setVarAtributos] = useState<Record<string, string>>({});
   const [varEstoque, setVarEstoque] = useState("");
   const [varPreco, setVarPreco] = useState("");
-  const [varCusto, setVarCusto] = useState("");
   const [varSku, setVarSku] = useState("");
   const [varBarras, setVarBarras] = useState("");
   const [savingVar, setSavingVar] = useState(false);
@@ -160,7 +154,7 @@ export default function ProdutosPage() {
   async function carregarProdutos() {
     const { data, error } = await supabase
       .from("produtos")
-      .select("id, nome, categoria, marca, preco, custo, estoque, status, imagem_url, tem_variacoes")
+      .select("id, nome, categoria, marca, preco, estoque, status, imagem_url, tem_variacoes")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -173,7 +167,7 @@ export default function ProdutosPage() {
     // Variações completas (para soma na lista E para o CSV com grade).
     const { data: vars } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, atributos, tamanho, cor, sku, codigo_barras, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, sku, codigo_barras, preco, estoque, status");
     setTodasVariacoes((vars as Variacao[]) || []);
     setSomaVariacoes(
       agregarEstoqueVariacoes(
@@ -212,7 +206,6 @@ export default function ProdutosPage() {
           categoria: p.categoria,
           marca: p.marca,
           preco: p.preco,
-          custo: p.custo,
           estoque: p.temVariacoes ? 0 : p.estoque,
           status: p.status,
           tem_variacoes: p.temVariacoes,
@@ -249,7 +242,6 @@ export default function ProdutosPage() {
             sku: v.sku,
             codigo_barras: v.codigo_barras,
             preco: v.preco,
-            custo: v.custo,
             estoque: v.estoque,
           };
         });
@@ -271,7 +263,7 @@ export default function ProdutosPage() {
   async function carregarVariacoes(produtoId: string) {
     const { data, error } = await supabase
       .from("produto_variacoes")
-      .select("id, atributos, tamanho, cor, sku, codigo_barras, preco, custo, estoque, status")
+      .select("id, atributos, tamanho, cor, sku, codigo_barras, preco, estoque, status")
       .eq("produto_id", produtoId)
       .order("created_at", { ascending: true });
     if (error) {
@@ -408,17 +400,12 @@ export default function ProdutosPage() {
     }
     const estoqueNum = Number(varEstoque || 0);
     const precoNum = varPreco ? Number(varPreco) : null;
-    const custoNum = varCusto ? Number(varCusto) : null;
     if (!Number.isFinite(estoqueNum) || estoqueNum < 0) {
       setErro("Estoque da variação não pode ser negativo.");
       return;
     }
     if (precoNum !== null && (!Number.isFinite(precoNum) || precoNum < 0)) {
       setErro("Preço da variação não pode ser negativo.");
-      return;
-    }
-    if (custoNum !== null && (!Number.isFinite(custoNum) || custoNum < 0)) {
-      setErro("Custo da variação não pode ser negativo.");
       return;
     }
     setSavingVar(true);
@@ -433,7 +420,6 @@ export default function ProdutosPage() {
       codigo_barras: varBarras.trim() || null,
       estoque: estoqueNum,
       preco: precoNum,
-      custo: custoNum,
     });
     if (error) {
       setErro(error.message);
@@ -443,7 +429,6 @@ export default function ProdutosPage() {
     setVarAtributos({});
     setVarEstoque("");
     setVarPreco("");
-    setVarCusto("");
     setVarSku("");
     setVarBarras("");
     await carregarVariacoes(editandoId);
@@ -558,7 +543,6 @@ export default function ProdutosPage() {
     setCategoria("Camiseta");
     setMarca("");
     setPreco("");
-    setCusto("");
     setEstoque("");
     setStatus("ativo");
     setImagemUrl("");
@@ -574,7 +558,6 @@ export default function ProdutosPage() {
     setVarAtributos({});
     setVarEstoque("");
     setVarPreco("");
-    setVarCusto("");
     setVarSku("");
     setVarBarras("");
   }
@@ -592,7 +575,6 @@ export default function ProdutosPage() {
     setCategoria(produto.categoria || "Camiseta");
     setMarca(produto.marca || "");
     setPreco(produto.preco?.toString() || "");
-    setCusto(produto.custo?.toString() || "");
     setEstoque(produto.estoque?.toString() || "");
     setStatus(produto.status || "ativo");
     setImagemUrl(produto.imagem_url || "");
@@ -671,17 +653,11 @@ export default function ProdutosPage() {
     }
 
     const precoNumero = Number(preco);
-    const custoNumero = Number(custo);
     // Com grade, o estoque vive nas variações; o campo do produto vira 0.
     const estoqueNumero = temVariacoes ? 0 : Number(estoque);
 
     if (Number.isNaN(precoNumero) || preco === "" || precoNumero < 0) {
       setErro("Informe um preço válido (não negativo).");
-      return;
-    }
-
-    if (Number.isNaN(custoNumero) || custo === "" || custoNumero < 0) {
-      setErro("Informe um custo válido (não negativo).");
       return;
     }
 
@@ -704,7 +680,6 @@ export default function ProdutosPage() {
           categoria,
           marca: marca.trim() || null,
           preco: precoNumero,
-          custo: custoNumero,
           estoque: estoqueNumero,
           status,
           imagem_url: imagemUrl.trim() || null,
@@ -723,7 +698,6 @@ export default function ProdutosPage() {
         categoria,
         marca: marca.trim() || null,
         preco: precoNumero,
-        custo: custoNumero,
         estoque: estoqueNumero,
         status,
         imagem_url: imagemUrl.trim() || null,
@@ -1045,7 +1019,7 @@ export default function ProdutosPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">
-                  Preço de venda
+                  Preço do produto
                 </label>
                 <input
                   type="number"
@@ -1053,47 +1027,6 @@ export default function ProdutosPage() {
                   min="0"
                   value={preco}
                   onChange={(e) => setPreco(e.target.value)}
-                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                  placeholder="0.00"
-                />
-                {parseFloat(custo) > 0 && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-[#94a3b8]">
-                      Sugestão (custo × {MARKUP.toLocaleString("pt-BR")}): R${" "}
-                      {(parseFloat(custo) * MARKUP).toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPreco((parseFloat(custo) * MARKUP).toFixed(2))
-                      }
-                      className="font-semibold text-[#2563eb] hover:underline"
-                    >
-                      Aplicar
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-[#475569]">Custo</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={custo}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setCusto(v);
-                    // Sugere o preço automaticamente se ainda estiver vazio.
-                    const n = parseFloat(v);
-                    if (!preco && Number.isFinite(n) && n > 0) {
-                      setPreco((n * MARKUP).toFixed(2));
-                    }
-                  }}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                   placeholder="0.00"
                 />
@@ -1359,15 +1292,6 @@ export default function ProdutosPage() {
                               value={varPreco}
                               onChange={(e) => setVarPreco(e.target.value)}
                               placeholder="Preço (opcional)"
-                              className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
-                            />
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={varCusto}
-                              onChange={(e) => setVarCusto(e.target.value)}
-                              placeholder="Custo (opcional)"
                               className="rounded-xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm outline-none"
                             />
                             <input
@@ -1662,7 +1586,6 @@ export default function ProdutosPage() {
                       "categoria",
                       "marca",
                       "preco",
-                      "custo",
                       "estoque",
                       "status",
                       "tamanho",
@@ -1679,7 +1602,6 @@ export default function ProdutosPage() {
                           p.categoria || "",
                           p.marca || "",
                           Number(v.preco ?? p.preco ?? 0),
-                          Number(v.custo ?? p.custo ?? 0),
                           Number(v.estoque || 0),
                           p.status || "ativo",
                           v.tamanho || "",
@@ -1692,7 +1614,6 @@ export default function ProdutosPage() {
                           p.categoria || "",
                           p.marca || "",
                           Number(p.preco || 0),
-                          Number(p.custo || 0),
                           Number(p.estoque || 0),
                           p.status || "ativo",
                           "",
@@ -1707,7 +1628,7 @@ export default function ProdutosPage() {
                   />
                 </div>
                 <p className="max-w-md text-right text-xs text-[#94a3b8]">
-                  O assistente aceita cabeçalhos comuns (produto, preço venda,
+                  O assistente aceita cabeçalhos comuns (produto, preço,
                   tamanho, cor, sku…) e agrupa linhas do mesmo nome em variações.
                 </p>
               </div>
@@ -1778,10 +1699,6 @@ export default function ProdutosPage() {
 
                           <p className="text-sm text-[#64748b]">
                             Preço: R$ {Number(produto.preco || 0).toFixed(2)}
-                          </p>
-
-                          <p className="text-sm text-[#64748b]">
-                            Custo: R$ {Number(produto.custo || 0).toFixed(2)}
                           </p>
 
                           <div className="mt-2 flex flex-wrap items-center gap-2">

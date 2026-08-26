@@ -62,7 +62,6 @@ type VendaLite = {
   created_at: string;
 };
 
-type ItemCusto = { venda_id: string; quantidade: number; custo_unitario: number | null };
 type DespesaLite = { valor: number; data: string };
 type ModoVale = "proximo_pagamento" | "pagamento_especifico" | "dividido";
 
@@ -98,7 +97,6 @@ export default function FuncionariosPage() {
   const [vales, setVales] = useState<Vale[]>([]);
   const [descontosVale, setDescontosVale] = useState<ValeDesconto[]>([]);
   const [vendas, setVendas] = useState<VendaLite[]>([]);
-  const [itensCusto, setItensCusto] = useState<ItemCusto[]>([]);
   const [despesas, setDespesas] = useState<DespesaLite[]>([]);
   const [atendServico, setAtendServico] = useState<
     { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
@@ -137,7 +135,7 @@ export default function FuncionariosPage() {
     setLoading(true);
     setErro("");
     await supabase.rpc("gerar_vales_recorrentes", { p_competencia: period.inicio });
-    const [funcRes, valesRes, descontosRes, vendasRes, servRes, itensRes, despesasRes] = await Promise.all([
+    const [funcRes, valesRes, descontosRes, vendasRes, servRes, despesasRes] = await Promise.all([
       supabase
         .from("funcionarios")
         .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao, telefone, comissao_base, frequencia_pagamento, dia_pagamento, dia_pagamento_2, dia_semana_pagamento, vale_recorrente_valor, vale_recorrente_dia, vale_recorrente_ativo")
@@ -148,17 +146,15 @@ export default function FuncionariosPage() {
         .select("id, vale_id, funcionario_id, competencia, parcela_pagamento, data_prevista, sequencia, total_divisoes, valor, status"),
       supabase.from("vendas").select("id, funcionario_id, total, status, created_at"),
       supabase.from("atendimentos_servico").select("funcionario_id, valor, percentual_loja, data"),
-      supabase.from("venda_itens").select("venda_id, quantidade, custo_unitario"),
       supabase.from("despesas").select("valor, data"),
     ]);
-    const primeiroErro = funcRes.error || valesRes.error || descontosRes.error || vendasRes.error || servRes.error || itensRes.error || despesasRes.error;
+    const primeiroErro = funcRes.error || valesRes.error || descontosRes.error || vendasRes.error || servRes.error || despesasRes.error;
     if (primeiroErro) setErro(primeiroErro.message);
     setFuncionarios((funcRes.data as Funcionario[] | null) || []);
     setVales((valesRes.data as Vale[] | null) || []);
     setDescontosVale((descontosRes.data as ValeDesconto[] | null) || []);
     setVendas((vendasRes.data as VendaLite[] | null) || []);
     setAtendServico(servRes.data || []);
-    setItensCusto((itensRes.data as ItemCusto[] | null) || []);
     setDespesas((despesasRes.data as DespesaLite[] | null) || []);
     setLoading(false);
   }
@@ -370,7 +366,7 @@ export default function FuncionariosPage() {
       return t >= janela.ini && t < janela.fim;
     };
     const resultadoLoja = calcularResultadoLoja(
-      { vendas, itens: itensCusto, despesas, servicos: atendServico },
+      { vendas, despesas, servicos: atendServico },
       { vendaNoPeriodo, dataNoPeriodo }
     );
     return funcionarios.map((f) => {
@@ -392,7 +388,7 @@ export default function FuncionariosPage() {
         baseTipo: a.baseTipo,
       };
     });
-  }, [funcionarios, vendas, valesParaAcerto, atendServico, itensCusto, despesas, janela]);
+  }, [funcionarios, vendas, valesParaAcerto, atendServico, despesas, janela]);
 
   const inputCls =
     "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10";
