@@ -43,7 +43,6 @@ declare
   v_item jsonb;
 begin
   if p_idempotency_key is not null then
-    select id into v_existente from public.vendas where id=p_idempotency_key::uuid and false;
     select id into v_existente from public.vendas where idempotency_key=p_idempotency_key;
     if v_existente is not null then return v_existente; end if;
   end if;
