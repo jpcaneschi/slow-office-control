@@ -597,7 +597,6 @@ export default function CondicionalPage() {
     setErro("");
     const itens = getItensDoCondicional(condicionalId);
     const payload = itens.map((i) => {
-      const prod = produtos.find((p) => p.id === i.produto_id);
       const qv = Math.max(
         0,
         Math.min(i.quantidade, Math.floor(Number(qtdVendida[i.id] ?? i.quantidade)))

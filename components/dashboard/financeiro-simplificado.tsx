@@ -111,7 +111,6 @@ export function FinanceiroSimplificado() {
   const [resumo, setResumo] = useState<Resumo>(resumoVazio);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [recorrentes, setRecorrentes] = useState<Recorrente[]>([]);
-  const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
   const [processando, setProcessando] = useState<string | null>(null);
@@ -124,7 +123,10 @@ export function FinanceiroSimplificado() {
   const [dataPagamento, setDataPagamento] = useState(hojeISO());
   const [observacao, setObservacao] = useState("");
   const [fornecedor, setFornecedor] = useState("");
-  const [parcelasCompra, setParcelasCompra] = useState("1");
+  const [quantidadeBoletos, setQuantidadeBoletos] = useState("1");
+  const [boletosFornecedor, setBoletosFornecedor] = useState<
+    { data: string; valor: string }[]
+  >([{ data: hojeISO(), valor: "" }]);
 
   const [rDescricao, setRDescricao] = useState("");
   const [rCategoria, setRCategoria] = useState("Aluguel");
@@ -132,7 +134,6 @@ export function FinanceiroSimplificado() {
   const [rDia, setRDia] = useState("5");
 
   const carregar = useCallback(async () => {
-    setLoading(true);
     setErro("");
     const [resumoRes, agendaRes, recorrentesRes] = await Promise.all([
       supabase.rpc("resumo_financeiro_mes", { p_competencia: competencia }),
@@ -151,7 +152,6 @@ export function FinanceiroSimplificado() {
     setResumo({ ...resumoVazio, ...(linha || {}) } as Resumo);
     setAgenda((agendaRes.data as AgendaItem[] | null) || []);
     setRecorrentes((recorrentesRes.data as Recorrente[] | null) || []);
-    setLoading(false);
   }, [competencia]);
 
   useEffect(() => {
@@ -179,58 +179,98 @@ export function FinanceiroSimplificado() {
   const sobra = Math.max(0, resumo.faturamento_recebido - resumo.despesas_previstas);
   const ehCompraFornecedor =
     categoria === "Compra de mercadoria" || categoria === "Fornecedor";
-  const qtdParcelasCompra = Math.min(
+  const qtdBoletos = Math.min(
     60,
-    Math.max(1, Math.trunc(Number(parcelasCompra || 1)))
+    Math.max(1, Math.trunc(Number(quantidadeBoletos || 1)))
   );
+  const totalBoletos = boletosFornecedor.reduce(
+    (soma, boleto) => soma + (Number(boleto.valor) || 0),
+    0
+  );
+
+  function ajustarQuantidadeBoletos(valorNovo: string) {
+    setQuantidadeBoletos(valorNovo);
+    const quantidade = Math.min(60, Math.max(1, Math.trunc(Number(valorNovo || 1))));
+    setBoletosFornecedor((atuais) => {
+      if (atuais.length === quantidade) return atuais;
+      if (atuais.length > quantidade) return atuais.slice(0, quantidade);
+      return [
+        ...atuais,
+        ...Array.from({ length: quantidade - atuais.length }, () => ({ data: "", valor: "" })),
+      ];
+    });
+  }
+
+  function atualizarBoleto(
+    indice: number,
+    campo: "data" | "valor",
+    valorNovo: string
+  ) {
+    setBoletosFornecedor((atuais) =>
+      atuais.map((boleto, i) => (i === indice ? { ...boleto, [campo]: valorNovo } : boleto))
+    );
+  }
 
   async function registrarDespesa() {
     setErro("");
     setSucesso("");
-    const n = Number(valor);
-    if (!descricao.trim() || !Number.isFinite(n) || n <= 0 || !vencimento) {
-      setErro("Informe descrição, valor e vencimento válidos.");
-      return;
-    }
-    if (ehCompraFornecedor && !fornecedor.trim()) {
-      setErro("Informe o fornecedor ou a marca da mercadoria.");
-      return;
-    }
-    if (!Number.isFinite(qtdParcelasCompra) || qtdParcelasCompra < 1 || qtdParcelasCompra > 60) {
-      setErro("Informe uma quantidade de parcelas entre 1 e 60.");
+
+    if (!descricao.trim()) {
+      setErro("Informe a descrição da despesa.");
       return;
     }
 
-    setProcessando("nova-despesa");
-
-    if (ehCompraFornecedor && qtdParcelasCompra > 1) {
-      const { error } = await supabase.rpc("registrar_compra_fornecedor", {
-        p_fornecedor: fornecedor.trim(),
-        p_descricao: descricao.trim(),
-        p_valor_total: n,
-        p_parcelas: qtdParcelasCompra,
-        p_primeiro_vencimento: vencimento,
-        p_observacao: observacao.trim() || null,
-      });
-      if (error) {
-        setErro(error.message);
-        setProcessando(null);
+    if (ehCompraFornecedor) {
+      if (!fornecedor.trim()) {
+        setErro("Informe o fornecedor ou a marca.");
         return;
       }
-      setDescricao("");
-      setValor("");
-      setObservacao("");
-      setFornecedor("");
-      setParcelasCompra("1");
-      setStatus("pendente");
-      setSucesso(
-        `Compra de fornecedor parcelada em ${qtdParcelasCompra}x. As parcelas foram lançadas nos respectivos meses e ficam pendentes até você marcar o pagamento.`
+      if (boletosFornecedor.length !== qtdBoletos) {
+        setErro("Confira a quantidade de boletos.");
+        return;
+      }
+      const invalido = boletosFornecedor.findIndex(
+        (boleto) => !boleto.data || !Number.isFinite(Number(boleto.valor)) || Number(boleto.valor) <= 0
       );
-      await carregar();
+      if (invalido >= 0) {
+        setErro(`Informe data e valor válidos no boleto ${invalido + 1}.`);
+        return;
+      }
+
+      setProcessando("nova-despesa");
+      const { error } = await supabase.rpc("registrar_boletos_fornecedor", {
+        p_fornecedor: fornecedor.trim(),
+        p_descricao: descricao.trim(),
+        p_parcelas: boletosFornecedor.map((boleto) => ({
+          data: boleto.data,
+          valor: Number(boleto.valor),
+        })),
+        p_observacao: observacao.trim() || null,
+      });
+      if (error) setErro(error.message);
+      else {
+        setDescricao("");
+        setObservacao("");
+        setFornecedor("");
+        setQuantidadeBoletos("1");
+        setBoletosFornecedor([{ data: hojeISO(), valor: "" }]);
+        setSucesso(
+          `${qtdBoletos} boleto${qtdBoletos > 1 ? "s" : ""} de fornecedor cadastrado${
+            qtdBoletos > 1 ? "s" : ""
+          }. Cada um ficou no vencimento informado e pendente até você marcar como pago.`
+        );
+        await carregar();
+      }
       setProcessando(null);
       return;
     }
 
+    const n = Number(valor);
+    if (!Number.isFinite(n) || n <= 0 || !vencimento) {
+      setErro("Informe valor e vencimento válidos.");
+      return;
+    }
+    setProcessando("nova-despesa");
     const competenciaDespesa = `${vencimento.slice(0, 7)}-01`;
     const { error } = await supabase.from("despesas").insert({
       descricao: descricao.trim(),
@@ -242,15 +282,12 @@ export function FinanceiroSimplificado() {
       status,
       competencia: competenciaDespesa,
       observacao: observacao.trim() || null,
-      fornecedor: ehCompraFornecedor ? fornecedor.trim() || null : null,
     });
     if (error) setErro(error.message);
     else {
       setDescricao("");
       setValor("");
       setObservacao("");
-      setFornecedor("");
-      setParcelasCompra("1");
       setSucesso(
         status === "pago" ? "Despesa registrada como paga." : "Conta registrada como pendente."
       );
@@ -447,9 +484,9 @@ export function FinanceiroSimplificado() {
           <div className="flex items-center gap-2">
             <PackageOpen className="h-5 w-5 text-[#2563eb]" />
             <div>
-              <h2 className="text-lg font-black text-[#0f172a]">Nova despesa ou compra</h2>
+              <h2 className="text-lg font-black text-[#0f172a]">Nova despesa</h2>
               <p className="text-xs text-[#64748b]">
-                Fornecedor, mercadoria, luz, água ou qualquer saída da loja.
+                Conta avulsa ou boletos de fornecedor. Boletos têm fim e datas livres.
               </p>
             </div>
           </div>
@@ -465,16 +502,8 @@ export function FinanceiroSimplificado() {
                 <option key={c}>{c}</option>
               ))}
             </select>
-            <input
-              className={inputCls}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder={ehCompraFornecedor ? "Valor total da compra" : "Valor"}
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-            />
-            {ehCompraFornecedor && (
+
+            {ehCompraFornecedor ? (
               <>
                 <input
                   className={inputCls}
@@ -484,7 +513,7 @@ export function FinanceiroSimplificado() {
                 />
                 <div>
                   <label className="mb-1 block text-xs font-bold text-[#64748b]">
-                    Parcelas do boleto
+                    Quantidade de boletos
                   </label>
                   <input
                     className={inputCls}
@@ -492,62 +521,110 @@ export function FinanceiroSimplificado() {
                     min="1"
                     max="60"
                     step="1"
-                    value={parcelasCompra}
-                    onChange={(e) => setParcelasCompra(e.target.value)}
+                    value={quantidadeBoletos}
+                    onChange={(e) => ajustarQuantidadeBoletos(e.target.value)}
                   />
                 </div>
+                <div className="sm:col-span-2 rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-[#1e3a8a]">Boletos do fornecedor</p>
+                      <p className="mt-1 text-xs leading-5 text-[#1e40af]">
+                        Informe a data e o valor de cada boleto. Não existe recorrência automática e não há vínculo com produto ou estoque.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#1d4ed8]">
+                      Total {brl(totalBoletos)}
+                    </span>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {boletosFornecedor.map((boleto, indice) => (
+                      <div key={indice} className="grid gap-2 rounded-2xl bg-white p-3 sm:grid-cols-[90px_1fr_1fr] sm:items-end">
+                        <p className="pb-3 text-xs font-black text-[#64748b]">
+                          Boleto {indice + 1}/{qtdBoletos}
+                        </p>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-[#64748b]">Vencimento</label>
+                          <input
+                            className={inputCls}
+                            type="date"
+                            value={boleto.data}
+                            onChange={(e) => atualizarBoleto(indice, "data", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-[#64748b]">Valor</label>
+                          <input
+                            className={inputCls}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0,00"
+                            value={boleto.valor}
+                            onChange={(e) => atualizarBoleto(indice, "valor", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <input
+                  className={`${inputCls} sm:col-span-2`}
+                  placeholder="Observação / número da nota (opcional)"
+                  value={observacao}
+                  onChange={(e) => setObservacao(e.target.value)}
+                />
               </>
-            )}
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#64748b]">
-                {ehCompraFornecedor && qtdParcelasCompra > 1
-                  ? "Vencimento da 1ª parcela"
-                  : "Vencimento"}
-              </label>
-              <input
-                className={inputCls}
-                type="date"
-                value={vencimento}
-                onChange={(e) => setVencimento(e.target.value)}
-              />
-            </div>
-            {!(ehCompraFornecedor && qtdParcelasCompra > 1) && (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-[#64748b]">Situação</label>
-                <select
-                  className={inputCls}
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as "pago" | "pendente")}
-                >
-                  <option value="pago">Já paguei</option>
-                  <option value="pendente">Ainda vou pagar</option>
-                </select>
-              </div>
-            )}
-            {ehCompraFornecedor && qtdParcelasCompra > 1 && (
-              <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-xs leading-5 text-[#1e40af]">
-                O valor total será dividido em {qtdParcelasCompra} parcelas mensais. Cada boleto aparecerá na agenda do mês correto e só vira pago quando você confirmar.
-              </div>
-            )}
-            {status === "pago" && !(ehCompraFornecedor && qtdParcelasCompra > 1) && (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-[#64748b]">
-                  Data que pagou
-                </label>
+            ) : (
+              <>
                 <input
                   className={inputCls}
-                  type="date"
-                  value={dataPagamento}
-                  onChange={(e) => setDataPagamento(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Valor"
+                  value={valor}
+                  onChange={(e) => setValor(e.target.value)}
                 />
-              </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#64748b]">Vencimento</label>
+                  <input
+                    className={inputCls}
+                    type="date"
+                    value={vencimento}
+                    onChange={(e) => setVencimento(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#64748b]">Situação</label>
+                  <select
+                    className={inputCls}
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as "pago" | "pendente")}
+                  >
+                    <option value="pago">Já paguei</option>
+                    <option value="pendente">Ainda vou pagar</option>
+                  </select>
+                </div>
+                {status === "pago" && (
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#64748b]">Data que pagou</label>
+                    <input
+                      className={inputCls}
+                      type="date"
+                      value={dataPagamento}
+                      onChange={(e) => setDataPagamento(e.target.value)}
+                    />
+                  </div>
+                )}
+                <input
+                  className={`${inputCls} ${status === "pago" ? "" : "sm:col-span-2"}`}
+                  placeholder="Observação (opcional)"
+                  value={observacao}
+                  onChange={(e) => setObservacao(e.target.value)}
+                />
+              </>
             )}
-            <input
-              className={`${inputCls} ${status === "pago" ? "" : "sm:col-span-2"}`}
-              placeholder="Observação (opcional)"
-              value={observacao}
-              onChange={(e) => setObservacao(e.target.value)}
-            />
           </div>
           <button
             disabled={processando === "nova-despesa"}
@@ -556,8 +633,8 @@ export function FinanceiroSimplificado() {
           >
             {processando === "nova-despesa"
               ? "Salvando..."
-              : ehCompraFornecedor && qtdParcelasCompra > 1
-                ? `Criar ${qtdParcelasCompra} parcelas do boleto`
+              : ehCompraFornecedor
+                ? `Cadastrar ${qtdBoletos} boleto${qtdBoletos > 1 ? "s" : ""}`
                 : status === "pago"
                   ? "Registrar despesa paga"
                   : "Adicionar conta pendente"}
@@ -626,7 +703,7 @@ export function FinanceiroSimplificado() {
       </div>
 
       <p className="text-center text-xs text-[#94a3b8]">
-        Mercadoria é reconhecida no Financeiro pelos boletos e compras de fornecedor lançados como despesa. O preço do produto serve somente para registrar a venda ao cliente.
+        Produto mantém apenas o preço usado na venda. Boletos de fornecedor são despesas independentes, com datas próprias e sem vínculo com produto ou estoque.
       </p>
     </section>
   );
