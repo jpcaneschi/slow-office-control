@@ -501,14 +501,22 @@ export default function FolhaPage() {
         salarioBase={salarioPdf}
         comissao={parcela.comissao}
         qtdVendas={parcela.ultima ? acerto.qtdVendas : 0}
-        totalVendido={parcela.ultima ? acerto.vendido : 0}
-        comissaoPct={parcela.ultima ? acerto.percentualAplicado : 0}
+        totalVendido={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.vendido : 0
+        }
+        comissaoPct={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima
+            ? acerto.percentualAplicado
+            : 0
+        }
         repasseServicos={parcela.repasse}
         vales={parcela.vales}
         outrosDescontos={descontoAjuste}
         outrosDescontosLabel="Ajuste / saldo de pagamento anterior"
         comissaoBaseLabel={rotuloBaseComissao(acerto.baseTipo)}
-        baseComissaoValor={parcela.ultima ? acerto.baseComissao : 0}
+        baseComissaoValor={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.baseComissao : 0
+        }
         dataPagamento={dataPagamento}
       />
     );
