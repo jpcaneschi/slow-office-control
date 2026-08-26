@@ -1,0 +1,54 @@
+name: Ajusta datas livres dos boletos
+on:
+  push:
+    branches: [refactor/remover-custo-produto-financeiro]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/remover-custo-produto-financeiro
+      - name: Aplicar ajuste
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('components/dashboard/financeiro-simplificado.tsx')
+          s=p.read_text()
+          def rep(old,new,label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'Padrão não encontrado: {label}')
+              s=s.replace(old,new)
+
+          rep('''function dataBR(data: string) {\n  if (!data) return "—";\n  return data.slice(0, 10).split("-").reverse().join("/");\n}\n''','''function dataBR(data: string) {\n  if (!data) return "—";\n  return data.slice(0, 10).split("-").reverse().join("/");\n}\n\nfunction adicionarMesesISO(dataISO: string, meses: number) {\n  const [ano, mes, dia] = dataISO.split("-").map(Number);\n  if (!ano || !mes || !dia) return hojeISO();\n  const alvo = new Date(Date.UTC(ano, mes - 1 + meses, 1));\n  const ultimoDia = new Date(\n    Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)\n  ).getUTCDate();\n  alvo.setUTCDate(Math.min(dia, ultimoDia));\n  return alvo.toISOString().slice(0, 10);\n}\n''','helper datas')
+
+          rep('''  const [fornecedor, setFornecedor] = useState("");\n  const [parcelasCompra, setParcelasCompra] = useState("1");\n''','''  const [fornecedor, setFornecedor] = useState("");\n  const [parcelasCompra, setParcelasCompra] = useState("1");\n  const [datasBoletos, setDatasBoletos] = useState<string[]>([hojeISO()]);\n''','state datas')
+
+          rep('''  const qtdParcelasCompra = Math.min(\n    60,\n    Math.max(1, Math.trunc(Number(parcelasCompra || 1)))\n  );\n\n  async function registrarDespesa() {\n''','''  const qtdParcelasCompra = Math.min(\n    60,\n    Math.max(1, Math.trunc(Number(parcelasCompra || 1)))\n  );\n\n  function alterarQuantidadeBoletos(valor: string) {\n    setParcelasCompra(valor);\n    const qtd = Math.min(60, Math.max(1, Math.trunc(Number(valor || 1))));\n    setDatasBoletos((atuais) => {\n      const base = atuais[0] || vencimento || hojeISO();\n      return Array.from(\n        { length: qtd },\n        (_, indice) => atuais[indice] || adicionarMesesISO(base, indice)\n      );\n    });\n  }\n\n  function alterarDataBoleto(indice: number, data: string) {\n    setDatasBoletos((atuais) => {\n      const proximas = [...atuais];\n      proximas[indice] = data;\n      return proximas;\n    });\n    if (indice === 0) setVencimento(data);\n  }\n\n  async function registrarDespesa() {\n''','handlers datas')
+
+          rep('''    if (!Number.isFinite(qtdParcelasCompra) || qtdParcelasCompra < 1 || qtdParcelasCompra > 60) {\n      setErro("Informe uma quantidade de parcelas entre 1 e 60.");\n      return;\n    }\n\n    setProcessando("nova-despesa");\n\n    if (ehCompraFornecedor && qtdParcelasCompra > 1) {\n      const { error } = await supabase.rpc("registrar_compra_fornecedor", {\n        p_fornecedor: fornecedor.trim(),\n        p_descricao: descricao.trim(),\n        p_valor_total: n,\n        p_parcelas: qtdParcelasCompra,\n        p_primeiro_vencimento: vencimento,\n        p_observacao: observacao.trim() || null,\n      });\n''','''    if (!Number.isFinite(qtdParcelasCompra) || qtdParcelasCompra < 1 || qtdParcelasCompra > 60) {\n      setErro("Informe uma quantidade de boletos entre 1 e 60.");\n      return;\n    }\n    const vencimentosCompra = datasBoletos.slice(0, qtdParcelasCompra);\n    if (ehCompraFornecedor && vencimentosCompra.some((data) => !/^\\d{4}-\\d{2}-\\d{2}$/.test(data))) {\n      setErro("Informe a data de vencimento de todos os boletos.");\n      return;\n    }\n\n    setProcessando("nova-despesa");\n\n    if (ehCompraFornecedor && qtdParcelasCompra > 1) {\n      const { error } = await supabase.rpc("registrar_compra_fornecedor_com_vencimentos", {\n        p_fornecedor: fornecedor.trim(),\n        p_descricao: descricao.trim(),\n        p_valor_total: n,\n        p_vencimentos: vencimentosCompra,\n        p_observacao: observacao.trim() || null,\n      });\n''','rpc datas livres')
+
+          rep('''      setFornecedor("");\n      setParcelasCompra("1");\n      setStatus("pendente");\n      setSucesso(\n        `Compra de fornecedor parcelada em ${qtdParcelasCompra}x. As parcelas foram lançadas nos respectivos meses e ficam pendentes até você marcar o pagamento.`\n      );\n''','''      setFornecedor("");\n      setParcelasCompra("1");\n      setDatasBoletos([hojeISO()]);\n      setStatus("pendente");\n      setSucesso(\n        `Compra cadastrada com ${qtdParcelasCompra} boletos nas datas informadas. Cada boleto fica pendente até você confirmar o pagamento.`\n      );\n''','reset datas')
+
+          rep('''                    value={parcelasCompra}\n                    onChange={(e) => setParcelasCompra(e.target.value)}\n''','''                    value={parcelasCompra}\n                    onChange={(e) => alterarQuantidadeBoletos(e.target.value)}\n''','quantidade boletos')
+
+          rep('''            <div>\n              <label className="mb-1 block text-xs font-bold text-[#64748b]">\n                {ehCompraFornecedor && qtdParcelasCompra > 1\n                  ? "Vencimento da 1ª parcela"\n                  : "Vencimento"}\n              </label>\n              <input\n                className={inputCls}\n                type="date"\n                value={vencimento}\n                onChange={(e) => setVencimento(e.target.value)}\n              />\n            </div>\n''','''            {!(ehCompraFornecedor && qtdParcelasCompra > 1) && (\n              <div>\n                <label className="mb-1 block text-xs font-bold text-[#64748b]">Vencimento</label>\n                <input\n                  className={inputCls}\n                  type="date"\n                  value={vencimento}\n                  onChange={(e) => {\n                    setVencimento(e.target.value);\n                    if (ehCompraFornecedor) alterarDataBoleto(0, e.target.value);\n                  }}\n                />\n              </div>\n            )}\n''','vencimento simples')
+
+          rep('''            {ehCompraFornecedor && qtdParcelasCompra > 1 && (\n              <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-xs leading-5 text-[#1e40af]">\n                O valor total será dividido em {qtdParcelasCompra} parcelas mensais. Cada boleto aparecerá na agenda do mês correto e só vira pago quando você confirmar.\n              </div>\n            )}\n''','''            {ehCompraFornecedor && qtdParcelasCompra > 1 && (\n              <div className="sm:col-span-2 rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">\n                <p className="text-xs font-black uppercase tracking-wide text-[#1d4ed8]">Datas dos boletos</p>\n                <p className="mt-1 text-xs leading-5 text-[#1e40af]">\n                  As datas são livres. Pode ser quinzenal, mensal ou qualquer combinação. A compra termina no último boleto cadastrado.\n                </p>\n                <div className="mt-3 grid gap-2 sm:grid-cols-2">\n                  {Array.from({ length: qtdParcelasCompra }, (_, indice) => (\n                    <label key={indice} className="rounded-xl bg-white p-3 text-xs font-bold text-[#475569]">\n                      Boleto {indice + 1}/{qtdParcelasCompra}\n                      <input\n                        className={`${inputCls} mt-2`}\n                        type="date"\n                        value={datasBoletos[indice] || ""}\n                        onChange={(e) => alterarDataBoleto(indice, e.target.value)}\n                      />\n                    </label>\n                  ))}\n                </div>\n              </div>\n            )}\n''','grade datas')
+
+          rep('''                ? `Criar ${qtdParcelasCompra} parcelas do boleto`\n''','''                ? `Criar ${qtdParcelasCompra} boletos`\n''','botao boletos')
+
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Commitar
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/dashboard/financeiro-simplificado.tsx
+          git commit -m "feat: permite datas independentes nos boletos"
+          git push origin HEAD:refactor/remover-custo-produto-financeiro
