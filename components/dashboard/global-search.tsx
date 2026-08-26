@@ -7,10 +7,10 @@ import {
   Loader2,
   Users,
   Package,
-  CalendarDays,
   ShoppingCart,
-  ClipboardList,
   FileText,
+  ReceiptText,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { buscarGlobal, type ResultadoBusca } from "@/lib/busca";
@@ -18,10 +18,10 @@ import { buscarGlobal, type ResultadoBusca } from "@/lib/busca";
 const ICONE: Record<ResultadoBusca["tipo"], LucideIcon> = {
   cliente: Users,
   produto: Package,
-  evento: CalendarDays,
   venda: ShoppingCart,
-  condicional: ClipboardList,
   promissoria: FileText,
+  despesa: ReceiptText,
+  funcionario: UserCog,
 };
 
 function Realce({ texto, termo }: { texto: string; termo: string }) {
@@ -46,11 +46,23 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const reqId = useRef(0);
 
   const termo = q.trim();
 
-  // Debounce da busca (400ms), a partir de 2 caracteres.
+  useEffect(() => {
+    function atalho(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        if (termo.length >= 2) setOpen(true);
+      }
+    }
+    document.addEventListener("keydown", atalho);
+    return () => document.removeEventListener("keydown", atalho);
+  }, [termo.length]);
+
   useEffect(() => {
     if (termo.length < 2) {
       setResultados([]);
@@ -62,12 +74,11 @@ export function GlobalSearch() {
     const meuReq = ++reqId.current;
     const id = setTimeout(async () => {
       const r = await buscarGlobal(termo);
-      // Descarta resultado obsoleto: só aplica se ainda é a busca mais recente.
       if (meuReq !== reqId.current) return;
       setResultados(r);
       setSel(0);
       setLoading(false);
-    }, 400);
+    }, 280);
     return () => clearTimeout(id);
   }, [termo]);
 
@@ -81,7 +92,7 @@ export function GlobalSearch() {
 
   function abrir(r: ResultadoBusca) {
     setOpen(false);
-    setQ(""); // limpa a busca ao navegar para outro módulo
+    setQ("");
     router.push(r.href);
   }
 
@@ -103,7 +114,6 @@ export function GlobalSearch() {
     }
   }
 
-  // Agrupa por categoria mantendo o índice global (pra navegação por teclado).
   const grupos = useMemo(() => {
     const g: { categoria: string; itens: { r: ResultadoBusca; idx: number }[] }[] = [];
     resultados.forEach((r, idx) => {
@@ -120,25 +130,32 @@ export function GlobalSearch() {
   return (
     <div
       ref={ref}
-      className="relative order-last w-full md:order-none md:w-auto md:min-w-[320px] md:flex-1 md:max-w-md"
+      className="relative order-last w-full md:order-none md:w-auto md:min-w-[320px] md:flex-1 md:max-w-xl"
     >
       <div className="flex items-center gap-2 rounded-xl border border-[#e8ecf4] bg-[#f4f6fb] px-4 py-2.5 focus-within:border-[#2563eb] focus-within:bg-white">
         <Search className="h-4 w-4 shrink-0 text-[#94a3b8]" />
         <input
+          ref={inputRef}
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => termo.length >= 2 && setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Buscar clientes, produtos, vendas, notas..."
+          placeholder="Buscar cliente, CPF, telefone, produto, SKU, venda, fornecedor..."
           aria-label="Busca global"
           className="w-full bg-transparent text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none"
         />
-        {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#94a3b8]" />}
+        {loading ? (
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#94a3b8]" />
+        ) : (
+          <span className="hidden shrink-0 rounded-md border border-[#dbe3ef] bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#94a3b8] lg:block">
+            ⌘K
+          </span>
+        )}
       </div>
 
       {open && termo.length >= 2 && (
-        <div className="absolute left-0 right-0 z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-2xl border border-[#e8ecf4] bg-white py-2 shadow-[0_16px_44px_rgba(15,23,42,0.16)]">
+        <div className="absolute left-0 right-0 z-40 mt-2 max-h-[72vh] overflow-y-auto rounded-2xl border border-[#e8ecf4] bg-white py-2 shadow-[0_16px_44px_rgba(15,23,42,0.16)]">
           {loading ? (
             <p className="px-4 py-6 text-center text-sm text-[#94a3b8]">Buscando…</p>
           ) : resultados.length === 0 ? (
