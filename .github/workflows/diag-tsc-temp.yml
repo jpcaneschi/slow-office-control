@@ -1,0 +1,32 @@
+name: Diagnostico TSC Temp
+on:
+  push:
+    branches: [feat/promissorias-produto-dashboard-servicos]
+permissions:
+  contents: write
+jobs:
+  diag:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/promissorias-produto-dashboard-servicos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Captura erros TypeScript
+        run: |
+          set +e
+          npx tsc --noEmit > tsc-errors.tmp.txt 2>&1
+          cat tsc-errors.tmp.txt
+          exit 0
+      - name: Commit diagnostico
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tsc-errors.tmp.txt
+          git commit -m "chore: captura diagnostico typescript" || exit 0
+          git push origin HEAD:feat/promissorias-produto-dashboard-servicos
