@@ -1,0 +1,65 @@
+name: Patch bonificacao PDF temp
+on:
+  push:
+    branches:
+      - feat/busca-timeline-alertas
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/busca-timeline-alertas
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ajusta nomenclatura e base da bonificacao no PDF
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('components/pdf/relatorios-pdf.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = '''}: FolhaProps) {\n  const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({'''
+          new = '''}: FolhaProps) {\n  const ehBonificacao = comissaoBaseLabel.toLowerCase().includes("lucro mensal");\n  const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''    comissaoDescricao: `Comissão sobre ${comissaoBaseLabel.toLowerCase()}`,'''
+          new = '''    comissaoDescricao: ehBonificacao\n      ? `Bonificação sobre ${comissaoBaseLabel.toLowerCase()}`\n      : `Comissão sobre ${comissaoBaseLabel.toLowerCase()}`,'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        <Text style={styles.sectionTitle}>Base de comissão no período</Text>'''
+          new = '''        <Text style={styles.sectionTitle}>\n          {ehBonificacao ? "Base da bonificação no período" : "Base de comissão no período"}\n        </Text>'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''            { label: "Percentual de comissão", value: `${comissaoPct}%` },'''
+          new = '''            {\n              label: ehBonificacao ? "Percentual da bonificação" : "Percentual de comissão",\n              value: `${comissaoPct}%`,\n            },'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('app/dashboard/folha/page.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = '''        qtdVendas={parcela.ultima ? acerto.qtdVendas : 0}\n        totalVendido={parcela.ultima ? acerto.vendido : 0}\n        comissaoPct={parcela.ultima ? acerto.percentualAplicado : 0}'''
+          new = '''        qtdVendas={parcela.ultima ? acerto.qtdVendas : 0}\n        totalVendido={\n          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.vendido : 0\n        }\n        comissaoPct={\n          funcionario.comissao_base === "lucro_loja" || parcela.ultima\n            ? acerto.percentualAplicado\n            : 0\n        }'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        baseComissaoValor={parcela.ultima ? acerto.baseComissao : 0}'''
+          new = '''        baseComissaoValor={\n          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.baseComissao : 0\n        }'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - run: git diff --check
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/pdf/relatorios-pdf.tsx app/dashboard/folha/page.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix: alinha bonificacao na folha e PDF"
+          git push origin HEAD:feat/busca-timeline-alertas
