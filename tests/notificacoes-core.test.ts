@@ -17,6 +17,7 @@ function dadosVazios(): DadosAlerta {
     condicionais: [],
     eventos: [],
     clientes: [],
+    despesas: [],
   };
 }
 
@@ -34,34 +35,34 @@ describe("calcularAtivas — estoque efetivo", () => {
     expect(ativas.find((a) => a.chave === "estoque_baixo:P")).toBeUndefined();
   });
 
-  it("produto de grade com estoque baixo agregado GERA alerta com o total", () => {
+  it("produto de grade com estoque agregado 2 GERA alerta crítico", () => {
     const dados = dadosVazios();
     dados.produtos = [
       { id: "P", nome: "Meia", estoque: 0, status: "ativo", tem_variacoes: true },
     ];
     dados.variacoes = [
-      { produto_id: "P", estoque: 2 },
+      { produto_id: "P", estoque: 1 },
       { produto_id: "P", estoque: 1 },
     ];
     const ativas = calcularAtivas(dados, HOJE, EM7);
     const alerta = ativas.find((a) => a.chave === "estoque_baixo:P");
     expect(alerta).toBeDefined();
-    expect(alerta?.descricao).toContain("3 em estoque");
+    expect(alerta?.descricao).toContain("2 em estoque");
   });
 
-  it("produto simples com estoque 7 NÃO aparece como alerta (limite 5)", () => {
+  it("produto simples com estoque 3 NÃO aparece como crítico", () => {
     const dados = dadosVazios();
     dados.produtos = [
-      { id: "S", nome: "Boné", estoque: 7, status: "ativo", tem_variacoes: false },
+      { id: "S", nome: "Boné", estoque: 3, status: "ativo", tem_variacoes: false },
     ];
     const ativas = calcularAtivas(dados, HOJE, EM7);
     expect(ativas).toHaveLength(0);
   });
 
-  it("produto simples com estoque 3 gera alerta", () => {
+  it("produto simples com estoque 2 gera alerta", () => {
     const dados = dadosVazios();
     dados.produtos = [
-      { id: "S", nome: "Boné", estoque: 3, status: "ativo", tem_variacoes: false },
+      { id: "S", nome: "Boné", estoque: 2, status: "ativo", tem_variacoes: false },
     ];
     const ativas = calcularAtivas(dados, HOJE, EM7);
     expect(ativas.map((a) => a.chave)).toContain("estoque_baixo:S");
@@ -76,13 +77,80 @@ describe("calcularAtivas — estoque efetivo", () => {
   });
 });
 
+describe("calcularAtivas — fornecedor", () => {
+  it("boleto pendente vencendo em até 3 dias gera alerta", () => {
+    const dados = dadosVazios();
+    dados.despesas = [
+      {
+        id: "B1",
+        status: "pendente",
+        data_vencimento: "2026-08-20",
+        fornecedor: "Barra",
+        descricao: "Boleto 1/3",
+        valor: 1200,
+      },
+    ];
+    const ativas = calcularAtivas(dados, HOJE, EM7);
+    const alerta = ativas.find((a) => a.chave === "fornecedor_vencer:B1");
+    expect(alerta?.titulo).toContain("a vencer");
+    expect(alerta?.descricao).toContain("Barra");
+    expect(alerta?.descricao).toContain("1.200,00");
+  });
+
+  it("boleto vencido gera alerta de atraso", () => {
+    const dados = dadosVazios();
+    dados.despesas = [
+      {
+        id: "B2",
+        status: "pendente",
+        data_vencimento: "2026-08-17",
+        fornecedor: "Nike",
+        descricao: "Boleto",
+        valor: 500,
+      },
+    ];
+    const ativas = calcularAtivas(dados, HOJE, EM7);
+    expect(ativas.map((a) => a.chave)).toContain("fornecedor_vencido:B2");
+  });
+
+  it("boleto já pago não gera alerta", () => {
+    const dados = dadosVazios();
+    dados.despesas = [
+      {
+        id: "B3",
+        status: "pago",
+        data_vencimento: "2026-08-19",
+        fornecedor: "Barra",
+        descricao: "Boleto",
+        valor: 800,
+      },
+    ];
+    expect(calcularAtivas(dados, HOJE, EM7)).toHaveLength(0);
+  });
+
+  it("despesa comum sem fornecedor não vira alerta de fornecedor", () => {
+    const dados = dadosVazios();
+    dados.despesas = [
+      {
+        id: "D1",
+        status: "pendente",
+        data_vencimento: "2026-08-19",
+        fornecedor: null,
+        descricao: "Internet",
+        valor: 100,
+      },
+    ];
+    expect(calcularAtivas(dados, HOJE, EM7)).toHaveLength(0);
+  });
+});
+
 describe("planejarSincronizacao — estados ativa/resolvida", () => {
   const alerta: NovaNotificacao = {
     chave: "estoque_baixo:P",
     tipo: "estoque",
-    titulo: "Estoque baixo",
+    titulo: "Estoque crítico",
     descricao: "x",
-    href: "/dashboard/produtos",
+    href: "/dashboard/produtos/P",
   };
 
   it("condição nova → inserir", () => {
@@ -148,10 +216,10 @@ describe("planejarSincronizacao — estados ativa/resolvida", () => {
           href: alerta.href,
         },
       ],
-      [{ ...alerta, descricao: "Produto está com 5 em estoque." }]
+      [{ ...alerta, descricao: "Produto está com 2 em estoque." }]
     );
     expect(plano.atualizar).toEqual([
-      { ...alerta, descricao: "Produto está com 5 em estoque." },
+      { ...alerta, descricao: "Produto está com 2 em estoque." },
     ]);
   });
 
