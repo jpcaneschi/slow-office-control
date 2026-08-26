@@ -65,6 +65,9 @@ type ResumoMes = {
 };
 type ResumoPeriodo = {
   vendas_periodo: number;
+  entradas_vendas: number;
+  recebimentos_promissorias: number;
+  receita_servicos: number;
   entradas_recebidas: number;
   despesas_pagas: number;
   movimentacao_periodo: number;
@@ -80,6 +83,9 @@ type SaidaPeriodo = {
 const resumoMesVazio: ResumoMes = { movimentacao_mes: 0, contas_receber: 0 };
 const resumoPeriodoVazio: ResumoPeriodo = {
   vendas_periodo: 0,
+  entradas_vendas: 0,
+  recebimentos_promissorias: 0,
+  receita_servicos: 0,
   entradas_recebidas: 0,
   despesas_pagas: 0,
   movimentacao_periodo: 0,
@@ -101,11 +107,6 @@ function somaConcluidas(vendas: Venda[], inicio: Date, fim: Date) {
       return t >= a && t < b;
     })
     .reduce((s, v) => s + Number(v.total || 0), 0);
-}
-
-function variacao(atual: number, anterior: number) {
-  if (anterior <= 0) return atual > 0 ? 100 : 0;
-  return ((atual - anterior) / anterior) * 100;
 }
 
 function dentroDoPeriodo(data: string, inicio: string, fim: string) {
@@ -207,6 +208,9 @@ export function DashboardHome() {
       : periodoRes.data;
     setResumoPeriodo({
       vendas_periodo: Number(linhaPeriodo?.vendas_periodo || 0),
+      entradas_vendas: Number(linhaPeriodo?.entradas_vendas || 0),
+      recebimentos_promissorias: Number(linhaPeriodo?.recebimentos_promissorias || 0),
+      receita_servicos: Number(linhaPeriodo?.receita_servicos || 0),
       entradas_recebidas: Number(linhaPeriodo?.entradas_recebidas || 0),
       despesas_pagas: Number(linhaPeriodo?.despesas_pagas || 0),
       movimentacao_periodo: Number(linhaPeriodo?.movimentacao_periodo || 0),
@@ -222,11 +226,9 @@ export function DashboardHome() {
     const inicio = startOfDay(isoToDate(period.inicio));
     const fim = startOfDay(isoToDate(period.fim));
     fim.setDate(fim.getDate() + 1);
-    const anteriorFim = inicio;
-    const anteriorInicio = new Date(inicio.getTime() - (fim.getTime() - inicio.getTime()));
     const ehHoje =
       period.inicio === presetRange("hoje").inicio && period.fim === presetRange("hoje").fim;
-    return { inicio, fim, anteriorInicio, anteriorFim, ehHoje };
+    return { inicio, fim, ehHoje };
   }, [period]);
 
   const clienteNome = useMemo(() => new Map(clientes.map((c) => [c.id, c.nome])), [clientes]);
@@ -235,25 +237,11 @@ export function DashboardHome() {
     [funcionarios]
   );
 
-  const vendasPeriodoLocal = somaConcluidas(vendas, janela.inicio, janela.fim);
-  const vendasAnterior = somaConcluidas(vendas, janela.anteriorInicio, janela.anteriorFim);
+  const vendasPeriodoContratadas = somaConcluidas(vendas, janela.inicio, janela.fim);
   const qtdPeriodo = vendas.filter((v) => {
     const t = new Date(v.created_at).getTime();
     return v.status === "concluida" && t >= janela.inicio.getTime() && t < janela.fim.getTime();
   }).length;
-
-  const spark = useMemo(() => {
-    const hoje = startOfDay(new Date());
-    const arr: number[] = [];
-    for (let x = 6; x >= 0; x--) {
-      const d = new Date(hoje);
-      d.setDate(d.getDate() - x);
-      const prox = new Date(d);
-      prox.setDate(prox.getDate() + 1);
-      arr.push(somaConcluidas(vendas, d, prox));
-    }
-    return arr;
-  }, [vendas]);
 
   const vendasLite: VendaLite[] = useMemo(
     () => vendas.map((v) => ({ total: v.total, status: v.status, created_at: v.created_at })),
@@ -341,7 +329,7 @@ export function DashboardHome() {
   }, [despesas, pagamentosEquipe, vales, funcionarioNome, period.inicio, period.fim]);
 
   const condicionaisAbertas = condicionais.filter((c) => c.status === "aberto").length;
-  const vendasPeriodo = Number(resumoPeriodo.vendas_periodo || vendasPeriodoLocal);
+  const vendasRecebidas = Number(resumoPeriodo.vendas_periodo || 0);
 
   return (
     <div className="space-y-6">
@@ -353,24 +341,32 @@ export function DashboardHome() {
 
       <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard
           icon={ShoppingCart}
           tint="#2563eb"
-          title={janela.ehHoje ? "Vendas hoje" : "Vendas no período"}
-          value={loading ? "…" : formatCurrency(vendasPeriodo)}
-          delta={loading ? undefined : variacao(vendasPeriodoLocal, vendasAnterior)}
-          deltaLabel={janela.ehHoje ? "vs ontem" : "vs período anterior"}
-          spark={spark}
+          title={janela.ehHoje ? "Vendas da loja hoje" : "Vendas da loja"}
+          value={loading ? "…" : formatCurrency(vendasRecebidas)}
+          deltaLabel={`recebido · ${labelForPeriod(period)}`}
           href="/dashboard/vendas"
-          ariaLabel="Ver vendas"
+          ariaLabel="Ver vendas da loja"
+        />
+
+        <MetricCard
+          icon={CircleDollarSign}
+          tint="#16a34a"
+          title="Ganhos de serviços"
+          value={loading ? "…" : formatCurrency(resumoPeriodo.receita_servicos)}
+          deltaLabel={labelForPeriod(period)}
+          href="/dashboard/servicos"
+          ariaLabel="Ver ganhos de serviços"
         />
 
         {podeVerFinanceiro && (
           <MetricCard
             icon={ReceiptText}
             tint="#dc2626"
-            title="Despesas pagas no período"
+            title="Despesas pagas"
             value={loading ? "…" : formatCurrency(resumoPeriodo.despesas_pagas)}
             deltaLabel={labelForPeriod(period)}
             href="/dashboard/financeiro"
@@ -384,9 +380,9 @@ export function DashboardHome() {
             tint="#7c3aed"
             title="Faturamento do mês"
             value={loading ? "…" : formatCurrency(resumoMes.movimentacao_mes)}
-            deltaLabel="toda movimentação: entradas + saídas pagas"
+            deltaLabel="entradas + serviços + saídas pagas"
             href="/dashboard/financeiro"
-            ariaLabel="Ver financeiro"
+            ariaLabel="Ver faturamento e movimentação"
           />
         )}
 
@@ -456,7 +452,7 @@ export function DashboardHome() {
         <RecentSales
           vendas={ultimas}
           totalQtd={qtdPeriodo}
-          totalValor={vendasPeriodo}
+          totalValor={vendasPeriodoContratadas}
           loading={loading}
         />
         <TasksAlerts />
