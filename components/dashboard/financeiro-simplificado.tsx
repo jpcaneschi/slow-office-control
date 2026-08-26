@@ -82,6 +82,17 @@ function dataBR(data: string) {
   return data.slice(0, 10).split("-").reverse().join("/");
 }
 
+function adicionarMesesISO(dataISO: string, meses: number) {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  if (!ano || !mes || !dia) return hojeISO();
+  const alvo = new Date(Date.UTC(ano, mes - 1 + meses, 1));
+  const ultimoDia = new Date(
+    Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  alvo.setUTCDate(Math.min(dia, ultimoDia));
+  return alvo.toISOString().slice(0, 10);
+}
+
 function uuidDeId(id: string, prefixo: string) {
   const match = id.match(new RegExp(`^${prefixo}-([0-9a-fA-F-]{36})`));
   return match?.[1] || null;
@@ -125,6 +136,7 @@ export function FinanceiroSimplificado() {
   const [observacao, setObservacao] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [parcelasCompra, setParcelasCompra] = useState("1");
+  const [datasBoletos, setDatasBoletos] = useState<string[]>([hojeISO()]);
 
   const [rDescricao, setRDescricao] = useState("");
   const [rCategoria, setRCategoria] = useState("Aluguel");
@@ -184,6 +196,27 @@ export function FinanceiroSimplificado() {
     Math.max(1, Math.trunc(Number(parcelasCompra || 1)))
   );
 
+  function alterarQuantidadeBoletos(valor: string) {
+    setParcelasCompra(valor);
+    const qtd = Math.min(60, Math.max(1, Math.trunc(Number(valor || 1))));
+    setDatasBoletos((atuais) => {
+      const base = atuais[0] || vencimento || hojeISO();
+      return Array.from(
+        { length: qtd },
+        (_, indice) => atuais[indice] || adicionarMesesISO(base, indice)
+      );
+    });
+  }
+
+  function alterarDataBoleto(indice: number, data: string) {
+    setDatasBoletos((atuais) => {
+      const proximas = [...atuais];
+      proximas[indice] = data;
+      return proximas;
+    });
+    if (indice === 0) setVencimento(data);
+  }
+
   async function registrarDespesa() {
     setErro("");
     setSucesso("");
@@ -197,19 +230,23 @@ export function FinanceiroSimplificado() {
       return;
     }
     if (!Number.isFinite(qtdParcelasCompra) || qtdParcelasCompra < 1 || qtdParcelasCompra > 60) {
-      setErro("Informe uma quantidade de parcelas entre 1 e 60.");
+      setErro("Informe uma quantidade de boletos entre 1 e 60.");
+      return;
+    }
+    const vencimentosCompra = datasBoletos.slice(0, qtdParcelasCompra);
+    if (ehCompraFornecedor && vencimentosCompra.some((data) => !/^\d{4}-\d{2}-\d{2}$/.test(data))) {
+      setErro("Informe a data de vencimento de todos os boletos.");
       return;
     }
 
     setProcessando("nova-despesa");
 
     if (ehCompraFornecedor && qtdParcelasCompra > 1) {
-      const { error } = await supabase.rpc("registrar_compra_fornecedor", {
+      const { error } = await supabase.rpc("registrar_compra_fornecedor_com_vencimentos", {
         p_fornecedor: fornecedor.trim(),
         p_descricao: descricao.trim(),
         p_valor_total: n,
-        p_parcelas: qtdParcelasCompra,
-        p_primeiro_vencimento: vencimento,
+        p_vencimentos: vencimentosCompra,
         p_observacao: observacao.trim() || null,
       });
       if (error) {
@@ -222,9 +259,10 @@ export function FinanceiroSimplificado() {
       setObservacao("");
       setFornecedor("");
       setParcelasCompra("1");
+      setDatasBoletos([hojeISO()]);
       setStatus("pendente");
       setSucesso(
-        `Compra de fornecedor parcelada em ${qtdParcelasCompra}x. As parcelas foram lançadas nos respectivos meses e ficam pendentes até você marcar o pagamento.`
+        `Compra cadastrada com ${qtdParcelasCompra} boletos nas datas informadas. Cada boleto fica pendente até você confirmar o pagamento.`
       );
       await carregar();
       setProcessando(null);
@@ -493,24 +531,25 @@ export function FinanceiroSimplificado() {
                     max="60"
                     step="1"
                     value={parcelasCompra}
-                    onChange={(e) => setParcelasCompra(e.target.value)}
+                    onChange={(e) => alterarQuantidadeBoletos(e.target.value)}
                   />
                 </div>
               </>
             )}
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#64748b]">
-                {ehCompraFornecedor && qtdParcelasCompra > 1
-                  ? "Vencimento da 1ª parcela"
-                  : "Vencimento"}
-              </label>
-              <input
-                className={inputCls}
-                type="date"
-                value={vencimento}
-                onChange={(e) => setVencimento(e.target.value)}
-              />
-            </div>
+            {!(ehCompraFornecedor && qtdParcelasCompra > 1) && (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-[#64748b]">Vencimento</label>
+                <input
+                  className={inputCls}
+                  type="date"
+                  value={vencimento}
+                  onChange={(e) => {
+                    setVencimento(e.target.value);
+                    if (ehCompraFornecedor) alterarDataBoleto(0, e.target.value);
+                  }}
+                />
+              </div>
+            )}
             {!(ehCompraFornecedor && qtdParcelasCompra > 1) && (
               <div>
                 <label className="mb-1 block text-xs font-bold text-[#64748b]">Situação</label>
@@ -525,8 +564,24 @@ export function FinanceiroSimplificado() {
               </div>
             )}
             {ehCompraFornecedor && qtdParcelasCompra > 1 && (
-              <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-xs leading-5 text-[#1e40af]">
-                O valor total será dividido em {qtdParcelasCompra} parcelas mensais. Cada boleto aparecerá na agenda do mês correto e só vira pago quando você confirmar.
+              <div className="sm:col-span-2 rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-[#1d4ed8]">Datas dos boletos</p>
+                <p className="mt-1 text-xs leading-5 text-[#1e40af]">
+                  As datas são livres. Pode ser quinzenal, mensal ou qualquer combinação. A compra termina no último boleto cadastrado.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {Array.from({ length: qtdParcelasCompra }, (_, indice) => (
+                    <label key={indice} className="rounded-xl bg-white p-3 text-xs font-bold text-[#475569]">
+                      Boleto {indice + 1}/{qtdParcelasCompra}
+                      <input
+                        className={`${inputCls} mt-2`}
+                        type="date"
+                        value={datasBoletos[indice] || ""}
+                        onChange={(e) => alterarDataBoleto(indice, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
             {status === "pago" && !(ehCompraFornecedor && qtdParcelasCompra > 1) && (
@@ -557,7 +612,7 @@ export function FinanceiroSimplificado() {
             {processando === "nova-despesa"
               ? "Salvando..."
               : ehCompraFornecedor && qtdParcelasCompra > 1
-                ? `Criar ${qtdParcelasCompra} parcelas do boleto`
+                ? `Criar ${qtdParcelasCompra} boletos`
                 : status === "pago"
                   ? "Registrar despesa paga"
                   : "Adicionar conta pendente"}
