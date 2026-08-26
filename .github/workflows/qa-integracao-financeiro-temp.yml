@@ -1,0 +1,35 @@
+name: QA integração financeiro temporário
+
+on:
+  push:
+    branches:
+      - fix/financeiro-boletos-sem-produto
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Ler guia Next.js relevante
+        run: |
+          DOC=$(find node_modules/next/dist/docs -type f \( -iname '*server*client*component*' -o -iname '*client*component*' \) | head -n 1)
+          echo "DOC=$DOC"
+          if [ -n "$DOC" ]; then sed -n '1,220p' "$DOC"; else find node_modules/next/dist/docs -maxdepth 4 -type f | head -n 80; fi
+      - name: Testes
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
