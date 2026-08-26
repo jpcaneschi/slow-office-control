@@ -123,6 +123,8 @@ export function FinanceiroSimplificado() {
   const [status, setStatus] = useState<"pago" | "pendente">("pago");
   const [dataPagamento, setDataPagamento] = useState(hojeISO());
   const [observacao, setObservacao] = useState("");
+  const [fornecedor, setFornecedor] = useState("");
+  const [parcelasCompra, setParcelasCompra] = useState("1");
 
   const [rDescricao, setRDescricao] = useState("");
   const [rCategoria, setRCategoria] = useState("Aluguel");
@@ -175,6 +177,12 @@ export function FinanceiroSimplificado() {
       : 100;
   const faltaEmpatar = Math.max(0, resumo.despesas_previstas - resumo.faturamento_recebido);
   const sobra = Math.max(0, resumo.faturamento_recebido - resumo.despesas_previstas);
+  const ehCompraFornecedor =
+    categoria === "Compra de mercadoria" || categoria === "Fornecedor";
+  const qtdParcelasCompra = Math.min(
+    60,
+    Math.max(1, Math.trunc(Number(parcelasCompra || 1)))
+  );
 
   async function registrarDespesa() {
     setErro("");
@@ -184,7 +192,45 @@ export function FinanceiroSimplificado() {
       setErro("Informe descrição, valor e vencimento válidos.");
       return;
     }
+    if (ehCompraFornecedor && !fornecedor.trim()) {
+      setErro("Informe o fornecedor ou a marca da mercadoria.");
+      return;
+    }
+    if (!Number.isFinite(qtdParcelasCompra) || qtdParcelasCompra < 1 || qtdParcelasCompra > 60) {
+      setErro("Informe uma quantidade de parcelas entre 1 e 60.");
+      return;
+    }
+
     setProcessando("nova-despesa");
+
+    if (ehCompraFornecedor && qtdParcelasCompra > 1) {
+      const { error } = await supabase.rpc("registrar_compra_fornecedor", {
+        p_fornecedor: fornecedor.trim(),
+        p_descricao: descricao.trim(),
+        p_valor_total: n,
+        p_parcelas: qtdParcelasCompra,
+        p_primeiro_vencimento: vencimento,
+        p_observacao: observacao.trim() || null,
+      });
+      if (error) {
+        setErro(error.message);
+        setProcessando(null);
+        return;
+      }
+      setDescricao("");
+      setValor("");
+      setObservacao("");
+      setFornecedor("");
+      setParcelasCompra("1");
+      setStatus("pendente");
+      setSucesso(
+        `Compra de fornecedor parcelada em ${qtdParcelasCompra}x. As parcelas foram lançadas nos respectivos meses e ficam pendentes até você marcar o pagamento.`
+      );
+      await carregar();
+      setProcessando(null);
+      return;
+    }
+
     const competenciaDespesa = `${vencimento.slice(0, 7)}-01`;
     const { error } = await supabase.from("despesas").insert({
       descricao: descricao.trim(),
@@ -196,12 +242,15 @@ export function FinanceiroSimplificado() {
       status,
       competencia: competenciaDespesa,
       observacao: observacao.trim() || null,
+      fornecedor: ehCompraFornecedor ? fornecedor.trim() || null : null,
     });
     if (error) setErro(error.message);
     else {
       setDescricao("");
       setValor("");
       setObservacao("");
+      setFornecedor("");
+      setParcelasCompra("1");
       setSucesso(
         status === "pago" ? "Despesa registrada como paga." : "Conta registrada como pendente."
       );
@@ -421,12 +470,40 @@ export function FinanceiroSimplificado() {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Valor"
+              placeholder={ehCompraFornecedor ? "Valor total da compra" : "Valor"}
               value={valor}
               onChange={(e) => setValor(e.target.value)}
             />
+            {ehCompraFornecedor && (
+              <>
+                <input
+                  className={inputCls}
+                  placeholder="Fornecedor / marca"
+                  value={fornecedor}
+                  onChange={(e) => setFornecedor(e.target.value)}
+                />
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#64748b]">
+                    Parcelas do boleto
+                  </label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min="1"
+                    max="60"
+                    step="1"
+                    value={parcelasCompra}
+                    onChange={(e) => setParcelasCompra(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             <div>
-              <label className="mb-1 block text-xs font-bold text-[#64748b]">Vencimento</label>
+              <label className="mb-1 block text-xs font-bold text-[#64748b]">
+                {ehCompraFornecedor && qtdParcelasCompra > 1
+                  ? "Vencimento da 1ª parcela"
+                  : "Vencimento"}
+              </label>
               <input
                 className={inputCls}
                 type="date"
@@ -434,18 +511,25 @@ export function FinanceiroSimplificado() {
                 onChange={(e) => setVencimento(e.target.value)}
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-[#64748b]">Situação</label>
-              <select
-                className={inputCls}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as "pago" | "pendente")}
-              >
-                <option value="pago">Já paguei</option>
-                <option value="pendente">Ainda vou pagar</option>
-              </select>
-            </div>
-            {status === "pago" && (
+            {!(ehCompraFornecedor && qtdParcelasCompra > 1) && (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-[#64748b]">Situação</label>
+                <select
+                  className={inputCls}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as "pago" | "pendente")}
+                >
+                  <option value="pago">Já paguei</option>
+                  <option value="pendente">Ainda vou pagar</option>
+                </select>
+              </div>
+            )}
+            {ehCompraFornecedor && qtdParcelasCompra > 1 && (
+              <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-xs leading-5 text-[#1e40af]">
+                O valor total será dividido em {qtdParcelasCompra} parcelas mensais. Cada boleto aparecerá na agenda do mês correto e só vira pago quando você confirmar.
+              </div>
+            )}
+            {status === "pago" && !(ehCompraFornecedor && qtdParcelasCompra > 1) && (
               <div>
                 <label className="mb-1 block text-xs font-bold text-[#64748b]">
                   Data que pagou
@@ -472,9 +556,11 @@ export function FinanceiroSimplificado() {
           >
             {processando === "nova-despesa"
               ? "Salvando..."
-              : status === "pago"
-                ? "Registrar despesa paga"
-                : "Adicionar conta pendente"}
+              : ehCompraFornecedor && qtdParcelasCompra > 1
+                ? `Criar ${qtdParcelasCompra} parcelas do boleto`
+                : status === "pago"
+                  ? "Registrar despesa paga"
+                  : "Adicionar conta pendente"}
           </button>
         </div>
 
