@@ -29,7 +29,6 @@ type Produto = {
   id: string;
   nome: string;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
   tem_variacoes: boolean | null;
@@ -42,7 +41,6 @@ type Variacao = {
   tamanho: string | null;
   cor: string | null;
   preco: number | null;
-  custo: number | null;
   estoque: number | null;
   status: string | null;
 };
@@ -90,7 +88,6 @@ type ItemRascunho = {
   nome: string;
   quantidade: number;
   preco_unitario: number;
-  custo_unitario: number;
 };
 
 export default function VendasPage() {
@@ -163,7 +160,7 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, custo, estoque, status, tem_variacoes")
+        .select("id, nome, preco, estoque, status, tem_variacoes")
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
@@ -194,7 +191,7 @@ export default function VendasPage() {
     // Variações ativas de todos os produtos (para a grade na venda).
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, atributos, tamanho, cor, preco, custo, estoque, status");
+      .select("id, produto_id, atributos, tamanho, cor, preco, estoque, status");
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -390,7 +387,7 @@ export default function VendasPage() {
       return;
     }
 
-    // Produto com grade → exige variação; preço/custo/estoque vêm da variação.
+    // Produto com grade → exige variação; preço e estoque vêm da variação.
     let variacao: Variacao | null = null;
     if (produto.tem_variacoes) {
       if (!variacaoId) {
@@ -410,9 +407,6 @@ export default function VendasPage() {
     const precoUnit = variacao
       ? Number(variacao.preco ?? produto.preco ?? 0)
       : Number(produto.preco || 0);
-    const custoUnit = variacao
-      ? Number(variacao.custo ?? produto.custo ?? 0)
-      : Number(produto.custo || 0);
     const chave = variacao ? variacao.id : produto.id;
     const rotulo = variacao
       ? `${produto.nome} (${rotuloVariacao(variacao.atributos, { tamanho: variacao.tamanho, cor: variacao.cor })})`
@@ -451,7 +445,6 @@ export default function VendasPage() {
           nome: rotulo,
           quantidade: quantidadeNumero,
           preco_unitario: precoUnit,
-          custo_unitario: custoUnit,
         },
       ]);
     }
@@ -572,7 +565,6 @@ export default function VendasPage() {
       variacao_id: item.variacao_id,
       quantidade: item.quantidade,
       preco_unitario: item.preco_unitario,
-      custo_unitario: item.custo_unitario,
     }));
 
     try {

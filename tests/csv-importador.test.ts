@@ -26,7 +26,7 @@ describe("sugerirMapeamento — sinônimos de cabeçalho", () => {
     expect(m["cor"].campo).toBe("atributo:Cor");
     expect(m["sku"].campo).toBe("sku");
     expect(m["preço venda"].campo).toBe("preco");
-    expect(m["custo"].campo).toBe("custo");
+    expect(m["custo"].campo).toBe("ignorar");
     expect(m["quantidade"].campo).toBe("estoque");
     expect(m["status"].campo).toBe("status");
   });
