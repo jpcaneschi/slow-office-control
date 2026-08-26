@@ -1,0 +1,64 @@
+name: Patch recebimentos grafico temp
+on:
+  push:
+    branches: [feat/promissorias-produto-dashboard-servicos]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/promissorias-produto-dashboard-servicos
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sincroniza grafico com recebimentos
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('components/dashboard/dashboard-home.tsx')
+          s=p.read_text()
+          s=s.replace('  total: number | null;\n  status: string;', '  total: number | null;\n  valor_recebido: number | null;\n  status: string;')
+          s=s.replace('type ResumoMes = {', 'type PagamentoPromissoria = { id: string; valor: number; data: string };\ntype ResumoMes = {')
+          s=s.replace('  const [vales, setVales] = useState<Vale[]>([]);\n', '  const [vales, setVales] = useState<Vale[]>([]);\n  const [pagamentosPromissoria, setPagamentosPromissoria] = useState<PagamentoPromissoria[]>([]);\n')
+          s=s.replace('const [v, c, cond, i, p, f, d, pg, vl, mes, periodoRes] = await Promise.all([', 'const [v, c, cond, i, p, f, d, pg, vl, pp, mes, periodoRes] = await Promise.all([')
+          s=s.replace('.select("id,cliente_id,forma_pagamento,total,status,created_at")', '.select("id,cliente_id,forma_pagamento,total,valor_recebido,status,created_at")')
+          s=s.replace('      supabase.from("vales").select("id,funcionario_id,valor,data,observacao"),\n      supabase.rpc("resumo_financeiro_mes"', '      supabase.from("vales").select("id,funcionario_id,valor,data,observacao"),\n      supabase\n        .from("promissoria_pagamentos")\n        .select("id,valor,data,promissorias!inner(status)")\n        .neq("promissorias.status", "cancelado"),\n      supabase.rpc("resumo_financeiro_mes"')
+          s=s.replace('      vl.error ||\n      mes.error ||', '      vl.error ||\n      pp.error ||\n      mes.error ||')
+          s=s.replace('    setVales((vl.data as Vale[] | null) || []);\n', '    setVales((vl.data as Vale[] | null) || []);\n    setPagamentosPromissoria((pp.data as unknown as PagamentoPromissoria[] | null) || []);\n')
+          old='''  const vendasLite: VendaLite[] = useMemo(\n    () => vendas.map((v) => ({ total: v.total, status: v.status, created_at: v.created_at })),\n    [vendas]\n  );'''
+          new='''  const vendasLite: VendaLite[] = useMemo(\n    () => [\n      ...vendas.map((v) => ({\n        total:\n          v.forma_pagamento === "promissoria"\n            ? 0\n            : v.forma_pagamento === "misto"\n              ? Math.max(0, Math.min(Number(v.total || 0), Number(v.valor_recebido || 0)))\n              : Number(v.total || 0),\n        status: v.status,\n        created_at: v.created_at,\n        contarPedido: true,\n      })),\n      ...pagamentosPromissoria.map((pg) => ({\n        total: Number(pg.valor || 0),\n        status: "concluida",\n        created_at: `${pg.data}T12:00:00`,\n        contarPedido: false,\n      })),\n    ],\n    [vendas, pagamentosPromissoria]\n  );'''
+          if old not in s:
+            raise SystemExit('bloco vendasLite não encontrado')
+          s=s.replace(old,new)
+          s=s.replace('  const vendasPeriodoContratadas = somaConcluidas(vendas, janela.inicio, janela.fim);\n', '')
+          p.write_text(s)
+
+          p=Path('components/dashboard/sales-panel.tsx')
+          s=p.read_text()
+          s=s.replace('  created_at: string;\n};', '  created_at: string;\n  contarPedido?: boolean;\n};')
+          s=s.replace('        pedidos += 1;', '        pedidos += v.contarPedido === false ? 0 : 1;')
+          s=s.replace('  const temDados = data.some((d) => d.pedidos > 0);', '  const temDados = data.some((d) => d.pedidos > 0 || d.faturamento > 0);')
+          s=s.replace('            Nenhuma venda concluída neste período', '            Nenhuma venda ou recebimento neste período')
+          p.write_text(s)
+
+          p=Path('components/dashboard/recent-sales.tsx')
+          s=p.read_text().replace('            Total:{" "}', '            Recebido:{" "}')
+          p.write_text(s)
+
+          p=Path('components/pdf/promissoria-acordo-pdf.tsx')
+          s=p.read_text().replace('<View style={styles.totalLine}><Text>Total já recebido</Text>', '<View style={styles.totalLine}><Text>Total já recebido (inclui entrada)</Text>')
+          p.write_text(s)
+          PY
+      - run: git diff --check
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/dashboard/dashboard-home.tsx components/dashboard/sales-panel.tsx components/dashboard/recent-sales.tsx components/pdf/promissoria-acordo-pdf.tsx
+          git commit -m "fix: sincroniza grafico com recebimentos reais" || exit 0
+          git push origin HEAD:feat/promissorias-produto-dashboard-servicos
