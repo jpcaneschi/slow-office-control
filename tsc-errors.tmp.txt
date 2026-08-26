@@ -1,1 +1,0 @@
-components/dashboard/dashboard-home.tsx(469,23): error TS2304: Cannot find name 'vendasPeriodoContratadas'.

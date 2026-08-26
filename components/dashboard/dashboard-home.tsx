@@ -466,7 +466,7 @@ export function DashboardHome() {
         <RecentSales
           vendas={ultimas}
           totalQtd={qtdPeriodo}
-          totalValor={vendasPeriodoContratadas}
+          totalValor={vendasRecebidas}
           loading={loading}
         />
         <TasksAlerts />
