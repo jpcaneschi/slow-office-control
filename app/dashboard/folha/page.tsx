@@ -377,11 +377,12 @@ export default function FolhaPage() {
   function montarParcelas(funcionario: Funcionario, acerto: AcertoMes): ParcelaFolha[] {
     const agenda = gerarDatasPagamentoMes(funcionario, competencia);
     const salarios = distribuirValor(Number(acerto.salario || 0), agenda.length);
+    const bonificacoes = distribuirValor(Number(acerto.comissao || 0), agenda.length);
     let saldoTransportado = 0;
 
     return agenda.map((item, indice) => {
       const ultima = indice === agenda.length - 1;
-      const comissao = ultima ? Number(acerto.comissao || 0) : 0;
+      const comissao = Number(bonificacoes[indice] || 0);
       const repasse = ultima ? Number(acerto.repasse || 0) : 0;
       const vales = descontosDaParcela(funcionario.id, item.parcela_numero).reduce(
         (s, d) => s + Number(d.valor || 0),
@@ -433,14 +434,13 @@ export default function FolhaPage() {
     parcela: ParcelaFolha
   ) {
     if (
-      parcela.ultima &&
       funcionario.comissao_base === "lucro_loja" &&
       !acerto.comissaoFechada
     ) {
       setErro(
-        `Feche primeiro a comissão de ${mesAnoPt(
+        `Feche primeiro a bonificação de ${mesAnoPt(
           competenciaOrigem
-        )} antes do último pagamento de ${mesAnoPt(competencia)}.`
+        )} antes de registrar pagamentos de ${mesAnoPt(competencia)}.`
       );
       return false;
     }
@@ -460,10 +460,10 @@ export default function FolhaPage() {
       const qtd = Number(data || 0);
       setSucesso(
         qtd > 0
-          ? `Comissão de ${mesAnoPt(
+          ? `Bonificação de ${mesAnoPt(
               competenciaOrigem
-            )} fechada e carregada para ${mesAnoPt(competencia)}.`
-          : `A comissão de ${mesAnoPt(
+            )} fechada e distribuída nos pagamentos de ${mesAnoPt(competencia)}.`
+          : `A bonificação de ${mesAnoPt(
               competenciaOrigem
             )} já estava fechada ou não há funcionário configurado nessa base.`
       );
@@ -501,14 +501,22 @@ export default function FolhaPage() {
         salarioBase={salarioPdf}
         comissao={parcela.comissao}
         qtdVendas={parcela.ultima ? acerto.qtdVendas : 0}
-        totalVendido={parcela.ultima ? acerto.vendido : 0}
-        comissaoPct={parcela.ultima ? acerto.percentualAplicado : 0}
+        totalVendido={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.vendido : 0
+        }
+        comissaoPct={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima
+            ? acerto.percentualAplicado
+            : 0
+        }
         repasseServicos={parcela.repasse}
         vales={parcela.vales}
         outrosDescontos={descontoAjuste}
         outrosDescontosLabel="Ajuste / saldo de pagamento anterior"
         comissaoBaseLabel={rotuloBaseComissao(acerto.baseTipo)}
-        baseComissaoValor={parcela.ultima ? acerto.baseComissao : 0}
+        baseComissaoValor={
+          funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.baseComissao : 0
+        }
         dataPagamento={dataPagamento}
       />
     );
@@ -751,7 +759,7 @@ export default function FolhaPage() {
                     origemJaFechada ? "font-black text-[#166534]" : "font-black text-[#92400e]"
                   }
                 >
-                  Comissão mensal: {mesAnoPt(competenciaOrigem)} → {mesAnoPt(competencia)}
+                  Bonificação mensal: {mesAnoPt(competenciaOrigem)} → {mesAnoPt(competencia)}
                 </p>
                 <p
                   className={`mt-1 text-sm ${
@@ -759,8 +767,8 @@ export default function FolhaPage() {
                   }`}
                 >
                   {origemJaFechada
-                    ? "Fechamento concluído. A base ficou congelada e entra no último pagamento desta competência."
-                    : "A base será o resultado mensal do Financeiro, sem descontar custo de produto uma segunda vez."}
+                    ? "Fechamento concluído. A bonificação ficou congelada e é dividida entre os pagamentos desta competência."
+                    : "O valor oficial nasce no fechamento do mês anterior e depois é dividido junto com o salário do mês seguinte."}
                 </p>
               </div>
             </div>
@@ -909,7 +917,7 @@ export default function FolhaPage() {
                                 Salário: <strong className="text-[#0f172a]">{formatCurrency(parcela.salario)}</strong>
                               </p>
                               <p className="text-[#64748b]">
-                                Comissão: <strong className="text-[#15803d]">{formatCurrency(parcela.comissao)}</strong>
+                                {funcionario.comissao_base === "lucro_loja" ? "Bonificação" : "Comissão"}: <strong className="text-[#15803d]">{formatCurrency(parcela.comissao)}</strong>
                               </p>
                               <p className="text-[#64748b]">
                                 Serviços: <strong className="text-[#15803d]">{formatCurrency(parcela.repasse)}</strong>

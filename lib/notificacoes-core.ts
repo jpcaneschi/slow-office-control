@@ -1,4 +1,4 @@
-// Lógica PURA das notificações (Área #8) — sem Supabase, para ser testável.
+// Lógica PURA das notificações — sem Supabase, para ser testável.
 // A orquestração (fetch/insert/update) fica em lib/notificacoes.ts.
 
 import { tipoInfo } from "@/lib/eventos-utils";
@@ -9,12 +9,32 @@ import {
   type VariacaoEstoque,
 } from "@/lib/estoque-utils";
 
-export const LIMITE_ESTOQUE = 5;
+// Alerta realmente crítico: quando restam no máximo 2 unidades.
+export const LIMITE_ESTOQUE = 2;
 
 export function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()
   ).padStart(2, "0")}`;
+}
+
+function somarDiasISO(iso: string, dias: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const data = new Date(a, m - 1, d);
+  data.setDate(data.getDate() + dias);
+  return toISO(data);
+}
+
+function brl(valor: number | null | undefined) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(valor || 0));
+}
+
+function dataBR(iso: string) {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
 }
 
 export type NovaNotificacao = {
@@ -25,7 +45,6 @@ export type NovaNotificacao = {
   href: string | null;
 };
 
-// Dados crus (já escopados por empresa pela RLS) que geram os alertas.
 export type DadosAlerta = {
   produtos: (ProdutoEstoque & { nome: string; status: string | null })[];
   variacoes: VariacaoEstoque[];
@@ -33,13 +52,17 @@ export type DadosAlerta = {
   condicionais: { id: string; status: string; data_limite: string | null }[];
   eventos: { id: string; titulo: string; tipo: string; status: string; data: string }[];
   clientes: { id: string; nome: string; data_nascimento: string | null }[];
+  despesas: {
+    id: string;
+    status: string | null;
+    data_vencimento: string | null;
+    fornecedor: string | null;
+    descricao: string;
+    valor: number | null;
+  }[];
 };
 
-/**
- * Recalcula, de forma PURA, as notificações que deveriam estar ATIVAS hoje a
- * partir das tabelas de origem. O estoque é o EFETIVO (agrega variações), então
- * produto de grade com estoque nas variações não dispara falso "estoque baixo".
- */
+/** Recalcula as notificações que deveriam estar ativas hoje. */
 export function calcularAtivas(
   dados: DadosAlerta,
   hojeISO: string,
@@ -47,10 +70,10 @@ export function calcularAtivas(
 ): NovaNotificacao[] {
   const soma = agregarEstoqueVariacoes(dados.variacoes);
   const novas: NovaNotificacao[] = [];
+  const em3ISO = somarDiasISO(hojeISO, 3);
 
   for (const p of dados.produtos) {
     if ((p.status || "ativo") !== "ativo") continue;
-    // Produto de grade ainda sem variação não tem estoque definido: não alerta.
     if (p.tem_variacoes && soma[p.id] == null) continue;
     if (!p.tem_variacoes && p.estoque == null) continue;
     const atual = estoqueEfetivo(p, soma);
@@ -58,9 +81,30 @@ export function calcularAtivas(
       novas.push({
         chave: `estoque_baixo:${p.id}`,
         tipo: "estoque",
-        titulo: "Estoque baixo",
+        titulo: atual <= 0 ? "Produto sem estoque" : "Estoque crítico",
         descricao: `${p.nome} está com ${atual} em estoque.`,
-        href: "/dashboard/produtos",
+        href: `/dashboard/produtos/${p.id}`,
+      });
+    }
+  }
+
+  for (const d of dados.despesas || []) {
+    if ((d.status || "pago") === "pago" || !d.data_vencimento || !d.fornecedor) continue;
+    if (d.data_vencimento < hojeISO) {
+      novas.push({
+        chave: `fornecedor_vencido:${d.id}`,
+        tipo: "fornecedor",
+        titulo: "Boleto de fornecedor vencido",
+        descricao: `${d.fornecedor} · ${brl(d.valor)} · venceu em ${dataBR(d.data_vencimento)}.`,
+        href: "/dashboard/financeiro",
+      });
+    } else if (d.data_vencimento <= em3ISO) {
+      novas.push({
+        chave: `fornecedor_vencer:${d.id}`,
+        tipo: "fornecedor",
+        titulo: "Boleto de fornecedor a vencer",
+        descricao: `${d.fornecedor} · ${brl(d.valor)} · vence em ${dataBR(d.data_vencimento)}.`,
+        href: "/dashboard/financeiro",
       });
     }
   }
@@ -121,7 +165,7 @@ export function calcularAtivas(
     }
   }
 
-  const mesDia = hojeISO.slice(5); // MM-DD
+  const mesDia = hojeISO.slice(5);
   for (const cl of dados.clientes) {
     if (!cl.data_nascimento) continue;
     if (cl.data_nascimento.slice(5) === mesDia) {
@@ -130,7 +174,7 @@ export function calcularAtivas(
         tipo: "aniversario",
         titulo: "Aniversário de cliente",
         descricao: `Hoje é aniversário de ${cl.nome}.`,
-        href: "/dashboard/clientes",
+        href: `/dashboard/clientes/${cl.id}`,
       });
     }
   }
@@ -149,18 +193,12 @@ export type ExistenteNotificacao = {
 };
 
 export type PlanoSincronizacao = {
-  inserir: NovaNotificacao[]; // condição nova → cria notificação ativa
-  atualizar: NovaNotificacao[]; // condição continua, mas texto/valor mudou
-  reativar: string[]; // chaves cuja condição voltou a valer → resolvida=false
-  resolver: string[]; // chaves cuja condição deixou de valer → resolvida=true
+  inserir: NovaNotificacao[];
+  atualizar: NovaNotificacao[];
+  reativar: string[];
+  resolver: string[];
 };
 
-/**
- * Diff PURO entre o que está no banco e o que deveria estar ativo agora.
- * A notificação NÃO é apagada quando a condição some — vira "resolvida"
- * (histórico preservado, mas fora dos contadores de alerta ativo). Se a
- * condição voltar, a mesma notificação é reativada.
- */
 export function planejarSincronizacao(
   existentes: ExistenteNotificacao[],
   ativas: NovaNotificacao[]

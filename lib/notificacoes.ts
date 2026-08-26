@@ -33,8 +33,8 @@ export type Notificacao = {
 };
 
 /**
- * Recalcula as condições e concilia com o banco (insere novas, reativa e
- * resolve). O RLS garante que só mexemos nas notificações da própria empresa.
+ * Recalcula as condições e concilia com o banco. O RLS limita tudo à empresa
+ * atual. Além dos alertas antigos, inclui boletos de fornecedor pendentes.
  */
 export async function sincronizarNotificacoes(): Promise<void> {
   const hoje = new Date();
@@ -44,7 +44,7 @@ export async function sincronizarNotificacoes(): Promise<void> {
   em7.setDate(em7.getDate() + 7);
   const em7ISO = toISO(em7);
 
-  const [prodRes, varRes, promRes, condRes, evRes, cliRes, notRes] =
+  const [prodRes, varRes, promRes, condRes, evRes, cliRes, despRes, notRes] =
     await Promise.all([
       supabase.from("produtos").select("id, nome, estoque, status, tem_variacoes"),
       supabase.from("produto_variacoes").select("produto_id, estoque"),
@@ -52,6 +52,11 @@ export async function sincronizarNotificacoes(): Promise<void> {
       supabase.from("condicionais").select("id, status, data_limite"),
       supabase.from("eventos").select("id, titulo, tipo, status, data"),
       supabase.from("clientes").select("id, nome, data_nascimento"),
+      supabase
+        .from("despesas")
+        .select("id,status,data_vencimento,fornecedor,descricao,valor")
+        .neq("status", "pago")
+        .not("fornecedor", "is", null),
       supabase
         .from("notificacoes")
         .select("chave, tipo, titulo, descricao, href, resolvida, lida"),
@@ -64,6 +69,7 @@ export async function sincronizarNotificacoes(): Promise<void> {
     condicionais: (condRes.data as DadosAlerta["condicionais"]) || [],
     eventos: (evRes.data as DadosAlerta["eventos"]) || [],
     clientes: (cliRes.data as DadosAlerta["clientes"]) || [],
+    despesas: (despRes.data as DadosAlerta["despesas"]) || [],
   };
 
   const ativas = calcularAtivas(dados, hojeISO, em7ISO);
@@ -76,7 +82,6 @@ export async function sincronizarNotificacoes(): Promise<void> {
   const trabalhos: PromiseLike<unknown>[] = [];
 
   if (inserir.length > 0) {
-    // onConflict ignora corrida entre abas; a nova nasce ativa (resolvida=false).
     trabalhos.push(
       supabase
         .from("notificacoes")

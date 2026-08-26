@@ -502,6 +502,7 @@ export function FolhaSalarialPdf({
   baseComissaoValor,
   dataPagamento,
 }: FolhaProps) {
+  const ehBonificacao = comissaoBaseLabel.toLowerCase().includes("lucro mensal");
   const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({
     salarioBase,
     comissao,
@@ -510,7 +511,9 @@ export function FolhaSalarialPdf({
     vales,
     outrosDescontos,
     outrosDescontosLabel,
-    comissaoDescricao: `Comissão sobre ${comissaoBaseLabel.toLowerCase()}`,
+    comissaoDescricao: ehBonificacao
+      ? `Bonificação sobre ${comissaoBaseLabel.toLowerCase()}`
+      : `Comissão sobre ${comissaoBaseLabel.toLowerCase()}`,
   });
 
   const periodo =
@@ -534,12 +537,17 @@ export function FolhaSalarialPdf({
           ]}
         />
 
-        <Text style={styles.sectionTitle}>Base de comissão no período</Text>
+        <Text style={styles.sectionTitle}>
+          {ehBonificacao ? "Base da bonificação no período" : "Base de comissão no período"}
+        </Text>
         <InfoGrid
           itens={[
             { label: "Vendas concluídas", value: String(qtdVendas) },
             { label: comissaoBaseLabel, value: brl(baseComissaoValor ?? totalVendido) },
-            { label: "Percentual de comissão", value: `${comissaoPct}%` },
+            {
+              label: ehBonificacao ? "Percentual da bonificação" : "Percentual de comissão",
+              value: `${comissaoPct}%`,
+            },
             { label: "Emissão", value: fmtData(hojeISO()) },
           ]}
         />

@@ -9,6 +9,7 @@ import {
   ClipboardList,
   ListTodo,
   Gift,
+  ReceiptText,
   CheckCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const ICONE: Record<string, { icon: LucideIcon; color: string }> = {
   condicional: { icon: ClipboardList, color: "#0891b2" },
   tarefa: { icon: ListTodo, color: "#2563eb" },
   aniversario: { icon: Gift, color: "#db2777" },
+  fornecedor: { icon: ReceiptText, color: "#d97706" },
 };
 
 function tempoAtras(iso: string) {
@@ -74,8 +76,6 @@ export function NotificationsBell() {
     };
   }, []);
 
-  // "Alerta ativo" = ainda não lido E cuja condição ainda vale (não resolvida).
-  // Notificação resolvida (ex.: estoque reposto) fica no histórico mas não conta.
   const alertasAtivos = notifs.filter((n) => !n.lida && !n.resolvida).length;
 
   async function abrirNotificacao(n: Notificacao) {
@@ -158,15 +158,11 @@ export function NotificationsBell() {
                             Resolvida
                           </span>
                         ) : (
-                          !n.lida && (
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563eb]" />
-                          )
+                          !n.lida && <span className="h-2 w-2 shrink-0 rounded-full bg-[#2563eb]" />
                         )}
                       </span>
                       {n.descricao && (
-                        <span className="mt-0.5 block text-xs text-[#64748b]">
-                          {n.descricao}
-                        </span>
+                        <span className="mt-0.5 block text-xs text-[#64748b]">{n.descricao}</span>
                       )}
                       <span className="mt-0.5 block text-[11px] text-[#94a3b8]">
                         {tempoAtras(n.created_at)}
