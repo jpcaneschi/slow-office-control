@@ -99,18 +99,6 @@ function startOfDay(d: Date) {
   return x;
 }
 
-function somaConcluidas(vendas: Venda[], inicio: Date, fim: Date) {
-  const a = inicio.getTime();
-  const b = fim.getTime();
-  return vendas
-    .filter((v) => v.status === "concluida")
-    .filter((v) => {
-      const t = new Date(v.created_at).getTime();
-      return t >= a && t < b;
-    })
-    .reduce((s, v) => s + Number(v.total || 0), 0);
-}
-
 function dentroDoPeriodo(data: string, inicio: string, fim: string) {
   const dia = (data || "").slice(0, 10);
   return !!dia && dia >= inicio && dia <= fim;

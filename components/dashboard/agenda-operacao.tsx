@@ -29,6 +29,7 @@ const cores: Record<string,string> = {
   venda: "#16a34a",
   venda_prazo: "#f59e0b",
   recebimento: "#059669",
+  servico: "#0d9488",
   compra: "#2563eb",
   despesa: "#dc2626",
   conta: "#f59e0b",
@@ -44,6 +45,7 @@ const labels: Record<string,string> = {
   venda: "Vendas",
   venda_prazo: "Vendas a receber",
   recebimento: "Recebimentos",
+  servico: "Serviços",
   compra: "Compras",
   despesa: "Despesas",
   conta: "Contas a pagar",
@@ -124,7 +126,7 @@ export function AgendaOperacao({ compact = false }: { compact?: boolean }) {
   </div>;
 
   return <div className={compact?"flex h-full flex-col rounded-3xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]":"space-y-5"}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><div>{!compact&&<><h1 className="text-2xl font-black text-[#0f172a]">Agenda da operação</h1><p className="text-sm text-[#64748b]">Vendas, compras, despesas, folha, cobranças e eventos em um único lugar.</p></>} {compact&&<h3 className="text-base font-black text-[#0f172a]">Resumo da agenda</h3>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div>{!compact&&<><h1 className="text-2xl font-black text-[#0f172a]">Agenda da operação</h1><p className="text-sm text-[#64748b]">Vendas, serviços, compras, despesas, folha, cobranças e eventos em um único lugar.</p></>} {compact&&<h3 className="text-base font-black text-[#0f172a]">Resumo da agenda</h3>}</div>
       <div className="flex items-center gap-2">{!compact&&<div className="flex rounded-xl border border-[#e8ecf4] bg-white p-1"><button onClick={()=>setView("mes")} className={`rounded-lg px-3 py-2 text-xs font-bold ${view==="mes"?"bg-[#2563eb] text-white":"text-[#475569]"}`}><LayoutGrid className="mr-1 inline h-4 w-4"/>Mês</button><button onClick={()=>setView("lista")} className={`rounded-lg px-3 py-2 text-xs font-bold ${view==="lista"?"bg-[#2563eb] text-white":"text-[#475569]"}`}><List className="mr-1 inline h-4 w-4"/>Lista</button></div>}
         <button onClick={()=>setMes(new Date(mes.getFullYear(),mes.getMonth()-1,1))} className="rounded-lg p-2 text-[#64748b] hover:bg-[#f8fafc]"><ChevronLeft className="h-4 w-4"/></button><span className="min-w-[105px] text-center text-sm font-black text-[#0f172a]">{MESES[mes.getMonth()]} {mes.getFullYear()}</span><button onClick={()=>setMes(new Date(mes.getFullYear(),mes.getMonth()+1,1))} className="rounded-lg p-2 text-[#64748b] hover:bg-[#f8fafc]"><ChevronRight className="h-4 w-4"/></button>
         {!compact&&<button onClick={()=>novo()} className="rounded-xl bg-[#2563eb] px-3 py-2 text-xs font-black text-white"><Plus className="mr-1 inline h-4 w-4"/>Evento</button>}
