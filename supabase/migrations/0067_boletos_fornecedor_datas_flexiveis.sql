@@ -53,7 +53,7 @@ begin
       fornecedor, compra_grupo_id, parcela_numero, total_parcelas
     ) values (
       v_org,
-      coalesce(nullif(trim(p_descricao), ''), 'Boleto de fornecedor') ||
+      trim(p_fornecedor) || ' • ' || coalesce(nullif(trim(p_descricao), ''), 'Boleto') ||
         case when v_total > 1 then ' • ' || v_indice || '/' || v_total else '' end,
       'Fornecedor',
       round(v_valor,2),
@@ -80,3 +80,28 @@ $$;
 
 revoke all on function public.registrar_boletos_fornecedor(text,text,jsonb,text) from public;
 grant execute on function public.registrar_boletos_fornecedor(text,text,jsonb,text) to authenticated;
+
+-- Na agenda, boletos de fornecedor usam o mesmo tipo visual de compra/mercadoria.
+-- O registro continua sendo uma despesa comum e não possui vínculo com produto.
+create or replace function public.agenda_operacao_mes(p_competencia date default current_date)
+returns table(id text, data date, tipo text, titulo text, detalhe text, valor numeric, status text, href text)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    a.id,
+    a.data,
+    case
+      when a.tipo = 'despesa' and coalesce(a.detalhe,'') ilike 'Fornecedor%' then 'compra'
+      else a.tipo
+    end as tipo,
+    a.titulo,
+    a.detalhe,
+    a.valor,
+    a.status,
+    a.href
+  from public.agenda_operacao_mes_base(p_competencia) a
+  where not (a.tipo = 'folha' and coalesce(a.valor,0) <= 0.009)
+  order by a.data,a.tipo,a.titulo;
+$$;
