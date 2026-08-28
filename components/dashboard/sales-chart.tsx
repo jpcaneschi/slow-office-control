@@ -12,6 +12,10 @@ import {
   LabelList,
   Cell,
 } from "recharts";
+import {
+  calcularEscalaGrafico,
+  formatarEixoBrl,
+} from "@/lib/grafico-vendas-utils";
 
 export type SalesPoint = {
   dia: string;
@@ -21,31 +25,6 @@ export type SalesPoint = {
 
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-const brlSemCentavos = (v: number) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
-
-function escalaBonita(max: number, permitir25 = true) {
-  if (!Number.isFinite(max) || max <= 0) {
-    return { max: 100, ticks: [0, 25, 50, 75, 100] };
-  }
-  const bruto = max / 9;
-  const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
-  const norm = bruto / mag;
-  let passo: number;
-  if (norm <= 1) passo = 1;
-  else if (norm <= 2) passo = 2;
-  else if (permitir25 && norm <= 2.5) passo = 2.5;
-  else if (norm <= 5) passo = 5;
-  else passo = 10;
-  passo *= mag;
-  const topo = Math.ceil(max / passo) * passo;
-  const ticks: number[] = [];
-  for (let v = 0; v <= topo + passo / 1000; v += passo) {
-    ticks.push(Math.round(v * 100) / 100);
-  }
-  return { max: topo, ticks };
-}
 
 function CustomTooltip({
   active,
@@ -80,15 +59,15 @@ function CustomTooltip({
 export function SalesChart({ data }: { data: SalesPoint[] }) {
   const maxFat = data.length ? Math.max(...data.map((d) => d.faturamento)) : 0;
   const maxPed = data.length ? Math.max(...data.map((d) => d.pedidos)) : 0;
-  const escalaFat = escalaBonita(maxFat);
-  const escalaPed = escalaBonita(maxPed, false);
+  const escalaFat = calcularEscalaGrafico(maxFat);
+  const escalaPed = calcularEscalaGrafico(maxPed, false);
   const many = data.length > 8;
   const barSize = data.length > 16 ? 10 : many ? 18 : 38;
 
   return (
-    <div className="h-[340px] w-full">
+    <div className="h-[280px] min-w-0 w-full sm:h-[340px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 28, right: 16, left: 8, bottom: 8 }}>
+        <ComposedChart data={data} margin={{ top: 28, right: 4, left: 0, bottom: 8 }}>
           <defs>
             <linearGradient id="barFat" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3b82f6" />
@@ -101,22 +80,24 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             dataKey="dia"
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#64748b", fontSize: 12 }}
-            minTickGap={12}
+            tick={{ fill: "#64748b", fontSize: 11 }}
+            minTickGap={16}
             dy={6}
           />
           <YAxis
             yAxisId="left"
+            width={72}
             tickLine={false}
             axisLine={false}
             tick={{ fill: "#94a3b8", fontSize: 11 }}
-            tickFormatter={brlSemCentavos}
+            tickFormatter={formatarEixoBrl}
             domain={[0, escalaFat.max]}
             ticks={escalaFat.ticks}
           />
           <YAxis
             yAxisId="right"
             orientation="right"
+            width={28}
             tickLine={false}
             axisLine={false}
             tick={{ fill: "#94a3b8", fontSize: 11 }}

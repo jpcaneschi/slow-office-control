@@ -21,6 +21,7 @@ export function CsvTools({
   onImportar?: (linhas: Record<string, string>[]) => Promise<{
     ok: number;
     erro?: string;
+    aviso?: string;
   }>;
   ajuda?: string;
 }) {
@@ -43,7 +44,9 @@ export function CsvTools({
         setStatus(
           res.erro
             ? `Erro: ${res.erro}`
-            : `${res.ok} registro(s) importado(s) com sucesso.`
+            : `${res.ok} registro(s) importado(s) com sucesso.${
+                res.aviso ? ` ${res.aviso}` : ""
+              }`
         );
       }
     } catch {

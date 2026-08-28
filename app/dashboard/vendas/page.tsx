@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
@@ -19,10 +19,14 @@ import {
 } from "@/lib/vendas-utils";
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
+import { QuickSearchSelect } from "@/components/dashboard/quick-search-select";
 
 type Cliente = {
   id: string;
   nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  email: string | null;
 };
 
 type Produto = {
@@ -32,6 +36,8 @@ type Produto = {
   estoque: number | null;
   status: string | null;
   tem_variacoes: boolean | null;
+  categoria: string | null;
+  marca: string | null;
 };
 
 type Variacao = {
@@ -43,6 +49,8 @@ type Variacao = {
   preco: number | null;
   estoque: number | null;
   status: string | null;
+  sku: string | null;
+  codigo_barras: string | null;
 };
 
 type Venda = {
@@ -148,6 +156,7 @@ export default function VendasPage() {
   const [quantidade, setQuantidade] = useState("1");
   const [itensRascunho, setItensRascunho] = useState<ItemRascunho[]>([]);
   const [variacoes, setVariacoes] = useState<Variacao[]>([]);
+  const produtoBuscaRef = useRef<HTMLInputElement>(null);
 
   async function carregarDados() {
     setLoading(true);
@@ -156,11 +165,11 @@ export default function VendasPage() {
     const [clientesRes, produtosRes, vendasRes, itensRes, pagamentosRes] = await Promise.all([
       supabase
         .from("clientes")
-        .select("id, nome")
+        .select("id, nome, cpf, telefone, email")
         .order("created_at", { ascending: false }),
       supabase
         .from("produtos")
-        .select("id, nome, preco, estoque, status, tem_variacoes")
+        .select("id, nome, preco, estoque, status, tem_variacoes, categoria, marca")
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
@@ -191,7 +200,9 @@ export default function VendasPage() {
     // Variações ativas de todos os produtos (para a grade na venda).
     const { data: varData } = await supabase
       .from("produto_variacoes")
-      .select("id, produto_id, atributos, tamanho, cor, preco, estoque, status");
+      .select(
+        "id, produto_id, atributos, tamanho, cor, preco, estoque, status, sku, codigo_barras"
+      );
     setVariacoes(
       (varData || []).filter((v) => (v.status || "ativo") === "ativo")
     );
@@ -360,6 +371,70 @@ export default function VendasPage() {
   // Variações do produto selecionado no formulário de item.
   const variacoesDoProduto = variacoes.filter((v) => v.produto_id === produtoId);
   const produtoSelecionado = produtos.find((p) => p.id === produtoId);
+  const opcoesClientes = useMemo(
+    () => [
+      {
+        value: "",
+        label: "Venda avulsa",
+        description: "Não vincular esta venda a um cliente",
+        searchText: "avulso sem cliente",
+      },
+      ...clientes.map((cliente) => ({
+        value: cliente.id,
+        label: cliente.nome,
+        description:
+          [cliente.telefone, cliente.email].filter(Boolean).join(" · ") ||
+          "Cliente cadastrado",
+        searchText: [cliente.cpf, cliente.telefone, cliente.email]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    ],
+    [clientes]
+  );
+  const opcoesProdutos = useMemo(
+    () => {
+      const gradePorProduto = new Map<string, Variacao[]>();
+      for (const variacao of variacoes) {
+        const grade = gradePorProduto.get(variacao.produto_id) || [];
+        grade.push(variacao);
+        gradePorProduto.set(variacao.produto_id, grade);
+      }
+
+      return produtos.map((produto) => {
+        const grade = gradePorProduto.get(produto.id) || [];
+        const estoqueDisponivel = produto.tem_variacoes
+          ? grade.reduce((total, variacao) => total + Number(variacao.estoque || 0), 0)
+          : Number(produto.estoque || 0);
+        const termosGrade = grade.flatMap((variacao) => [
+          variacao.sku,
+          variacao.codigo_barras,
+          variacao.tamanho,
+          variacao.cor,
+          ...Object.values(variacao.atributos || {}),
+        ]);
+
+        return {
+          value: produto.id,
+          label: produto.nome,
+          description: [
+            produto.marca,
+            produto.categoria,
+            produto.tem_variacoes ? "com grade" : null,
+            `estoque ${estoqueDisponivel}`,
+            formatCurrency(Number(produto.preco || 0)),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          searchText: [produto.marca, produto.categoria, ...termosGrade]
+            .filter(Boolean)
+            .join(" "),
+          disabled: estoqueDisponivel <= 0,
+        };
+      });
+    },
+    [produtos, variacoes]
+  );
 
   function adicionarItem() {
     setErro("");
@@ -452,6 +527,7 @@ export default function VendasPage() {
     setProdutoId("");
     setVariacaoId("");
     setQuantidade("1");
+    requestAnimationFrame(() => produtoBuscaRef.current?.focus());
   }
 
   function removerItem(chave: string) {
@@ -752,21 +828,15 @@ export default function VendasPage() {
             </h2>
 
             <div className="mt-5 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm text-[#475569]">Cliente</label>
-                <select
-                  value={clienteId}
-                  onChange={(e) => setClienteId(e.target.value)}
-                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                >
-                  <option value="">Venda avulsa</option>
-                  {clientes.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <QuickSearchSelect
+                label="Cliente"
+                value={clienteId}
+                options={opcoesClientes}
+                onChange={setClienteId}
+                placeholder="Busque por nome, sobrenome, CPF, telefone ou e-mail"
+                emptyMessage="Nenhum cliente encontrado. Use venda avulsa ou cadastre o cliente."
+                hint="Digite qualquer trecho para localizar rapidamente um cliente já cadastrado."
+              />
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
@@ -1139,24 +1209,19 @@ export default function VendasPage() {
             </h2>
 
             <div className="mt-5 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm text-[#475569]">Produto</label>
-                <select
-                  value={produtoId}
-                  onChange={(e) => setProdutoId(e.target.value)}
-                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
-                >
-                  <option value="">Selecione um produto</option>
-                  {produtos.map((produto) => (
-                    <option key={produto.id} value={produto.id}>
-                      {produto.nome}
-                      {produto.tem_variacoes
-                        ? " — grade"
-                        : ` — estoque ${produto.estoque ?? 0}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <QuickSearchSelect
+                label="Produto"
+                value={produtoId}
+                options={opcoesProdutos}
+                onChange={(id) => {
+                  setProdutoId(id);
+                  setVariacaoId("");
+                }}
+                placeholder="Busque por produto, marca, categoria, SKU ou código"
+                emptyMessage="Nenhum produto ativo encontrado para esta busca."
+                hint="Selecione com Enter. Depois de adicionar, a busca volta a receber o foco."
+                inputRef={produtoBuscaRef}
+              />
 
               {produtoSelecionado?.tem_variacoes && (
                 <div>
