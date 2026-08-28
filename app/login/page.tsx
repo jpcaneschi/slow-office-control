@@ -7,6 +7,8 @@ import { Loader2, Mail, Lock, Building2, UserRound, ArrowLeft } from "lucide-rea
 import { supabase } from "@/lib/supabase";
 import { acessoPermiteEntrada, mensagemStatusAcesso } from "@/lib/acesso-utils";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+
 export default function LoginPage() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar">("entrar");
@@ -176,7 +178,7 @@ export default function LoginPage() {
     setRecuperando(true);
     const { error } = await supabase.auth.resetPasswordForEmail(
       emailNormalizado,
-      { redirectTo: `${window.location.origin}/redefinir-senha` }
+      { redirectTo: `${SITE_URL || window.location.origin}/redefinir-senha` }
     );
     setRecuperando(false);
     if (error) {
