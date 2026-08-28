@@ -9,8 +9,12 @@ import {
   paraInputDate,
   dataValida,
   hojeISO,
-  normalizarDataEntrada,
 } from "@/lib/datas";
+import {
+  planejarImportacaoClientes,
+  prepararImportacaoClientes,
+  type ClienteExistente,
+} from "@/lib/clientes-import";
 
 type Cliente = {
   id: string;
@@ -19,6 +23,9 @@ type Cliente = {
   cpf: string | null;
   status: string | null;
   data_nascimento: string | null;
+  email: string | null;
+  endereco: string | null;
+  observacoes: string | null;
 };
 
 const statusOptions = ["ativo", "inativo", "vip", "em atraso"];
@@ -41,13 +48,18 @@ export default function ClientesPage() {
   const [cpf, setCpf] = useState("");
   const [status, setStatus] = useState("ativo");
   const [dataNascimento, setDataNascimento] = useState("");
+  const [email, setEmail] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [observacoes, setObservacoes] = useState("");
 
   async function carregarClientes() {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("clientes")
-      .select("id, nome, telefone, cpf, status, data_nascimento")
+      .select(
+        "id, nome, telefone, cpf, status, data_nascimento, email, endereco, observacoes"
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -70,6 +82,9 @@ export default function ClientesPage() {
     setCpf("");
     setStatus("ativo");
     setDataNascimento("");
+    setEmail("");
+    setEndereco("");
+    setObservacoes("");
     setEditandoId(null);
   }
 
@@ -80,6 +95,9 @@ export default function ClientesPage() {
     setCpf(cliente.cpf || "");
     setStatus(cliente.status || "ativo");
     setDataNascimento(paraInputDate(cliente.data_nascimento));
+    setEmail(cliente.email || "");
+    setEndereco(cliente.endereco || "");
+    setObservacoes(cliente.observacoes || "");
     setErro("");
   }
 
@@ -126,6 +144,9 @@ export default function ClientesPage() {
           cpf: cpf.trim() || null,
           status,
           data_nascimento: dataNascimento || null,
+          email: email.trim().toLocaleLowerCase() || null,
+          endereco: endereco.trim() || null,
+          observacoes: observacoes.trim() || null,
         })
         .eq("id", editandoId);
 
@@ -141,6 +162,9 @@ export default function ClientesPage() {
         cpf: cpf.trim() || null,
         status,
         data_nascimento: dataNascimento || null,
+        email: email.trim().toLocaleLowerCase() || null,
+        endereco: endereco.trim() || null,
+        observacoes: observacoes.trim() || null,
       });
 
       if (error) {
@@ -191,11 +215,13 @@ export default function ClientesPage() {
 
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             <p className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] px-3 py-2 text-xs text-[#1e40af]">
-              Somente o nome é obrigatório. Telefone, CPF e nascimento são opcionais.
+              Somente o nome é obrigatório. Os demais dados são opcionais.
             </p>
             <div>
-              <label className={labelClass}>Nome</label>
+              <label htmlFor="cliente-nome" className={labelClass}>Nome</label>
               <input
+                id="cliente-nome"
+                required
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 className={inputClass}
@@ -204,8 +230,10 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Telefone <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <label htmlFor="cliente-telefone" className={labelClass}>Telefone <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
+                id="cliente-telefone"
+                type="tel"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 className={inputClass}
@@ -214,8 +242,21 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>CPF <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <label htmlFor="cliente-email" className={labelClass}>E-mail <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
+                id="cliente-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                placeholder="cliente@exemplo.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="cliente-cpf" className={labelClass}>CPF <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <input
+                id="cliente-cpf"
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 className={inputClass}
@@ -224,8 +265,9 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Data de nascimento <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <label htmlFor="cliente-nascimento" className={labelClass}>Data de nascimento <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
               <input
+                id="cliente-nascimento"
                 type="date"
                 value={dataNascimento}
                 max={hojeISO()}
@@ -235,8 +277,9 @@ export default function ClientesPage() {
             </div>
 
             <div>
-              <label className={labelClass}>Status</label>
+              <label htmlFor="cliente-status" className={labelClass}>Status</label>
               <select
+                id="cliente-status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className={inputClass}
@@ -247,6 +290,30 @@ export default function ClientesPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="cliente-endereco" className={labelClass}>Endereço <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <textarea
+                id="cliente-endereco"
+                value={endereco}
+                onChange={(e) => setEndereco(e.target.value)}
+                className={inputClass}
+                rows={3}
+                placeholder="Rua, número, bairro, cidade, UF e CEP"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="cliente-observacoes" className={labelClass}>Observações <span className="font-normal text-[#94a3b8]">(opcional)</span></label>
+              <textarea
+                id="cliente-observacoes"
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                className={inputClass}
+                rows={4}
+                placeholder="Preferências e informações importantes do cliente"
+              />
             </div>
 
             <button
@@ -268,52 +335,78 @@ export default function ClientesPage() {
             <h2 className="text-lg font-bold text-[#0f172a]">Clientes</h2>
             <CsvTools
               nomeArquivo="clientes"
-              headers={["nome", "telefone", "cpf", "status", "data_nascimento"]}
+              headers={[
+                "nome",
+                "telefone",
+                "cpf",
+                "email",
+                "endereco",
+                "observacoes",
+                "status",
+                "data_nascimento",
+              ]}
               linhas={clientes.map((c) => [
                 c.nome,
                 c.telefone || "",
                 c.cpf || "",
+                c.email || "",
+                c.endereco || "",
+                c.observacoes || "",
                 c.status || "ativo",
                 paraInputDate(c.data_nascimento),
               ])}
-              ajuda="Colunas: nome, telefone, cpf, status, data_nascimento (AAAA-MM-DD ou DD/MM/AAAA)."
+              ajuda="Aceita o CSV do Nexo ou a exportação de clientes da Shopify. Reimportações são identificadas e ignoradas."
               onImportar={async (linhas) => {
-                // Normaliza a data de cada linha (aceita AAAA-MM-DD ou DD/MM/AAAA).
-                // data === null → formato/valor de data inválido naquela linha.
-                const preparadas = linhas.map((r, i) => ({
-                  linha: i + 2, // +1 cabeçalho, +1 base-1 → nº da linha no arquivo
-                  nome: (r.nome || "").trim(),
-                  telefone: (r.telefone || "").trim() || null,
-                  cpf: (r.cpf || "").trim() || null,
-                  status: (r.status || "").trim() || "ativo",
-                  data: normalizarDataEntrada(r.data_nascimento),
-                }));
-
-                const comNome = preparadas.filter((c) => c.nome);
-                if (comNome.length === 0)
+                const preparacao = prepararImportacaoClientes(linhas);
+                if (preparacao.clientes.length === 0 && preparacao.erros.length === 0)
                   return { ok: 0, erro: "Nenhuma linha com nome válido." };
 
-                // Bloqueia importação se houver data inválida — nada entra em silêncio.
-                const invalidas = comNome.filter((c) => c.data === null);
-                if (invalidas.length > 0) {
-                  const nums = invalidas.map((c) => c.linha).join(", ");
+                // Bloqueia o arquivo inteiro se houver data inválida: nada entra
+                // parcialmente sem o operador perceber.
+                if (preparacao.erros.length > 0) {
+                  const nums = preparacao.erros.map((c) => c.linha).join(", ");
                   return {
                     ok: 0,
                     erro: `Data de nascimento inválida na(s) linha(s): ${nums}. Use AAAA-MM-DD ou DD/MM/AAAA.`,
                   };
                 }
 
-                const novos = comNome.map((c) => ({
-                  nome: c.nome,
-                  telefone: c.telefone,
-                  cpf: c.cpf,
-                  status: c.status,
-                  data_nascimento: c.data || null, // "" → null
-                }));
-                const { error } = await supabase.from("clientes").insert(novos);
+                // Consulta novamente antes de gravar para deduplicar contra o
+                // estado mais recente, sempre limitado à empresa atual pela RLS.
+                const { data: existentes, error: erroConsulta } = await supabase
+                  .from("clientes")
+                  .select("nome, telefone, cpf, email, endereco, observacoes");
+                if (erroConsulta) return { ok: 0, erro: erroConsulta.message };
+
+                const plano = planejarImportacaoClientes(
+                  preparacao.clientes,
+                  (existentes || []) as ClienteExistente[]
+                );
+                const avisos: string[] = [];
+                if (plano.duplicados > 0) {
+                  avisos.push(
+                    `${plano.duplicados} registro(s) já existente(s) foram ignorado(s).`
+                  );
+                }
+                if (preparacao.semNome > 0) {
+                  avisos.push(
+                    `${preparacao.semNome} linha(s) sem nome foram ignorada(s).`
+                  );
+                }
+
+                if (plano.novos.length === 0) {
+                  return {
+                    ok: 0,
+                    aviso: avisos.join(" ") || "Nenhum cliente novo encontrado.",
+                  };
+                }
+
+                const { error } = await supabase
+                  .from("clientes")
+                  .insert(plano.novos);
                 if (error) return { ok: 0, erro: error.message };
                 await carregarClientes();
-                return { ok: novos.length };
+                return { ok: plano.novos.length, aviso: avisos.join(" ") };
               }}
             />
           </div>
@@ -348,6 +441,14 @@ export default function ClientesPage() {
                       <p className="text-sm text-[#64748b]">
                         CPF: {cliente.cpf || "Não informado"}
                       </p>
+                      <p className="text-sm text-[#64748b]">
+                        E-mail: {cliente.email || "Não informado"}
+                      </p>
+                      {cliente.endereco && (
+                        <p className="mt-1 max-w-2xl text-sm text-[#64748b]">
+                          Endereço: {cliente.endereco}
+                        </p>
+                      )}
                       <p className="mt-2 inline-flex rounded-full bg-[#eff6ff] px-3 py-1 text-xs font-semibold text-[#2563eb]">
                         {cliente.status || "ativo"}
                       </p>

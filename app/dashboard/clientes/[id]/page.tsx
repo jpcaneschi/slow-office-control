@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EntityTimeline, type TimelineItem } from "@/components/dashboard/entity-timeline";
+import { formatDataBR } from "@/lib/datas";
 import { formatCurrency } from "@/lib/vendas-utils";
 import {
   agregarPagamentosPromissoria,
@@ -20,6 +21,10 @@ type Cliente = {
   telefone: string | null;
   cpf: string | null;
   status: string | null;
+  email: string | null;
+  endereco: string | null;
+  observacoes: string | null;
+  data_nascimento: string | null;
 };
 
 type Venda = {
@@ -82,14 +87,16 @@ export default function ClienteHistoricoPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const clienteRes = await supabase
+      const clientePromise = supabase
         .from("clientes")
-        .select("id, nome, telefone, cpf, status")
+        .select(
+          "id, nome, telefone, cpf, status, email, endereco, observacoes, data_nascimento"
+        )
         .eq("id", clienteId)
         .maybeSingle();
-      setCliente(clienteRes.data);
 
-      const [vRes, pRes, cRes, sRes, tRes, timelineRes] = await Promise.all([
+      const [clienteRes, vRes, pRes, cRes, sRes, tRes, timelineRes] = await Promise.all([
+        clientePromise,
         supabase
           .from("vendas")
           .select("id, total, forma_pagamento, status, created_at")
@@ -117,6 +124,7 @@ export default function ClienteHistoricoPage() {
           .order("data", { ascending: false }),
         supabase.rpc("timeline_cliente", { p_cliente_id: clienteId }),
       ]);
+      setCliente(clienteRes.data);
       setVendas(vRes.data || []);
       setPromissorias(pRes.data || []);
       setCondicionais(cRes.data || []);
@@ -185,6 +193,26 @@ export default function ClienteHistoricoPage() {
         title={cliente?.nome || "Cliente"}
         description={`${cliente?.telefone || "Sem telefone"} · CPF ${cliente?.cpf || "—"}`}
       />
+
+      <div className="grid gap-4 rounded-[30px] border border-[#e8ecf4] bg-white p-6 sm:grid-cols-2 xl:grid-cols-4">
+        <DadoCliente titulo="E-mail" valor={cliente?.email || "Não informado"} />
+        <DadoCliente
+          titulo="Nascimento"
+          valor={formatDataBR(cliente?.data_nascimento)}
+        />
+        <DadoCliente titulo="Status" valor={cliente?.status || "ativo"} />
+        <DadoCliente titulo="Endereço" valor={cliente?.endereco || "Não informado"} />
+        {cliente?.observacoes && (
+          <div className="sm:col-span-2 xl:col-span-4">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#94a3b8]">
+              Observações
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[#334155]">
+              {cliente.observacoes}
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Resumo */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -404,6 +432,19 @@ function Secao({
       ) : (
         <div className="mt-4 space-y-2">{children}</div>
       )}
+    </div>
+  );
+}
+
+function DadoCliente({ titulo, valor }: { titulo: string; valor: string }) {
+  return (
+    <div>
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-[#94a3b8]">
+        {titulo}
+      </p>
+      <p className="mt-1 break-words text-sm font-semibold text-[#334155]">
+        {valor}
+      </p>
     </div>
   );
 }

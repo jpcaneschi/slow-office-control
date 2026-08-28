@@ -328,7 +328,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/* Conteúdo */}
           <main className="flex-1 px-4 py-6 pb-24 md:px-8 xl:pb-6">
-            <div className="mx-auto max-w-[1400px]">
+            <div className="mx-auto max-w-[1600px]">
               <RouteGuard>{children}</RouteGuard>
             </div>
           </main>

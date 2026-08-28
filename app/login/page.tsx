@@ -71,7 +71,7 @@ export default function LoginPage() {
     // Administradores da plataforma não são clientes e não precisam criar uma
     // organização só para analisar/decidir solicitações de acesso.
     if (adminRes.data === true) {
-      router.replace("/dashboard/acessos");
+      router.replace("/admin");
       return;
     }
 

@@ -64,21 +64,24 @@ export function MetricCard({
     <>
       <div className="flex items-start gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl sm:h-11 sm:w-11"
           style={{ backgroundColor: `${tint}1a`, color: tint }}
         >
           <Icon className="h-5 w-5" />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[#64748b]">{title}</p>
-          <p className="mt-1 text-2xl font-black tracking-tight text-[#0f172a]">
+        <div className={`min-w-0 flex-1 ${href ? "pr-4" : ""}`}>
+          <p className="line-clamp-2 min-h-10 text-sm font-medium leading-5 text-[#64748b]">
+            {title}
+          </p>
+          <p className="mt-1 whitespace-nowrap text-[clamp(1.125rem,1.2vw,1.5rem)] font-black leading-tight tracking-tight text-[#0f172a]">
             {value}
           </p>
         </div>
-        {href && (
-          <ChevronRight className="h-4 w-4 shrink-0 text-[#cbd5e1] transition group-hover:text-[#2563eb]" />
-        )}
       </div>
+
+      {href && (
+        <ChevronRight className="absolute right-4 top-5 h-4 w-4 text-[#cbd5e1] transition group-hover:text-[#2563eb]" />
+      )}
 
       {typeof delta === "number" && (
         <div className="mt-3 flex items-center gap-1.5 text-xs">
@@ -107,7 +110,7 @@ export function MetricCard({
   );
 
   const baseClass =
-    "block rounded-3xl border border-[#eef2f7] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.05)]";
+    "relative block h-full min-w-0 rounded-3xl border border-[#eef2f7] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-5";
 
   if (href) {
     return (

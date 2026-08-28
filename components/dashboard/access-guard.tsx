@@ -29,10 +29,11 @@ export function AccessGuard({ children }: { children: ReactNode }) {
       ]);
 
       if (!ativo) return;
-      if (
-        adminRes.data === true ||
-        (!pedidoRes.error && acessoPermiteEntrada(pedidoRes.data?.status))
-      ) {
+      if (adminRes.data === true) {
+        router.replace("/admin");
+        return;
+      }
+      if (!pedidoRes.error && acessoPermiteEntrada(pedidoRes.data?.status)) {
         setEstado("liberado");
         return;
       }
