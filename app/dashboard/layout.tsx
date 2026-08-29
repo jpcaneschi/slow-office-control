@@ -293,10 +293,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* ─── Coluna principal ────────────────────────────────────────── */}
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           {/* Cabeçalho */}
           <header className="sticky top-0 z-30 border-b border-[#e8ecf4] bg-white/85 backdrop-blur-xl">
-            <div className="flex flex-wrap items-center gap-4 px-4 py-4 md:px-8">
+            <div className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 md:px-8">
               <button
                 onClick={() => setMobileNavOpen(true)}
                 aria-label="Abrir menu"
@@ -304,7 +304,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <h1 className="text-2xl font-black tracking-tight text-[#0f172a]">
+              <h1 className="max-w-[45vw] truncate text-xl font-black tracking-tight text-[#0f172a] sm:max-w-none sm:text-2xl">
                 {currentLabel}
               </h1>
 
@@ -327,8 +327,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </header>
 
           {/* Conteúdo */}
-          <main className="flex-1 px-4 py-6 pb-24 md:px-8 xl:pb-6">
-            <div className="mx-auto max-w-[1600px]">
+          <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 md:px-8 xl:pb-6">
+            <div className="mx-auto min-w-0 max-w-[1600px]">
               <RouteGuard>{children}</RouteGuard>
             </div>
           </main>

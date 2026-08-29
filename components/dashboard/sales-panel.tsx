@@ -249,7 +249,7 @@ export function SalesPanel({
             {open && (
               <div
                 role="listbox"
-                className="absolute right-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-[#e8ecf4] bg-white py-1 shadow-[0_12px_30px_rgba(15,23,42,0.12)]"
+                className="absolute left-0 z-20 mt-1.5 max-h-[min(60vh,22rem)] w-48 overflow-y-auto rounded-xl border border-[#e8ecf4] bg-white py-1 shadow-[0_12px_30px_rgba(15,23,42,0.12)] sm:left-auto sm:right-0"
               >
                 {PERIODS.map((p) => {
                   const r = presetRange(p.key);
@@ -329,13 +329,13 @@ export function SalesPanel({
       </div>
 
       {carregandoGrafico ? (
-        <div className="flex h-[340px] w-full items-center justify-center">
+        <div className="flex h-[260px] w-full items-center justify-center sm:h-[340px]">
           <div className="h-full w-full animate-pulse rounded-xl bg-[#f1f5f9]" />
         </div>
       ) : temDados ? (
         <SalesChart data={data} />
       ) : (
-        <div className="flex h-[340px] w-full flex-col items-center justify-center gap-2 text-center">
+        <div className="flex h-[260px] w-full flex-col items-center justify-center gap-2 text-center sm:h-[340px]">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f1f5f9] text-[#94a3b8]">
             <BarChart3 className="h-6 w-6" />
           </span>

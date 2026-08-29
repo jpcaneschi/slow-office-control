@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -57,17 +58,48 @@ function CustomTooltip({
 }
 
 export function SalesChart({ data }: { data: SalesPoint[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const atualizar = () => setCompact(element.getBoundingClientRect().width < 480);
+    atualizar();
+    const observer = new ResizeObserver(atualizar);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   const maxFat = data.length ? Math.max(...data.map((d) => d.faturamento)) : 0;
   const maxPed = data.length ? Math.max(...data.map((d) => d.pedidos)) : 0;
   const escalaFat = calcularEscalaGrafico(maxFat);
   const escalaPed = calcularEscalaGrafico(maxPed, false);
   const many = data.length > 8;
-  const barSize = data.length > 16 ? 10 : many ? 18 : 38;
+  const barSize = compact
+    ? data.length > 16
+      ? 6
+      : many
+        ? 10
+        : 20
+    : data.length > 16
+      ? 10
+      : many
+        ? 18
+        : 38;
 
   return (
-    <div className="h-[280px] min-w-0 w-full sm:h-[340px]">
+    <div ref={containerRef} className="h-[250px] min-w-0 w-full sm:h-[340px]">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 28, right: 4, left: 0, bottom: 8 }}>
+        <ComposedChart
+          data={data}
+          margin={
+            compact
+              ? { top: 18, right: -6, left: -12, bottom: 4 }
+              : { top: 28, right: 4, left: 0, bottom: 8 }
+          }
+        >
           <defs>
             <linearGradient id="barFat" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3b82f6" />
@@ -80,16 +112,16 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             dataKey="dia"
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#64748b", fontSize: 11 }}
-            minTickGap={16}
+            tick={{ fill: "#64748b", fontSize: compact ? 9 : 11 }}
+            minTickGap={compact ? 28 : 16}
             dy={6}
           />
           <YAxis
             yAxisId="left"
-            width={72}
+            width={compact ? 56 : 72}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: compact ? 9 : 11 }}
             tickFormatter={formatarEixoBrl}
             domain={[0, escalaFat.max]}
             ticks={escalaFat.ticks}
@@ -97,10 +129,10 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
           <YAxis
             yAxisId="right"
             orientation="right"
-            width={28}
+            width={compact ? 20 : 28}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: compact ? 9 : 11 }}
             domain={[0, escalaPed.max]}
             ticks={escalaPed.ticks}
             allowDecimals={false}
@@ -122,7 +154,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
                 fill={d.faturamento === maxFat ? "#2563eb" : "url(#barFat)"}
               />
             ))}
-            {!many && (
+            {!many && !compact && (
               <LabelList
                 dataKey="faturamento"
                 position="top"
@@ -137,10 +169,10 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             dataKey="pedidos"
             stroke="#2563eb"
             strokeWidth={2.5}
-            dot={many ? false : { r: 4, fill: "#ffffff", stroke: "#2563eb", strokeWidth: 2 }}
+            dot={many || compact ? false : { r: 4, fill: "#ffffff", stroke: "#2563eb", strokeWidth: 2 }}
             activeDot={{ r: 6 }}
           >
-            {!many && (
+            {!many && !compact && (
               <LabelList
                 dataKey="pedidos"
                 position="top"

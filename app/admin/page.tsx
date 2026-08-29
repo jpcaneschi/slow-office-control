@@ -5,11 +5,15 @@ import {
   AlertTriangle,
   Ban,
   Building2,
+  ChevronDown,
   Clock3,
   Copy,
   CreditCard,
   History,
+  LayoutDashboard,
+  ListChecks,
   MailPlus,
+  ReceiptText,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -93,6 +97,14 @@ type EdicaoCliente = {
   valor: string;
   validade: string;
 };
+
+type AdminTab =
+  | "resumo"
+  | "solicitacoes"
+  | "clientes"
+  | "cobrancas"
+  | "convites"
+  | "auditoria";
 
 const PLANOS = ["Essencial", "Profissional", "Master"] as const;
 const STATUS_ASSINATURA = [
@@ -186,6 +198,10 @@ export default function AdminPage() {
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
   const [accessFilter, setAccessFilter] = useState("todos");
+  const [subscriptionFilter, setSubscriptionFilter] = useState("todos");
+  const [planFilter, setPlanFilter] = useState("todos");
+  const [activeTab, setActiveTab] = useState<AdminTab>("resumo");
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [competencia, setCompetencia] = useState(mesAtual());
   const [dueDate, setDueDate] = useState(vencimentoPadrao(mesAtual()));
 
@@ -250,7 +266,16 @@ export default function AdminPage() {
   const visibleRequests = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
     return pedidos.filter((pedido) => {
+      if (activeTab === "solicitacoes" && pedido.status !== "pendente") return false;
+      if (activeTab === "clientes" && pedido.status === "pendente") return false;
       if (accessFilter !== "todos" && pedido.status !== accessFilter) return false;
+      if (
+        subscriptionFilter !== "todos" &&
+        pedido.assinatura_status !== subscriptionFilter
+      ) {
+        return false;
+      }
+      if (planFilter !== "todos" && pedido.plano !== planFilter) return false;
       if (!term) return true;
       return [
         pedido.nome,
@@ -264,11 +289,19 @@ export default function AdminPage() {
         .toLocaleLowerCase("pt-BR")
         .includes(term);
     });
-  }, [accessFilter, pedidos, search]);
+  }, [accessFilter, activeTab, pedidos, planFilter, search, subscriptionFilter]);
 
   function clearMessages() {
     setError("");
     setSuccess("");
+  }
+
+  function trocarAba(tab: AdminTab) {
+    setActiveTab(tab);
+    setAccessFilter("todos");
+    setSubscriptionFilter("todos");
+    setPlanFilter("todos");
+    setExpandedClientId(null);
   }
 
   function updateEdit(userId: string, patch: Partial<EdicaoCliente>) {
@@ -432,35 +465,72 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <section
-        id="visao-geral"
-        className="scroll-mt-24 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0b1f44] via-[#112f66] to-[#1d4ed8] p-6 text-white shadow-[0_20px_50px_rgba(15,47,102,0.2)] sm:p-8"
-      >
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-blue-100">
-              <ShieldCheck className="h-4 w-4" /> Área exclusiva do administrador
+    <div className="min-w-0 space-y-6">
+      <section className="rounded-[24px] border border-[#e5eaf2] bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.04)] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-[#2563eb]">
+              <ShieldCheck className="h-4 w-4" /> Administração Nexo
             </div>
-            <h1 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">
-              Controle a operação do Nexo pelo próprio site.
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-[#0f172a] sm:text-3xl">
+              Administração da plataforma
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-blue-100/80 sm:text-base">
-              Aprove cadastros, gerencie planos, acompanhe mensalidades e bloqueie ou
-              reative acessos sem entrar no Supabase ou na Vercel.
+            <p className="mt-1 text-sm text-[#64748b]">
+              Clientes, acessos, planos e cobranças em uma central única.
             </p>
           </div>
           <button
             type="button"
             onClick={load}
             disabled={loading}
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+            className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-[#dbe4f0] bg-white px-4 py-2.5 text-sm font-bold text-[#334155] transition hover:border-[#93b4f7] hover:text-[#2563eb] disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Atualizar dados
+            Atualizar
           </button>
         </div>
       </section>
+
+      <nav
+        aria-label="Seções da administração"
+        className="flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-[#e5eaf2] bg-white p-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.03)]"
+      >
+        {[
+          { key: "resumo", label: "Visão geral", icon: LayoutDashboard },
+          { key: "solicitacoes", label: "Solicitações", icon: ListChecks },
+          { key: "clientes", label: "Clientes", icon: Users },
+          { key: "cobrancas", label: "Cobranças", icon: ReceiptText },
+          { key: "convites", label: "Convites", icon: MailPlus },
+          { key: "auditoria", label: "Auditoria", icon: History },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => trocarAba(tab.key as AdminTab)}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition sm:px-4 ${
+                active
+                  ? "bg-[#2563eb] text-white shadow-sm"
+                  : "text-[#64748b] hover:bg-[#f4f6fb] hover:text-[#0f172a]"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+              {tab.key === "solicitacoes" && resumo.solicitacoes_pendentes > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                    active ? "bg-white/20 text-white" : "bg-[#fff7ed] text-[#c2410c]"
+                  }`}
+                >
+                  {resumo.solicitacoes_pendentes}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
       {error && (
         <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm font-semibold text-[#b91c1c]">
@@ -473,7 +543,9 @@ export default function AdminPage() {
         </div>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {activeTab === "resumo" && (
+        <>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           {
             label: "Aguardando aprovação",
@@ -527,19 +599,64 @@ export default function AdminPage() {
         })}
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => trocarAba("solicitacoes")}
+          className="rounded-[22px] border border-[#fed7aa] bg-[#fffaf5] p-5 text-left transition hover:border-[#fb923c]"
+        >
+          <p className="text-sm font-black text-[#9a3412]">Solicitações para analisar</p>
+          <p className="mt-2 text-2xl font-black text-[#0f172a]">
+            {resumo.solicitacoes_pendentes}
+          </p>
+          <p className="mt-1 text-xs text-[#64748b]">Aprovar ou recusar novos logins</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => trocarAba("clientes")}
+          className="rounded-[22px] border border-[#bfdbfe] bg-[#f8fbff] p-5 text-left transition hover:border-[#60a5fa]"
+        >
+          <p className="text-sm font-black text-[#1d4ed8]">Base de clientes</p>
+          <p className="mt-2 text-2xl font-black text-[#0f172a]">
+            {resumo.clientes_liberados}
+          </p>
+          <p className="mt-1 text-xs text-[#64748b]">Planos, acesso e situação de cada loja</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => trocarAba("cobrancas")}
+          className="rounded-[22px] border border-[#e9d5ff] bg-[#fcfaff] p-5 text-left transition hover:border-[#c084fc]"
+        >
+          <p className="text-sm font-black text-[#7e22ce]">Cobrança mensal</p>
+          <p className="mt-2 text-2xl font-black text-[#0f172a]">
+            {formatCurrency(Number(resumo.receita_mensal_prevista || 0))}
+          </p>
+          <p className="mt-1 text-xs text-[#64748b]">Gerar e acompanhar mensalidades</p>
+        </button>
+      </section>
+        </>
+      )}
+
+      {(activeTab === "solicitacoes" || activeTab === "clientes") && (
       <section id="clientes" className="scroll-mt-24 space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#2563eb]">
-              Clientes e acessos
+              {activeTab === "solicitacoes" ? "Fila de aprovação" : "Base de clientes"}
             </p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight">Lojas da plataforma</h2>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">
+              {activeTab === "solicitacoes"
+                ? "Solicitações de acesso"
+                : "Clientes da plataforma"}
+            </h2>
             <p className="mt-1 text-sm text-[#64748b]">
-              Aprovação do login e cobrança são controles separados, ambos protegidos no banco.
+              {activeTab === "solicitacoes"
+                ? "Revise os dados antes de liberar um novo login."
+                : "Pesquise uma loja e abra apenas os controles que precisa alterar."}
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative min-w-0 sm:w-80">
+          <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+            <div className="relative min-w-0 sm:col-span-2 lg:w-72">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
               <input
                 value={search}
@@ -548,16 +665,44 @@ export default function AdminPage() {
                 className="w-full rounded-xl border border-[#dbe4f0] bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#2563eb]"
               />
             </div>
-            <select
-              value={accessFilter}
-              onChange={(event) => setAccessFilter(event.target.value)}
-              className="rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
-            >
-              <option value="todos">Todos os acessos</option>
-              <option value="pendente">Aguardando</option>
-              <option value="aprovado">Aprovados</option>
-              <option value="rejeitado">Revogados</option>
-            </select>
+            {activeTab === "clientes" && (
+              <>
+                <select
+                  aria-label="Filtrar por acesso"
+                  value={accessFilter}
+                  onChange={(event) => setAccessFilter(event.target.value)}
+                  className="min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                >
+                  <option value="todos">Todos os acessos</option>
+                  <option value="aprovado">Liberados</option>
+                  <option value="rejeitado">Revogados</option>
+                </select>
+                <select
+                  aria-label="Filtrar por assinatura"
+                  value={subscriptionFilter}
+                  onChange={(event) => setSubscriptionFilter(event.target.value)}
+                  className="min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                >
+                  <option value="todos">Todas as situações</option>
+                  <option value="ativa">Ativa</option>
+                  <option value="trial">Teste gratuito</option>
+                  <option value="atrasada">Em atraso</option>
+                  <option value="inativa">Inativa</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
+                <select
+                  aria-label="Filtrar por plano"
+                  value={planFilter}
+                  onChange={(event) => setPlanFilter(event.target.value)}
+                  className="min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                >
+                  <option value="todos">Todos os planos</option>
+                  {PLANOS.map((plan) => (
+                    <option key={plan}>{plan}</option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
         </div>
 
@@ -584,8 +729,9 @@ export default function AdminPage() {
                   key={pedido.id}
                   className="rounded-[26px] border border-[#e8ecf4] bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.03)] sm:p-6"
                 >
-                  <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
-                    <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-lg font-black text-[#0f172a]">
                           {pedido.organization_nome ||
@@ -622,8 +768,46 @@ export default function AdminPage() {
                           Aprovado. A loja será criada quando o cliente entrar pela primeira vez.
                         </p>
                       )}
+                      </div>
+                      <div className="shrink-0 sm:text-right">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#94a3b8]">
+                          Plano atual
+                        </p>
+                        <p className="mt-1 text-sm font-black text-[#0f172a]">
+                          {pedido.plano || "Não definido"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[#64748b]">
+                          {pedido.valor_mensal === null
+                            ? "Sem valor mensal"
+                            : formatCurrency(Number(pedido.valor_mensal))}
+                        </p>
+                      </div>
                     </div>
 
+                    <button
+                      type="button"
+                      aria-expanded={expandedClientId === pedido.id}
+                      onClick={() =>
+                        setExpandedClientId((current) =>
+                          current === pedido.id ? null : pedido.id
+                        )
+                      }
+                      className="mt-4 flex w-full items-center justify-between rounded-xl border border-[#dbe4f0] bg-[#f8fafc] px-4 py-3 text-left text-sm font-bold text-[#334155] transition hover:border-[#93b4f7] hover:text-[#2563eb]"
+                    >
+                      <span>
+                        {pedido.status === "pendente"
+                          ? "Analisar solicitação"
+                          : "Gerenciar cliente"}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${
+                          expandedClientId === pedido.id ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {expandedClientId === pedido.id && (
+                    <div className="mt-4 rounded-2xl border border-[#e8ecf4] bg-[#fbfcfe] p-4">
                     <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:w-[620px] xl:grid-cols-4">
                       <label className="text-xs font-bold text-[#64748b]">
                         Plano
@@ -689,9 +873,8 @@ export default function AdminPage() {
                         <div className="sm:col-span-2" />
                       )}
                     </div>
-                  </div>
 
-                  <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-[#eef2f7] pt-4">
+                  <div className="mt-4 flex flex-col gap-2 border-t border-[#eef2f7] pt-4 sm:flex-row sm:flex-wrap sm:justify-end">
                     {pedido.status === "aprovado" && pedido.organization_id && (
                       <button
                         type="button"
@@ -724,6 +907,9 @@ export default function AdminPage() {
                       </button>
                     )}
                   </div>
+                    </div>
+                    )}
+                  </div>
                 </article>
               );
             })}
@@ -731,6 +917,9 @@ export default function AdminPage() {
         )}
       </section>
 
+      )}
+
+      {activeTab === "cobrancas" && (
       <section id="mensalidades" className="scroll-mt-24 space-y-4">
         <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-5 sm:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -848,6 +1037,9 @@ export default function AdminPage() {
         </div>
       </section>
 
+      )}
+
+      {activeTab === "convites" && (
       <section id="convites" className="scroll-mt-24 grid gap-5 xl:grid-cols-[1fr_1.15fr]">
         <form
           onSubmit={createInvite}
@@ -996,6 +1188,9 @@ export default function AdminPage() {
         </div>
       </section>
 
+      )}
+
+      {activeTab === "auditoria" && (
       <section
         id="historico"
         className="scroll-mt-24 rounded-[28px] border border-[#e8ecf4] bg-white p-5 sm:p-6"
@@ -1029,6 +1224,7 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+      )}
 
       <div className="flex items-center gap-2 rounded-2xl border border-[#dbe4f0] bg-[#f8fafc] px-4 py-3 text-xs text-[#64748b]">
         <Building2 className="h-4 w-4 shrink-0 text-[#2563eb]" />

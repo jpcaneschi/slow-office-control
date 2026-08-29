@@ -355,7 +355,7 @@ export function DashboardHome() {
 
       <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} />
 
-      <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1900px]:grid-cols-6">
+      <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-6">
         <MetricCard
           icon={ShoppingCart}
           tint="#2563eb"
