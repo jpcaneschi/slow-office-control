@@ -18,7 +18,7 @@ export function proxy() {
     `font-src 'self' data:`,
     `connect-src 'self' https://*.supabase.co wss://*.supabase.co`,
     `worker-src 'self' blob:`,
-    `frame-ancestors 'self'`,
+    `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `object-src 'none'`,
