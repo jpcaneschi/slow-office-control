@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
-import { usePeriod, isoToDate } from "@/components/dashboard/period-context";
+import {
+  usePeriod,
+  isoToDate,
+  presetRange,
+} from "@/components/dashboard/period-context";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeCancelarVenda } from "@/lib/permissoes";
 import { validarPagamento } from "@/lib/pdv-regras";
@@ -20,6 +24,11 @@ import {
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 import { QuickSearchSelect } from "@/components/dashboard/quick-search-select";
+import {
+  resumirRecebimentos,
+  vendaCorrespondeFiltro,
+  type FiltroFormaVenda,
+} from "@/lib/vendas-filtros";
 
 type Cliente = {
   id: string;
@@ -62,6 +71,9 @@ type Venda = {
   subtotal: number;
   desconto: number;
   total: number;
+  valor_recebido: number | null;
+  valor_liquido: number | null;
+  entrada_forma: string | null;
   observacao: string | null;
   status: string;
   created_at: string;
@@ -81,6 +93,7 @@ type PagamentoVenda = {
   venda_id: string;
   forma: "pix" | "dinheiro" | "cartao";
   valor: number;
+  taxa_valor: number | null;
 };
 
 type PagamentoRascunho = {
@@ -115,6 +128,8 @@ export default function VendasPage() {
     { id: string; nome: string }[]
   >([]);
   const [paginaVendas, setPaginaVendas] = useState(0);
+  const [filtroPagamento, setFiltroPagamento] =
+    useState<FiltroFormaVenda>("todas");
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [pixDesconto, setPixDesconto] = useState(5);
   const [maxParcelasCfg, setMaxParcelasCfg] = useState(6);
@@ -173,12 +188,12 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
-        .select("id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, observacao, status, created_at")
+        .select("id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, valor_recebido, valor_liquido, entrada_forma, observacao, status, created_at")
         .order("created_at", { ascending: false }),
       supabase
         .from("venda_itens")
         .select("id, venda_id, produto_id, variacao_id, quantidade, preco_unitario, total_item"),
-      supabase.from("venda_pagamentos").select("venda_id, forma, valor"),
+      supabase.from("venda_pagamentos").select("venda_id, forma, valor, taxa_valor"),
     ]);
 
     if (clientesRes.error) setErro(clientesRes.error.message);
@@ -244,7 +259,7 @@ export default function VendasPage() {
   }, [cancelandoVenda, cancelando]);
 
   // Filtro global de período (mesmo do Financeiro/Dashboard).
-  const { period } = usePeriod();
+  const { period, setPeriod } = usePeriod();
   const { papel } = usePapel();
   const podeCancelar = podeCancelarVenda(papel);
   const janela = useMemo(() => {
@@ -266,24 +281,28 @@ export default function VendasPage() {
     });
   }, [vendas, janela]);
 
+  const vendasFiltradas = useMemo(
+    () =>
+      vendasNoPeriodo.filter((venda) =>
+        vendaCorrespondeFiltro(venda, pagamentosVenda, filtroPagamento)
+      ),
+    [filtroPagamento, pagamentosVenda, vendasNoPeriodo]
+  );
+
+  const recebimentosPeriodo = useMemo(
+    () => resumirRecebimentos(vendasNoPeriodo, pagamentosVenda),
+    [pagamentosVenda, vendasNoPeriodo]
+  );
+
+  useEffect(() => {
+    setPaginaVendas(0);
+  }, [filtroPagamento, period.inicio, period.fim]);
+
   const totalConcluido = useMemo(() => {
     return vendasNoPeriodo
       .filter((item) => item.status === "concluida")
       .reduce((acc, item) => acc + Number(item.total || 0), 0);
   }, [vendasNoPeriodo]);
-
-  const totalPix = useMemo(() => {
-    const concluidas = new Set(
-      vendasNoPeriodo.filter((item) => item.status === "concluida").map((item) => item.id)
-    );
-    const vendasPixIntegrais = vendasNoPeriodo
-      .filter((item) => item.forma_pagamento === "pix" && item.status === "concluida")
-      .reduce((acc, item) => acc + Number(item.total || 0), 0);
-    const partesPix = pagamentosVenda
-      .filter((item) => concluidas.has(item.venda_id) && item.forma === "pix")
-      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
-    return vendasPixIntegrais + partesPix;
-  }, [vendasNoPeriodo, pagamentosVenda]);
 
   const subtotalRascunho = useMemo(() => {
     return itensRascunho.reduce(
@@ -775,10 +794,10 @@ export default function VendasPage() {
   const porPaginaVendas = 5;
   const totalPaginasVendas = Math.max(
     1,
-    Math.ceil(vendasNoPeriodo.length / porPaginaVendas)
+    Math.ceil(vendasFiltradas.length / porPaginaVendas)
   );
   const paginaAtual = Math.min(paginaVendas, totalPaginasVendas - 1);
-  const vendasPagina = vendasNoPeriodo.slice(
+  const vendasPagina = vendasFiltradas.slice(
     paginaAtual * porPaginaVendas,
     paginaAtual * porPaginaVendas + porPaginaVendas
   );
@@ -797,32 +816,52 @@ export default function VendasPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[28px] border border-[#e8ecf4] bg-white p-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-[24px] border border-[#e8ecf4] bg-white p-4 sm:p-5">
           <p className="text-sm font-bold text-[#475569]">Vendas concluídas</p>
-          <p className="mt-3 text-3xl font-black tracking-tight text-[#0f172a]">
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] sm:text-3xl">
             {vendasNoPeriodo.filter((item) => item.status === "concluida").length}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-[#bbf7d0] bg-[#f0fdf4] p-5">
+        <div className="rounded-[24px] border border-[#bbf7d0] bg-[#f0fdf4] p-4 sm:p-5">
           <p className="text-sm font-bold text-[#15803d]">Faturamento</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
+          <p className="mt-3 break-words text-xl font-black tracking-tight text-[#0f172a] sm:text-2xl">
             {formatCurrency(totalConcluido)}
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-[#bfdbfe] bg-[#eff6ff] p-5">
-          <p className="text-sm font-bold text-[#1d4ed8]">Vendas no Pix</p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a]">
-            {formatCurrency(totalPix)}
+        <div className="rounded-[24px] border border-[#bfdbfe] bg-[#eff6ff] p-4 sm:col-span-2 sm:p-5 lg:col-span-1">
+          <p className="text-sm font-bold text-[#1d4ed8]">Recebido no período</p>
+          <p className="mt-3 break-words text-xl font-black tracking-tight text-[#0f172a] sm:text-2xl">
+            {formatCurrency(recebimentosPeriodo.totalRecebido)}
+          </p>
+        </div>
+
+        <div className="rounded-[24px] border border-[#e8ecf4] bg-white p-4 sm:p-5">
+          <p className="text-xs font-bold text-[#64748b] sm:text-sm">Pix / Dinheiro</p>
+          <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
+            {formatCurrency(recebimentosPeriodo.pix)}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[#64748b]">
+            Dinheiro: {formatCurrency(recebimentosPeriodo.dinheiro)}
+          </p>
+        </div>
+
+        <div className="rounded-[24px] border border-[#e9d5ff] bg-[#faf5ff] p-4 sm:p-5">
+          <p className="text-xs font-bold text-[#7e22ce] sm:text-sm">Cartão líquido</p>
+          <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
+            {formatCurrency(recebimentosPeriodo.cartaoLiquido)}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[#7e22ce]">
+            Bruto: {formatCurrency(recebimentosPeriodo.cartaoBruto)}
           </p>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-4 sm:p-6">
             <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Nova venda
             </h2>
@@ -970,7 +1009,7 @@ export default function VendasPage() {
                           </button>
                         </div>
                         {pagamento.forma === "cartao" && (
-                          <div className="mt-2 grid grid-cols-2 gap-2">
+                          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <input
                               type="number"
                               min="1"
@@ -1039,7 +1078,7 @@ export default function VendasPage() {
               )}
 
               {formaPagamento === "cartao" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm text-[#475569]">
                       Parcelas
@@ -1079,21 +1118,21 @@ export default function VendasPage() {
                     />
                   </div>
                   {regraTaxaAplicavel && (
-                    <p className="col-span-2 text-xs text-[#94a3b8]">
+                    <p className="text-xs text-[#94a3b8] sm:col-span-2">
                       Taxa da regra cadastrada
                       {taxaBloqueada
                         ? " (ajuste manual bloqueado)."
                         : " — você pode ajustar se precisar."}
                     </p>
                   )}
-                  <p className="col-span-2 text-xs font-semibold text-[#1d4ed8]">
+                  <p className="text-xs font-semibold text-[#1d4ed8] sm:col-span-2">
                     Você recebe (líquido): {formatCurrency(valorLiquidoRascunho)}
                   </p>
                 </div>
               )}
 
               {formaPagamento === "misto" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm text-[#475569]">
                       Valor pago agora (entrada)
@@ -1122,7 +1161,7 @@ export default function VendasPage() {
                       <option value="cartao">Cartão</option>
                     </select>
                   </div>
-                  <p className="col-span-2 text-xs font-semibold text-[#b45309]">
+                  <p className="text-xs font-semibold text-[#b45309] sm:col-span-2">
                     Restante no fiado: {formatCurrency(restanteMisto)}
                   </p>
                 </div>
@@ -1130,7 +1169,7 @@ export default function VendasPage() {
 
               {geraPromissoria && (
                 <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm text-[#92400e]">
                         Parcelas (meses)
@@ -1166,7 +1205,7 @@ export default function VendasPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-[#475569]">Desconto manual</label>
-                <div className="grid grid-cols-[130px_1fr] gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[130px_1fr]">
                   <select
                     value={tipoDesconto}
                     onChange={(e) => setTipoDesconto(e.target.value as "valor" | "percentual")}
@@ -1203,7 +1242,7 @@ export default function VendasPage() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-4 sm:p-6">
             <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Adicionar itens
             </h2>
@@ -1314,7 +1353,7 @@ export default function VendasPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-6">
+          <div className="rounded-[30px] border border-[#2563eb]/20 bg-[#2563eb]/[0.06] p-4 sm:p-6">
             <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
               Resumo da venda
             </h2>
@@ -1341,21 +1380,100 @@ export default function VendasPage() {
             </button>
           </div>
 
-          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-            <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-              Vendas registradas{" "}
-              <span className="text-sm font-semibold text-[#94a3b8]">
-                ({vendasNoPeriodo.length})
-              </span>
-            </h2>
+          <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-4 sm:p-6">
+            <div className="flex flex-col gap-4">
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
+                  Vendas registradas{" "}
+                  <span className="text-sm font-semibold text-[#94a3b8]">
+                    ({vendasFiltradas.length})
+                  </span>
+                </h2>
+                <p className="mt-1 text-xs text-[#64748b]">
+                  Consulte por data e por cada forma realmente recebida, inclusive em pagamentos divididos.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-3 sm:p-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.25fr]">
+                  <label className="text-xs font-bold text-[#64748b]">
+                    Data inicial
+                    <input
+                      type="date"
+                      value={period.inicio}
+                      onChange={(event) => {
+                        const inicio = event.target.value;
+                        if (!inicio) return;
+                        setPeriod({
+                          inicio,
+                          fim: inicio > period.fim ? inicio : period.fim,
+                        });
+                      }}
+                      className="mt-1.5 w-full min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-[#64748b]">
+                    Data final
+                    <input
+                      type="date"
+                      value={period.fim}
+                      onChange={(event) => {
+                        const fim = event.target.value;
+                        if (!fim) return;
+                        setPeriod({
+                          inicio: fim < period.inicio ? fim : period.inicio,
+                          fim,
+                        });
+                      }}
+                      className="mt-1.5 w-full min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-[#64748b]">
+                    Forma de pagamento
+                    <select
+                      value={filtroPagamento}
+                      onChange={(event) =>
+                        setFiltroPagamento(event.target.value as FiltroFormaVenda)
+                      }
+                      className="mt-1.5 w-full min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                    >
+                      <option value="todas">Todas as formas</option>
+                      <option value="pix">Pix (inclusive dividido)</option>
+                      <option value="dinheiro">Dinheiro (inclusive dividido)</option>
+                      <option value="cartao">Cartão (inclusive dividido)</option>
+                      <option value="promissoria">Promissória</option>
+                      <option value="misto">Entrada + promissória</option>
+                      <option value="multiplo">Pagamento dividido</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1">
+                  {[
+                    ["Hoje", "hoje"],
+                    ["7 dias", "7"],
+                    ["15 dias", "15"],
+                    ["30 dias", "30"],
+                  ].map(([label, preset]) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setPeriod(presetRange(preset as "hoje" | "7" | "15" | "30"))}
+                      className="shrink-0 rounded-lg border border-[#dbe4f0] bg-white px-3 py-2 text-xs font-bold text-[#475569] transition hover:border-[#93b4f7] hover:text-[#2563eb]"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             {loading ? (
               <p className="mt-4 text-[#64748b]">Carregando vendas...</p>
-            ) : vendasNoPeriodo.length === 0 ? (
+            ) : vendasFiltradas.length === 0 ? (
               <p className="mt-4 text-[#64748b]">
                 {vendas.length === 0
                   ? "Nenhuma venda cadastrada ainda."
-                  : "Nenhuma venda no período selecionado."}
+                  : "Nenhuma venda encontrada para a data e a forma selecionadas."}
               </p>
             ) : (
               <>
@@ -1363,6 +1481,9 @@ export default function VendasPage() {
                 {vendasPagina.map((venda) => {
                   const itensDaVenda = itensVenda.filter(
                     (item) => item.venda_id === venda.id
+                  );
+                  const pagamentosDaVenda = pagamentosVenda.filter(
+                    (pagamento) => pagamento.venda_id === venda.id
                   );
 
                   return (
@@ -1394,10 +1515,37 @@ export default function VendasPage() {
                             Responsável: {venda.responsavel}
                           </p>
 
+                          <p className="text-sm font-bold text-[#334155]">
+                            Data: {new Date(venda.created_at).toLocaleString("pt-BR", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
+                          </p>
+
                           <p className="text-sm text-[#64748b]">
                             Subtotal: {formatCurrency(Number(venda.subtotal || 0))} · Total:{" "}
                             {formatCurrency(Number(venda.total || 0))}
                           </p>
+
+                          {venda.forma_pagamento === "multiplo" &&
+                            pagamentosDaVenda.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {pagamentosDaVenda.map((pagamento) => (
+                                  <span
+                                    key={`${pagamento.venda_id}-${pagamento.forma}`}
+                                    className="rounded-lg border border-[#dbe4f0] bg-white px-2.5 py-1 text-xs font-semibold text-[#475569]"
+                                  >
+                                    {rotuloFormaPagamento(pagamento.forma)}: {formatCurrency(Number(pagamento.valor || 0))}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                          {venda.forma_pagamento === "misto" && (
+                            <p className="text-xs font-semibold text-[#b45309]">
+                              Entrada em {rotuloFormaPagamento(venda.entrada_forma || "")}: {formatCurrency(Number(venda.valor_recebido || 0))}
+                            </p>
+                          )}
 
                           <p className="text-sm text-[#94a3b8]">
                             {venda.observacao || "Sem observação"}
@@ -1423,7 +1571,7 @@ export default function VendasPage() {
                         </div>
 
                         {venda.status === "concluida" && (
-                          <div className="flex min-w-[190px] flex-col gap-2">
+                          <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[190px]">
                             <button
                               type="button"
                               onClick={() => abrirDevolucao(venda.id)}
@@ -1516,7 +1664,7 @@ export default function VendasPage() {
               </div>
 
               {totalPaginasVendas > 1 && (
-                <div className="mt-5 flex items-center justify-between">
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                   <button
                     type="button"
                     onClick={() => setPaginaVendas((p) => Math.max(0, p - 1))}

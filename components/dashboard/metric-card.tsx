@@ -73,7 +73,7 @@ export function MetricCard({
           <p className="line-clamp-2 min-h-10 text-sm font-medium leading-5 text-[#64748b]">
             {title}
           </p>
-          <p className="mt-1 whitespace-nowrap text-[clamp(1.125rem,1.2vw,1.5rem)] font-black leading-tight tracking-tight text-[#0f172a]">
+          <p className="mt-1 break-words text-[clamp(1.125rem,1.2vw,1.5rem)] font-black leading-tight tracking-tight text-[#0f172a] sm:whitespace-nowrap">
             {value}
           </p>
         </div>
