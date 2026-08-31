@@ -7,6 +7,7 @@ import {
   ValePdf,
   RepasseProfissionalPdf,
 } from "@/components/pdf/relatorios-pdf";
+import { PromissoriaAcordoPdf } from "@/components/pdf/promissoria-acordo-pdf";
 
 // Render de verdade (Área #11): garante que os PDFs geram sem erro depois de
 // remover o letterSpacing e itemizar a folha. Um PDF válido começa com "%PDF-".
@@ -93,4 +94,51 @@ describe("relatorios-pdf — render", () => {
       })
     );
   }, 30000);
+
+  it("acordo com vários produtos, descontos e histórico de recebimentos", async () => {
+    await pdfOk(
+      React.createElement(PromissoriaAcordoPdf, {
+        loja: "Slow Office",
+        cliente: "Cliente de Teste",
+        cpf: "000.000.000-00",
+        emissao: "2026-08-31",
+        itens: [
+          {
+            nome: "Produto A",
+            detalhe: "Preto · M",
+            quantidade: 2,
+            precoOriginal: 100,
+            descontoValor: 10,
+            descontoPercentual: 10,
+            precoUnitario: 90,
+          },
+          {
+            nome: "Produto B",
+            quantidade: 1,
+            precoOriginal: 80,
+            descontoValor: 5,
+            descontoPercentual: 6.25,
+            precoUnitario: 75,
+          },
+        ],
+        subtotalProdutos: 280,
+        descontoProdutos: 25,
+        valorProdutos: 255,
+        acrescimoValor: 25.5,
+        acrescimoPercentual: 10,
+        entrada: 50,
+        valorTotal: 280.5,
+        totalPago: 100,
+        saldoAtual: 180.5,
+        parcelas: [
+          { numero: 1, vencimento: "2026-09-30", valor: 115.25 },
+          { numero: 2, vencimento: "2026-10-30", valor: 115.25 },
+        ],
+        recebimentos: [
+          { data: "2026-08-31", tipo: "entrada", forma: "Pix", valor: 50 },
+          { data: "2026-09-15", tipo: "parcela", forma: "Dinheiro", valor: 50 },
+        ],
+      })
+    );
+  }, 20000);
 });

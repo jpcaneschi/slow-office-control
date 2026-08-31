@@ -33,8 +33,22 @@ const dataBR = (v: string) => {
   return d && m && a ? `${d}/${m}/${a}` : "—";
 };
 
-export type AcordoItem = { nome: string; detalhe?: string; quantidade: number; precoUnitario: number };
+export type AcordoItem = {
+  nome: string;
+  detalhe?: string;
+  quantidade: number;
+  precoUnitario: number;
+  precoOriginal?: number;
+  descontoValor?: number;
+  descontoPercentual?: number;
+};
 export type AcordoParcela = { numero: number; vencimento: string; valor: number };
+export type AcordoRecebimento = {
+  data: string;
+  tipo: "entrada" | "parcela";
+  forma?: string | null;
+  valor: number;
+};
 
 type Props = {
   loja: string;
@@ -42,6 +56,8 @@ type Props = {
   cpf?: string | null;
   emissao: string;
   itens: AcordoItem[];
+  subtotalProdutos?: number;
+  descontoProdutos?: number;
   valorProdutos: number;
   acrescimoValor: number;
   acrescimoPercentual: number;
@@ -50,12 +66,14 @@ type Props = {
   totalPago: number;
   saldoAtual: number;
   parcelas: AcordoParcela[];
+  recebimentos?: AcordoRecebimento[];
   observacao?: string | null;
 };
 
 export function PromissoriaAcordoPdf({
   loja, cliente, cpf, emissao, itens, valorProdutos, acrescimoValor,
-  acrescimoPercentual, entrada, valorTotal, totalPago, saldoAtual, parcelas, observacao,
+  subtotalProdutos = valorProdutos, descontoProdutos = 0, acrescimoPercentual,
+  entrada, valorTotal, totalPago, saldoAtual, parcelas, recebimentos = [], observacao,
 }: Props) {
   return (
     <Document>
@@ -77,30 +95,64 @@ export function PromissoriaAcordoPdf({
         {itens.length ? (
           <View style={styles.table}>
             <View style={[styles.row, styles.head]}>
-              <Text style={[styles.cell, { width: "48%" }]}>Produto</Text>
-              <Text style={[styles.cell, { width: "14%" }]}>Qtd.</Text>
-              <Text style={[styles.cell, { width: "19%", textAlign: "right" }]}>Unitário</Text>
-              <Text style={[styles.cell, { width: "19%", textAlign: "right" }]}>Total</Text>
+              <Text style={[styles.cell, { width: "36%" }]}>Produto</Text>
+              <Text style={[styles.cell, { width: "10%" }]}>Qtd.</Text>
+              <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>Valor</Text>
+              <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>Desc./un.</Text>
+              <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>Total</Text>
             </View>
-            {itens.map((it, i) => (
-              <View key={`${it.nome}-${i}`} style={styles.row} wrap={false}>
-                <View style={[styles.cell, { width: "48%" }]}><Text>{it.nome}</Text>{it.detalhe ? <Text style={styles.textMuted}>{it.detalhe}</Text> : null}</View>
-                <Text style={[styles.cell, { width: "14%" }]}>{it.quantidade}</Text>
-                <Text style={[styles.cell, { width: "19%", textAlign: "right" }]}>{brl(it.precoUnitario)}</Text>
-                <Text style={[styles.cell, { width: "19%", textAlign: "right" }]}>{brl(it.precoUnitario * it.quantidade)}</Text>
-              </View>
-            ))}
+            {itens.map((it, i) => {
+              const precoOriginal = Number(it.precoOriginal ?? it.precoUnitario);
+              const descontoUnitario = Number(it.descontoValor || 0);
+              return (
+                <View key={`${it.nome}-${i}`} style={styles.row} wrap={false}>
+                  <View style={[styles.cell, { width: "36%" }]}><Text>{it.nome}</Text>{it.detalhe ? <Text style={styles.textMuted}>{it.detalhe}</Text> : null}</View>
+                  <Text style={[styles.cell, { width: "10%" }]}>{it.quantidade}</Text>
+                  <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>{brl(precoOriginal)}</Text>
+                  <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>
+                    {descontoUnitario > 0
+                      ? `${brl(descontoUnitario)}${Number(it.descontoPercentual || 0) > 0 ? ` (${Number(it.descontoPercentual).toFixed(2)}%)` : ""}`
+                      : "—"}
+                  </Text>
+                  <Text style={[styles.cell, { width: "18%", textAlign: "right" }]}>{brl(it.precoUnitario * it.quantidade)}</Text>
+                </View>
+              );
+            })}
           </View>
         ) : <View style={styles.note}><Text>Dívida sem produto vinculado (ex.: saldo anterior ao sistema).</Text></View>}
 
         <View style={styles.totalBox}>
-          <View style={styles.totalLine}><Text>Preço/base</Text><Text>{brl(valorProdutos)}</Text></View>
+          <View style={styles.totalLine}><Text>Subtotal dos produtos</Text><Text>{brl(subtotalProdutos)}</Text></View>
+          {descontoProdutos > 0 ? <View style={styles.totalLine}><Text>Descontos nos produtos</Text><Text>- {brl(descontoProdutos)}</Text></View> : null}
+          <View style={styles.totalLine}><Text>Produtos após descontos</Text><Text>{brl(valorProdutos)}</Text></View>
           <View style={styles.totalLine}><Text>Acréscimo / juros ({acrescimoPercentual.toFixed(2)}%)</Text><Text>{brl(acrescimoValor)}</Text></View>
           <View style={styles.totalLine}><Text style={styles.totalStrong}>Total do acordo</Text><Text style={styles.totalStrong}>{brl(valorTotal)}</Text></View>
           <View style={styles.totalLine}><Text>Entrada</Text><Text>- {brl(entrada)}</Text></View>
           <View style={styles.totalLine}><Text>Total já recebido (inclui entrada)</Text><Text>{brl(totalPago)}</Text></View>
           <View style={[styles.totalLine, { marginBottom: 0 }]}><Text style={styles.totalStrong}>Saldo atual</Text><Text style={styles.totalStrong}>{brl(saldoAtual)}</Text></View>
         </View>
+
+        {recebimentos.length > 0 ? (
+          <>
+            <Text style={styles.section}>Histórico de recebimentos</Text>
+            <View style={styles.table}>
+              <View style={[styles.row, styles.head]}>
+                <Text style={[styles.cell, { width: "24%" }]}>Data</Text>
+                <Text style={[styles.cell, { width: "26%" }]}>Tipo</Text>
+                <Text style={[styles.cell, { width: "26%" }]}>Forma</Text>
+                <Text style={[styles.cell, { width: "24%", textAlign: "right" }]}>Valor</Text>
+              </View>
+              {recebimentos.map((recebimento, index) => (
+                <View key={`${recebimento.data}-${index}`} style={styles.row} wrap={false}>
+                  <Text style={[styles.cell, { width: "24%" }]}>{dataBR(recebimento.data)}</Text>
+                  <Text style={[styles.cell, { width: "26%" }]}>{recebimento.tipo === "entrada" ? "Entrada" : "Parcela recebida"}</Text>
+                  <Text style={[styles.cell, { width: "26%" }]}>{recebimento.forma || "Não informada"}</Text>
+                  <Text style={[styles.cell, { width: "24%", textAlign: "right" }]}>{brl(recebimento.valor)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <Text style={styles.section}>Plano de parcelas</Text>
         <View style={styles.table}>
