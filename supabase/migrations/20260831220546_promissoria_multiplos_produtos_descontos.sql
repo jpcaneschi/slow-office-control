@@ -1,5 +1,5 @@
 -- Promissórias com vários produtos, preço/desconto por item e recebimentos na data local.
--- Compatível com registros antigos: nenhum item, pagamento ou saldo existente é removido.
+-- Compatível com registros antigos: nenhum item, pagamento ou saldo existente é removido ou regravado.
 
 alter table public.promissoria_itens
   add column if not exists preco_original numeric(12, 2),
