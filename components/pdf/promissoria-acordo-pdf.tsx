@@ -1,8 +1,20 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image as PdfImage, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import nexoLogo from "@/public/nexo-gestao-horizontal.png";
+
+const nexoLogoAsset = nexoLogo as unknown;
+const NEXO_LOGO_SRC =
+  typeof nexoLogoAsset === "string"
+    ? nexoLogoAsset.startsWith("/public/") && typeof process !== "undefined"
+      ? `${process.cwd()}${nexoLogoAsset}`
+      : nexoLogoAsset
+    : nexoLogoAsset && typeof nexoLogoAsset === "object" && "src" in nexoLogoAsset
+      ? String(nexoLogoAsset.src)
+      : "";
 
 const styles = StyleSheet.create({
   page: { padding: 36, fontSize: 10, color: "#0f172a", fontFamily: "Helvetica" },
   header: { borderBottomWidth: 1, borderBottomColor: "#dbe3ef", paddingBottom: 14, marginBottom: 18 },
+  logo: { width: 96, height: 30, objectFit: "contain", objectPosition: "left", marginBottom: 8 },
   eyebrow: { fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: 1.2 },
   title: { fontSize: 22, fontWeight: 700, marginTop: 4 },
   subtitle: { fontSize: 10, color: "#64748b", marginTop: 5 },
@@ -79,6 +91,7 @@ export function PromissoriaAcordoPdf({
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
+          {NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={styles.logo} /> : null}
           <Text style={styles.eyebrow}>{loja || "Loja"}</Text>
           <Text style={styles.title}>Acordo de pagamento</Text>
           <Text style={styles.subtitle}>Promissória detalhada e posição atual do saldo</Text>

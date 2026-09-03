@@ -1,13 +1,29 @@
 import {
   Document,
+  Image as PdfImage,
   Page,
   Text,
   View,
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
+import nexoLogo from "@/public/nexo-gestao-horizontal.png";
 import { montarFolha } from "@/lib/folha-utils";
 import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
+import type {
+  MovimentoFinanceiro,
+  ResumoFinanceiroPeriodo,
+} from "@/lib/relatorios-financeiros";
+
+const nexoLogoAsset = nexoLogo as unknown;
+const NEXO_LOGO_SRC =
+  typeof nexoLogoAsset === "string"
+    ? nexoLogoAsset.startsWith("/public/") && typeof process !== "undefined"
+      ? `${process.cwd()}${nexoLogoAsset}`
+      : nexoLogoAsset
+    : nexoLogoAsset && typeof nexoLogoAsset === "object" && "src" in nexoLogoAsset
+      ? String(nexoLogoAsset.src)
+      : "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modelos de PDF em PRETO & BRANCO (para impressão em folha branca).
@@ -81,6 +97,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000000",
     paddingBottom: 12,
   },
+  brandLogo: { width: 92, height: 28, objectFit: "contain", objectPosition: "left" },
   loja: { fontSize: 18, fontFamily: "DejaVuPDF", fontWeight: 700, color: "#000000" },
   lojaSub: { fontSize: 8, color: "#555555", marginTop: 3 },
   headRight: { alignItems: "flex-end" },
@@ -224,7 +241,10 @@ function Header({
   return (
     <View style={styles.header}>
       <View>
-        <Text style={styles.loja}>{loja || "Sua Empresa"}</Text>
+        {NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={styles.brandLogo} /> : null}
+        <Text style={[styles.loja, { fontSize: 11, marginTop: 5 }]}>
+          {loja || "Sua Empresa"}
+        </Text>
         <Text style={styles.lojaSub}>Documento oficial da loja</Text>
       </View>
       <View style={styles.headRight}>
@@ -701,6 +721,233 @@ export function RepasseProfissionalPdf({
           esquerda="Assinatura do profissional"
           direita="Responsável pela loja"
         />
+        <Rodape loja={loja} />
+      </Page>
+    </Document>
+  );
+}
+
+// ── 7) Relatório financeiro completo por período ────────────────────────────
+export type RelatorioFinanceiroPdfProps = {
+  loja: string;
+  periodoInicio: string;
+  periodoFim: string;
+  resumo: ResumoFinanceiroPeriodo;
+  movimentos: MovimentoFinanceiro[];
+  fechadoEm?: string | null;
+};
+
+function nomeForma(valor: string | null | undefined) {
+  const nomes: Record<string, string> = {
+    pix: "Pix",
+    dinheiro: "Dinheiro",
+    cartao: "Cartão",
+    promissoria: "Promissória",
+    misto: "Entrada + promissória",
+    multiplo: "Pagamento dividido",
+    "não informado": "Não informado",
+  };
+  return nomes[valor || ""] || valor || "Não informado";
+}
+
+function nomeTipo(valor: string) {
+  const nomes: Record<string, string> = {
+    recebimento_venda: "Venda recebida",
+    recebimento_promissoria: "Promissória recebida",
+    servico: "Serviço",
+    compra: "Compra / fornecedor",
+    despesa: "Despesa",
+    folha: "Folha",
+    vale: "Vale / adiantamento",
+  };
+  return nomes[valor] || valor;
+}
+
+export function RelatorioFinanceiroPdf({
+  loja,
+  periodoInicio,
+  periodoFim,
+  resumo,
+  movimentos,
+  fechadoEm,
+}: RelatorioFinanceiroPdfProps) {
+  const vendas = movimentos.filter((movimento) => movimento.natureza === "venda");
+  const caixa = movimentos.filter((movimento) => movimento.natureza !== "venda");
+  const resumoPorDia = Array.from(
+    movimentos.reduce((mapa, movimento) => {
+      const atual = mapa.get(movimento.data) || {
+        vendas: 0,
+        entradas: 0,
+        saidas: 0,
+      };
+      if (movimento.natureza === "venda") atual.vendas += movimento.valor;
+      if (movimento.natureza === "entrada") atual.entradas += movimento.valor;
+      if (movimento.natureza === "saida") atual.saidas += movimento.valor;
+      mapa.set(movimento.data, atual);
+      return mapa;
+    }, new Map<string, { vendas: number; entradas: number; saidas: number }>())
+  ).sort(([a], [b]) => a.localeCompare(b));
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <Header
+          loja={loja}
+          titulo="Relatório financeiro"
+          numero={gerarNumero("REL")}
+        />
+
+        <Text style={styles.sectionTitle}>Período e situação</Text>
+        <InfoGrid
+          itens={[
+            {
+              label: "Período analisado",
+              value: `${fmtData(periodoInicio)} a ${fmtData(periodoFim)}`,
+            },
+            {
+              label: "Situação do período",
+              value: fechadoEm
+                ? `Fechado em ${fmtData(fechadoEm)}`
+                : "Relatório em aberto",
+            },
+          ]}
+        />
+
+        <Text style={styles.sectionTitle}>Resumo executivo</Text>
+        <InfoGrid
+          itens={[
+            { label: "Vendas realizadas", value: brl(resumo.vendas_brutas) },
+            { label: "Quantidade de vendas", value: String(resumo.vendas_quantidade) },
+            { label: "Entradas recebidas", value: brl(resumo.entradas_total) },
+            { label: "Saídas pagas", value: brl(resumo.saidas_total) },
+            { label: "Resultado de caixa", value: brl(resumo.resultado_caixa) },
+            { label: "Contas pendentes no período", value: brl(resumo.despesas_pendentes) },
+          ]}
+        />
+
+        <Text style={styles.sectionTitle}>Composição financeira</Text>
+        <View style={styles.table}>
+          <View style={styles.tHead}>
+            <Text style={[styles.tHeadCell, { flex: 1 }]}>Componente</Text>
+            <Text style={[styles.tHeadCell, { width: 105, textAlign: "right" }]}>Valor</Text>
+          </View>
+          {[
+            ["Vendas recebidas no caixa", resumo.entradas_vendas],
+            ["Recebimentos de promissórias", resumo.recebimentos_promissorias],
+            ["Receita da loja em serviços", resumo.receita_servicos],
+            ["Despesas operacionais pagas", resumo.despesas_operacionais_pagas],
+            ["Compras e fornecedores pagos", resumo.compras_pagas],
+            ["Folha e vales pagos", resumo.folha_vales_pagos],
+          ].map(([label, valor]) => (
+            <View key={String(label)} style={styles.tRow} wrap={false}>
+              <Text style={[styles.tCell, { flex: 1 }]}>{String(label)}</Text>
+              <Text style={[styles.tCell, { width: 105, textAlign: "right" }]}>
+                {brl(Number(valor))}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>Fechamento diário</Text>
+        {resumoPorDia.length === 0 ? (
+          <Text style={styles.paragraph}>Não houve movimentação no período.</Text>
+        ) : (
+          <View style={styles.table}>
+            <View style={styles.tHead}>
+              <Text style={[styles.tHeadCell, { width: 68 }]}>Data</Text>
+              <Text style={[styles.tHeadCell, { flex: 1, textAlign: "right" }]}>Vendido</Text>
+              <Text style={[styles.tHeadCell, { flex: 1, textAlign: "right" }]}>Recebido</Text>
+              <Text style={[styles.tHeadCell, { flex: 1, textAlign: "right" }]}>Pago</Text>
+              <Text style={[styles.tHeadCell, { flex: 1, textAlign: "right" }]}>Saldo</Text>
+            </View>
+            {resumoPorDia.map(([data, totais]) => (
+              <View key={data} style={styles.tRow} wrap={false}>
+                <Text style={[styles.tCell, { width: 68 }]}>{fmtData(data)}</Text>
+                <Text style={[styles.tCell, { flex: 1, textAlign: "right" }]}>
+                  {brl(totais.vendas)}
+                </Text>
+                <Text style={[styles.tCell, { flex: 1, textAlign: "right" }]}>
+                  {brl(totais.entradas)}
+                </Text>
+                <Text style={[styles.tCell, { flex: 1, textAlign: "right" }]}>
+                  {brl(totais.saidas)}
+                </Text>
+                <Text style={[styles.tCell, { flex: 1, textAlign: "right" }]}>
+                  {brl(totais.entradas - totais.saidas)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Vendas e produtos</Text>
+        {vendas.length === 0 ? (
+          <Text style={styles.paragraph}>Nenhuma venda concluída neste período.</Text>
+        ) : (
+          <View style={styles.table}>
+            <View style={styles.tHead}>
+              <Text style={[styles.tHeadCell, { width: 65 }]}>Data</Text>
+              <Text style={[styles.tHeadCell, { flex: 1 }]}>Produtos</Text>
+              <Text style={[styles.tHeadCell, { width: 82 }]}>Forma</Text>
+              <Text style={[styles.tHeadCell, { width: 82, textAlign: "right" }]}>Venda</Text>
+            </View>
+            {vendas.map((movimento) => (
+              <View key={movimento.id} style={styles.tRow} wrap={false}>
+                <Text style={[styles.tCell, { width: 65 }]}>{fmtData(movimento.data)}</Text>
+                <Text style={[styles.tCell, { flex: 1 }]}>
+                  {movimento.detalhe || movimento.descricao}
+                </Text>
+                <Text style={[styles.tCell, { width: 82 }]}>
+                  {nomeForma(movimento.forma_pagamento)}
+                </Text>
+                <Text style={[styles.tCell, { width: 82, textAlign: "right" }]}>
+                  {brl(movimento.valor)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Entradas e saídas realizadas</Text>
+        {caixa.length === 0 ? (
+          <Text style={styles.paragraph}>Nenhuma entrada ou saída realizada neste período.</Text>
+        ) : (
+          <View style={styles.table}>
+            <View style={styles.tHead}>
+              <Text style={[styles.tHeadCell, { width: 65 }]}>Data</Text>
+              <Text style={[styles.tHeadCell, { width: 95 }]}>Tipo</Text>
+              <Text style={[styles.tHeadCell, { flex: 1 }]}>Descrição</Text>
+              <Text style={[styles.tHeadCell, { width: 75 }]}>Forma</Text>
+              <Text style={[styles.tHeadCell, { width: 82, textAlign: "right" }]}>Valor</Text>
+            </View>
+            {caixa.map((movimento) => (
+              <View key={movimento.id} style={styles.tRow} wrap={false}>
+                <Text style={[styles.tCell, { width: 65 }]}>{fmtData(movimento.data)}</Text>
+                <Text style={[styles.tCell, { width: 95 }]}>{nomeTipo(movimento.tipo)}</Text>
+                <Text style={[styles.tCell, { flex: 1 }]}>
+                  {movimento.descricao}
+                  {movimento.detalhe ? ` · ${movimento.detalhe}` : ""}
+                </Text>
+                <Text style={[styles.tCell, { width: 75 }]}>
+                  {nomeForma(movimento.forma_pagamento)}
+                </Text>
+                <Text style={[styles.tCell, { width: 82, textAlign: "right" }]}>
+                  {movimento.natureza === "saida" ? "− " : "+ "}
+                  {brl(movimento.valor)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={[styles.clauseBox, { marginTop: 18 }]}>
+          <Text style={styles.clauseText}>
+            Vendas realizadas representam o valor dos pedidos concluídos. Entradas e saídas
+            consideram o dia em que o dinheiro efetivamente entrou ou foi pago; por isso uma
+            promissória pode aparecer como venda em uma data e como recebimento em outra.
+          </Text>
+        </View>
+
         <Rodape loja={loja} />
       </Page>
     </Document>

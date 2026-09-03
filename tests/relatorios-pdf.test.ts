@@ -6,6 +6,7 @@ import {
   PromissoriaPdf,
   ValePdf,
   RepasseProfissionalPdf,
+  RelatorioFinanceiroPdf,
 } from "@/components/pdf/relatorios-pdf";
 import { PromissoriaAcordoPdf } from "@/components/pdf/promissoria-acordo-pdf";
 
@@ -137,6 +138,66 @@ describe("relatorios-pdf — render", () => {
         recebimentos: [
           { data: "2026-08-31", tipo: "entrada", forma: "Pix", valor: 50 },
           { data: "2026-09-15", tipo: "parcela", forma: "Dinheiro", valor: 50 },
+        ],
+      })
+    );
+  }, 20000);
+
+  it("relatório financeiro mensal completo", async () => {
+    await pdfOk(
+      React.createElement(RelatorioFinanceiroPdf, {
+        loja: "Slow Office",
+        periodoInicio: "2026-08-01",
+        periodoFim: "2026-08-31",
+        fechadoEm: "2026-08-31",
+        resumo: {
+          vendas_brutas: 1000,
+          vendas_quantidade: 2,
+          entradas_vendas: 700,
+          recebimentos_promissorias: 200,
+          receita_servicos: 100,
+          entradas_total: 1000,
+          despesas_operacionais_pagas: 300,
+          compras_pagas: 200,
+          folha_vales_pagos: 100,
+          saidas_total: 600,
+          resultado_caixa: 400,
+          despesas_pendentes: 50,
+        },
+        movimentos: [
+          {
+            id: "venda-1",
+            data: "2026-08-05",
+            natureza: "venda",
+            tipo: "venda",
+            descricao: "Venda para Cliente",
+            detalhe: "1x Camiseta",
+            forma_pagamento: "pix",
+            valor: 300,
+            status: "concluida",
+          },
+          {
+            id: "entrada-1",
+            data: "2026-08-05",
+            natureza: "entrada",
+            tipo: "recebimento_venda",
+            descricao: "Recebimento de venda",
+            detalhe: "1x Camiseta",
+            forma_pagamento: "pix",
+            valor: 300,
+            status: "recebido",
+          },
+          {
+            id: "saida-1",
+            data: "2026-08-06",
+            natureza: "saida",
+            tipo: "compra",
+            descricao: "Fornecedor",
+            detalhe: "Mercadoria",
+            forma_pagamento: "não informado",
+            valor: 200,
+            status: "pago",
+          },
         ],
       })
     );

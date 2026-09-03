@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { garantirEmpresa } from "@/lib/empresa-config";
 import { acessoPermiteEntrada, type StatusAcesso } from "@/lib/acesso-utils";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -152,10 +153,8 @@ export default function OnboardingPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1e40af] to-[#2563eb] p-4">
       <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
-        <div className="mb-6 text-center">
-          <p className="text-[24px] font-black leading-none tracking-tight text-[#2563eb]">
-            Nexo
-          </p>
+        <div className="mb-6 flex justify-center">
+          <NexoLogo priority className="h-12 w-auto" />
         </div>
 
         {carregando ? (

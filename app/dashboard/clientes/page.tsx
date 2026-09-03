@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CsvTools } from "@/components/dashboard/csv-tools";
+import { RankingClientes } from "@/components/dashboard/ranking-clientes";
 import {
   paraInputDate,
   dataValida,
@@ -185,7 +186,7 @@ export default function ClientesPage() {
         <PageHeader
           eyebrow="Cadastro"
           title="Clientes"
-          description="Cadastro, edição e exclusão de clientes."
+          description="Cadastro, histórico e ranking dos clientes que mais compram."
         />
         <Link
           href="/dashboard"
@@ -194,6 +195,8 @@ export default function ClientesPage() {
           Voltar
         </Link>
       </div>
+
+      <RankingClientes />
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <div className={cardClass}>

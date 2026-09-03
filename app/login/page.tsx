@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Loader2, Mail, Lock, Building2, UserRound, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { acessoPermiteEntrada, mensagemStatusAcesso } from "@/lib/acesso-utils";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
 
@@ -202,13 +203,8 @@ export default function LoginPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Voltar ao site
         </Link>
-        <div className="mb-6 text-center">
-          <p className="text-[26px] font-black leading-none tracking-tight text-[#2563eb]">
-            Nexo
-          </p>
-          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.42em] text-[#94a3b8]">
-            Gestão
-          </p>
+        <div className="mb-6 flex justify-center">
+          <NexoLogo priority className="h-14 w-auto" />
         </div>
 
         {checandoSessao ? (

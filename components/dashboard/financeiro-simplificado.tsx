@@ -8,9 +8,12 @@ import {
   CircleDollarSign,
   Clock3,
   PackageOpen,
+  PencilLine,
   ReceiptText,
+  Save,
   TrendingDown,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -50,6 +53,21 @@ type Recorrente = {
   valor: number;
   dia_vencimento: number;
   ativo: boolean;
+};
+
+type ContaEdicao = {
+  itemId: string;
+  despesaId: string | null;
+  recorrenteId: string | null;
+  competencia: string;
+  descricao: string;
+  categoria: string;
+  valor: string;
+  vencimento: string;
+  status: "pago" | "pendente";
+  dataPagamento: string;
+  observacao: string;
+  editavel: boolean;
 };
 
 const categorias = [
@@ -119,7 +137,7 @@ export function FinanceiroSimplificado() {
   const [categoria, setCategoria] = useState("Compra de mercadoria");
   const [valor, setValor] = useState("");
   const [vencimento, setVencimento] = useState(hojeISO());
-  const [status, setStatus] = useState<"pago" | "pendente">("pago");
+  const [status, setStatus] = useState<"pago" | "pendente">("pendente");
   const [dataPagamento, setDataPagamento] = useState(hojeISO());
   const [observacao, setObservacao] = useState("");
   const [fornecedor, setFornecedor] = useState("");
@@ -132,6 +150,8 @@ export function FinanceiroSimplificado() {
   const [rCategoria, setRCategoria] = useState("Aluguel");
   const [rValor, setRValor] = useState("");
   const [rDia, setRDia] = useState("5");
+  const [contaEdicao, setContaEdicao] = useState<ContaEdicao | null>(null);
+  const [carregandoConta, setCarregandoConta] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -323,38 +343,122 @@ export function FinanceiroSimplificado() {
     setProcessando(null);
   }
 
-  async function marcarPaga(item: AgendaItem) {
+  async function abrirConta(item: AgendaItem) {
     setErro("");
     setSucesso("");
-    setProcessando(item.id);
+    setCarregandoConta(item.id);
+
     if (item.tipo === "conta") {
       const id = uuidDeId(item.id, "rec");
       if (!id) {
         setErro("Não foi possível identificar a conta recorrente.");
-        setProcessando(null);
+        setCarregandoConta(null);
         return;
       }
-      const { error } = await supabase.rpc("lancar_despesa_recorrente", {
-        p_recorrente_id: id,
-        p_competencia: competencia,
-      });
-      if (error) setErro(error.message);
-      else setSucesso("Conta marcada como paga.");
-    } else if (item.tipo === "despesa" || item.tipo === "compra") {
+      const { data, error } = await supabase
+        .from("despesas_recorrentes")
+        .select("id,descricao,categoria,valor,observacao")
+        .eq("id", id)
+        .maybeSingle();
+      if (error || !data) {
+        setErro(error?.message || "Conta recorrente não encontrada.");
+      } else {
+        setContaEdicao({
+          itemId: item.id,
+          despesaId: null,
+          recorrenteId: id,
+          competencia,
+          descricao: data.descricao || item.titulo,
+          categoria: data.categoria || "Outros",
+          valor: String(Number(data.valor || item.valor || 0)),
+          vencimento: item.data,
+          status: "pendente",
+          dataPagamento: hojeISO(),
+          observacao: data.observacao || "",
+          editavel: true,
+        });
+      }
+    } else if (["despesa", "compra"].includes(item.tipo)) {
       const id = uuidDeId(item.id, "desp");
       if (!id) {
         setErro("Não foi possível identificar a despesa.");
-        setProcessando(null);
+        setCarregandoConta(null);
         return;
       }
-      const { error } = await supabase.rpc("marcar_despesa_paga", {
-        p_despesa_id: id,
-        p_data_pagamento: hojeISO(),
-      });
-      if (error) setErro(error.message);
-      else setSucesso("Despesa marcada como paga.");
+      const { data, error } = await supabase
+        .from("despesas")
+        .select(
+          "id,descricao,categoria,valor,data_vencimento,data,status,data_pagamento,observacao,venda_id"
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (error || !data) {
+        setErro(error?.message || "Conta não encontrada.");
+      } else {
+        setContaEdicao({
+          itemId: item.id,
+          despesaId: id,
+          recorrenteId: null,
+          competencia,
+          descricao: data.descricao || item.titulo,
+          categoria: data.categoria || "Outros",
+          valor: String(Number(data.valor || item.valor || 0)),
+          vencimento: data.data_vencimento || data.data || item.data,
+          status: data.status === "pago" ? "pago" : "pendente",
+          dataPagamento: data.data_pagamento || hojeISO(),
+          observacao: data.observacao || "",
+          editavel: !data.venda_id,
+        });
+      }
     }
-    await carregar();
+    setCarregandoConta(null);
+  }
+
+  async function salvarConta() {
+    if (!contaEdicao) return;
+    const numero = Number(contaEdicao.valor);
+    if (
+      !contaEdicao.descricao.trim() ||
+      !contaEdicao.categoria.trim() ||
+      !contaEdicao.vencimento ||
+      !Number.isFinite(numero) ||
+      numero <= 0
+    ) {
+      setErro("Preencha descrição, categoria, valor e vencimento.");
+      return;
+    }
+    if (contaEdicao.status === "pago" && !contaEdicao.dataPagamento) {
+      setErro("Informe a data em que a conta foi paga.");
+      return;
+    }
+
+    setProcessando("editar-conta");
+    setErro("");
+    setSucesso("");
+    const { error } = await supabase.rpc("salvar_conta_financeira", {
+      p_despesa_id: contaEdicao.despesaId,
+      p_recorrente_id: contaEdicao.recorrenteId,
+      p_competencia: contaEdicao.competencia,
+      p_descricao: contaEdicao.descricao.trim(),
+      p_categoria: contaEdicao.categoria,
+      p_valor: numero,
+      p_data_vencimento: contaEdicao.vencimento,
+      p_status: contaEdicao.status,
+      p_data_pagamento:
+        contaEdicao.status === "pago" ? contaEdicao.dataPagamento : null,
+      p_observacao: contaEdicao.observacao.trim() || null,
+    });
+    if (error) {
+      setErro(error.message);
+    } else {
+      setSucesso(
+        contaEdicao.status === "pago"
+          ? "Conta atualizada e pagamento confirmado."
+          : "Conta atualizada como pendente."
+      );
+      setContaEdicao(null);
+      await carregar();
+    }
     setProcessando(null);
   }
 
@@ -468,14 +572,15 @@ export function FinanceiroSimplificado() {
           titulo="Pendentes"
           itens={pendentes}
           vazio="Nenhuma conta pendente neste mês."
-          processando={processando}
-          onPagar={marcarPaga}
+          carregando={carregandoConta}
+          onAbrir={abrirConta}
         />
         <ContasLista
           titulo="Já pagas"
           itens={pagas}
           vazio="Nenhum pagamento registrado neste mês."
-          processando={processando}
+          carregando={carregandoConta}
+          onAbrir={abrirConta}
         />
       </div>
 
@@ -705,6 +810,16 @@ export function FinanceiroSimplificado() {
       <p className="text-center text-xs text-[#94a3b8]">
         Produto mantém apenas o preço usado na venda. Boletos de fornecedor são despesas independentes, com datas próprias e sem vínculo com produto ou estoque.
       </p>
+
+      {contaEdicao && (
+        <ContaModal
+          conta={contaEdicao}
+          salvando={processando === "editar-conta"}
+          onChange={setContaEdicao}
+          onClose={() => setContaEdicao(null)}
+          onSalvar={salvarConta}
+        />
+      )}
     </section>
   );
 }
@@ -765,14 +880,14 @@ function ContasLista({
   titulo,
   itens,
   vazio,
-  processando,
-  onPagar,
+  carregando,
+  onAbrir,
 }: {
   titulo: string;
   itens: AgendaItem[];
   vazio: string;
-  processando: string | null;
-  onPagar?: (item: AgendaItem) => void;
+  carregando: string | null;
+  onAbrir: (item: AgendaItem) => void;
 }) {
   return (
     <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
@@ -806,15 +921,13 @@ function ContasLista({
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-black text-[#0f172a]">{brl(Number(item.valor || 0))}</p>
-                {onPagar &&
-                !["pago", "recebido"].includes(item.status) &&
-                ["conta", "despesa", "compra"].includes(item.tipo) ? (
+                {["conta", "despesa", "compra"].includes(item.tipo) ? (
                   <button
-                    disabled={processando === item.id}
-                    onClick={() => onPagar(item)}
+                    disabled={carregando === item.id}
+                    onClick={() => onAbrir(item)}
                     className="mt-1 text-xs font-bold text-[#2563eb] disabled:opacity-50"
                   >
-                    {processando === item.id ? "Salvando..." : "Marcar paga"}
+                    {carregando === item.id ? "Abrindo..." : "Abrir / editar"}
                   </button>
                 ) : item.href ? (
                   <Link href={item.href} className="mt-1 inline-block text-xs font-bold text-[#2563eb]">
@@ -825,6 +938,211 @@ function ContasLista({
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function ContaModal({
+  conta,
+  salvando,
+  onChange,
+  onClose,
+  onSalvar,
+}: {
+  conta: ContaEdicao;
+  salvando: boolean;
+  onChange: (conta: ContaEdicao) => void;
+  onClose: () => void;
+  onSalvar: () => void;
+}) {
+  useEffect(() => {
+    function aoPressionar(event: KeyboardEvent) {
+      if (event.key === "Escape" && !salvando) onClose();
+    }
+    window.addEventListener("keydown", aoPressionar);
+    return () => window.removeEventListener("keydown", aoPressionar);
+  }, [onClose, salvando]);
+
+  const categoriasDisponiveis = categorias.includes(conta.categoria)
+    ? categorias
+    : [conta.categoria, ...categorias];
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-[#081226]/60 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editar-conta-titulo"
+    >
+      <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[30px] bg-white shadow-2xl sm:max-w-xl sm:rounded-[30px]">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#e8edf5] bg-white px-5 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eff6ff] text-[#2563eb]">
+              <PencilLine className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.15em] text-[#2563eb]">
+                Conta financeira
+              </p>
+              <h2 id="editar-conta-titulo" className="mt-1 text-xl font-black text-[#0f172a]">
+                Abrir e editar
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={salvando}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-5 sm:p-6">
+          {!conta.editavel && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+              Este lançamento é uma taxa gerada automaticamente por uma venda. Ele pode ser consultado aqui, mas deve continuar vinculado à venda original.
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-xs font-black uppercase tracking-wide text-[#64748b] sm:col-span-2">
+              Descrição
+              <input
+                className={`${inputCls} mt-1.5`}
+                value={conta.descricao}
+                disabled={!conta.editavel}
+                onChange={(event) => onChange({ ...conta, descricao: event.target.value })}
+              />
+            </label>
+            <label className="text-xs font-black uppercase tracking-wide text-[#64748b]">
+              Categoria
+              <select
+                className={`${inputCls} mt-1.5`}
+                value={conta.categoria}
+                disabled={!conta.editavel}
+                onChange={(event) => onChange({ ...conta, categoria: event.target.value })}
+              >
+                {categoriasDisponiveis.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-black uppercase tracking-wide text-[#64748b]">
+              Valor (R$)
+              <input
+                className={`${inputCls} mt-1.5`}
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={conta.valor}
+                disabled={!conta.editavel}
+                onChange={(event) => onChange({ ...conta, valor: event.target.value })}
+              />
+            </label>
+            <label className="text-xs font-black uppercase tracking-wide text-[#64748b] sm:col-span-2">
+              Vencimento
+              <input
+                className={`${inputCls} mt-1.5`}
+                type="date"
+                value={conta.vencimento}
+                disabled={!conta.editavel}
+                onChange={(event) => onChange({ ...conta, vencimento: event.target.value })}
+              />
+            </label>
+          </div>
+
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-[#64748b]">Situação</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl bg-[#f1f5f9] p-1.5">
+              <button
+                type="button"
+                disabled={!conta.editavel}
+                onClick={() => onChange({ ...conta, status: "pendente" })}
+                className={`rounded-xl px-3 py-2.5 text-sm font-black transition ${
+                  conta.status === "pendente"
+                    ? "bg-white text-amber-700 shadow-sm"
+                    : "text-[#64748b]"
+                } disabled:opacity-60`}
+              >
+                Ainda não paguei
+              </button>
+              <button
+                type="button"
+                disabled={!conta.editavel}
+                onClick={() =>
+                  onChange({
+                    ...conta,
+                    status: "pago",
+                    dataPagamento: conta.dataPagamento || hojeISO(),
+                  })
+                }
+                className={`rounded-xl px-3 py-2.5 text-sm font-black transition ${
+                  conta.status === "pago"
+                    ? "bg-white text-emerald-700 shadow-sm"
+                    : "text-[#64748b]"
+                } disabled:opacity-60`}
+              >
+                Já paguei
+              </button>
+            </div>
+          </div>
+
+          {conta.status === "pago" && (
+            <label className="block text-xs font-black uppercase tracking-wide text-[#64748b]">
+              Data real do pagamento
+              <input
+                className={`${inputCls} mt-1.5`}
+                type="date"
+                value={conta.dataPagamento}
+                disabled={!conta.editavel}
+                onChange={(event) => onChange({ ...conta, dataPagamento: event.target.value })}
+              />
+            </label>
+          )}
+
+          <label className="block text-xs font-black uppercase tracking-wide text-[#64748b]">
+            Observação
+            <textarea
+              className={`${inputCls} mt-1.5 min-h-24 resize-y`}
+              value={conta.observacao}
+              disabled={!conta.editavel}
+              onChange={(event) => onChange({ ...conta, observacao: event.target.value })}
+              placeholder="Detalhes opcionais"
+            />
+          </label>
+
+          {conta.editavel && (
+            <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4 text-xs leading-5 text-[#1e40af]">
+              Abrir a conta não muda o status. Ela só será marcada como paga se “Já paguei” estiver selecionado e você salvar as alterações.
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-[#e8edf5] bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={salvando}
+            className="min-h-11 rounded-xl border border-[#dfe6f0] px-5 py-2.5 text-sm font-black text-[#475569] disabled:opacity-50"
+          >
+            {conta.editavel ? "Cancelar" : "Fechar"}
+          </button>
+          {conta.editavel && (
+            <button
+              type="button"
+              onClick={onSalvar}
+              disabled={salvando}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-black text-white disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {salvando ? "Salvando…" : "Salvar alterações"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

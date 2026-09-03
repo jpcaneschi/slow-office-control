@@ -3,8 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -26,12 +27,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-[#dfe6f1] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/admin" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2563eb] text-white shadow-sm">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
+            <NexoLogo priority className="h-10 w-auto shrink-0" />
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
-                <p className="text-lg font-black tracking-tight text-[#0f172a]">Nexo</p>
                 <span className="text-[10px] font-black uppercase tracking-[0.15em] text-[#2563eb]">
                   Admin
                 </span>
