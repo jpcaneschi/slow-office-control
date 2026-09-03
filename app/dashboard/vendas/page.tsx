@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Eye,
+  FileBarChart2,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
@@ -29,6 +37,8 @@ import {
   vendaCorrespondeFiltro,
   type FiltroFormaVenda,
 } from "@/lib/vendas-filtros";
+import { baixarCSV } from "@/lib/csv";
+import { agruparItensVendidos } from "@/lib/vendas-relatorio";
 
 type Cliente = {
   id: string;
@@ -130,6 +140,7 @@ export default function VendasPage() {
   const [paginaVendas, setPaginaVendas] = useState(0);
   const [filtroPagamento, setFiltroPagamento] =
     useState<FiltroFormaVenda>("todas");
+  const [relatorioItensAberto, setRelatorioItensAberto] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState("pix");
   const [pixDesconto, setPixDesconto] = useState(5);
   const [maxParcelasCfg, setMaxParcelasCfg] = useState(6);
@@ -289,6 +300,36 @@ export default function VendasPage() {
     [filtroPagamento, pagamentosVenda, vendasNoPeriodo]
   );
 
+  const nomesProdutos = useMemo(
+    () => new Map(produtos.map((produto) => [produto.id, produto.nome])),
+    [produtos]
+  );
+  const nomesVariacoes = useMemo(
+    () =>
+      new Map(
+        variacoes.map((variacao) => [
+          variacao.id,
+          rotuloVariacao(variacao.atributos, {
+            tamanho: variacao.tamanho,
+            cor: variacao.cor,
+          }),
+        ])
+      ),
+    [variacoes]
+  );
+  const relatorioItens = useMemo(
+    () =>
+      agruparItensVendidos(vendasFiltradas, itensVenda, {
+        produtos: nomesProdutos,
+        variacoes: nomesVariacoes,
+      }),
+    [itensVenda, nomesProdutos, nomesVariacoes, vendasFiltradas]
+  );
+  const quantidadeItensRelatorio = useMemo(
+    () => relatorioItens.reduce((total, item) => total + item.quantidade, 0),
+    [relatorioItens]
+  );
+
   const recebimentosPeriodo = useMemo(
     () => resumirRecebimentos(vendasNoPeriodo, pagamentosVenda),
     [pagamentosVenda, vendasNoPeriodo]
@@ -385,6 +426,24 @@ export default function VendasPage() {
   function getProdutoNome(id: string) {
     const produto = produtos.find((item) => item.id === id);
     return produto?.nome || "Produto não encontrado";
+  }
+
+  function getVariacaoNome(id: string | null) {
+    if (!id) return "Sem variação";
+    return nomesVariacoes.get(id) || "Variação não encontrada";
+  }
+
+  function exportarRelatorioItens() {
+    baixarCSV(
+      `vendas-produtos-${period.inicio}-a-${period.fim}.csv`,
+      ["Produto", "Tamanho / variação", "Quantidade", "Valor vendido"],
+      relatorioItens.map((item) => [
+        item.produto,
+        item.variacao,
+        item.quantidade,
+        item.valor.toFixed(2).replace(".", ","),
+      ])
+    );
   }
 
   // Variações do produto selecionado no formulário de item.
@@ -1465,6 +1524,107 @@ export default function VendasPage() {
                   ))}
                 </div>
               </div>
+
+              <div className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
+                <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                  <button
+                    type="button"
+                    onClick={() => setRelatorioItensAberto((aberto) => !aberto)}
+                    aria-expanded={relatorioItensAberto}
+                    className="flex min-w-0 items-center gap-3 text-left"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#dbeafe] text-[#2563eb]">
+                      <FileBarChart2 className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black text-[#0f172a]">
+                        Relatório de produtos e tamanhos
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[#64748b]">
+                        {quantidadeItensRelatorio} item(ns) nas vendas concluídas deste filtro
+                      </span>
+                    </span>
+                    {relatorioItensAberto ? (
+                      <ChevronUp className="ml-1 h-4 w-4 shrink-0 text-[#64748b]" />
+                    ) : (
+                      <ChevronDown className="ml-1 h-4 w-4 shrink-0 text-[#64748b]" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportarRelatorioItens}
+                    disabled={relatorioItens.length === 0}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#bfdbfe] bg-white px-3 py-2.5 text-xs font-bold text-[#1d4ed8] transition hover:bg-[#eff6ff] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" /> Exportar CSV
+                  </button>
+                </div>
+
+                {relatorioItensAberto ? (
+                  <div className="border-t border-[#dbeafe] bg-white p-3 sm:p-4">
+                    {relatorioItens.length === 0 ? (
+                      <p className="py-4 text-center text-sm text-[#64748b]">
+                        Nenhum produto vendido no período e forma selecionados.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="space-y-2 sm:hidden">
+                          {relatorioItens.map((item) => (
+                            <div
+                              key={`${item.produto_id}-${item.variacao_id || "sem"}`}
+                              className="rounded-xl border border-[#e8ecf4] bg-[#f8fafc] p-3"
+                            >
+                              <p className="text-sm font-bold text-[#0f172a]">{item.produto}</p>
+                              <p className="mt-1 text-xs font-semibold text-[#2563eb]">
+                                {item.variacao}
+                              </p>
+                              <div className="mt-2 flex items-center justify-between text-xs text-[#64748b]">
+                                <span>{item.quantidade} unidade(s)</span>
+                                <span className="font-bold text-[#0f172a]">
+                                  {formatCurrency(item.valor)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="hidden overflow-x-auto sm:block">
+                          <table className="w-full min-w-[560px] border-collapse text-sm">
+                            <thead>
+                              <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                                <th className="pb-2 pr-3">Produto</th>
+                                <th className="px-3 pb-2">Tamanho / variação</th>
+                                <th className="px-3 pb-2 text-right">Quantidade</th>
+                                <th className="pb-2 pl-3 text-right">Valor vendido</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {relatorioItens.map((item) => (
+                                <tr
+                                  key={`${item.produto_id}-${item.variacao_id || "sem"}`}
+                                  className="border-t border-[#eef2f7]"
+                                >
+                                  <td className="py-2.5 pr-3 font-semibold text-[#0f172a]">
+                                    {item.produto}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-[#475569]">
+                                    {item.variacao}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right font-semibold text-[#334155]">
+                                    {item.quantidade}
+                                  </td>
+                                  <td className="py-2.5 pl-3 text-right font-bold text-[#0f172a]">
+                                    {formatCurrency(item.valor)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {loading ? (
@@ -1562,16 +1722,28 @@ export default function VendasPage() {
                                   key={item.id}
                                   className="rounded-2xl border border-[#e8ecf4] bg-white px-3 py-2 text-sm text-[#475569]"
                                 >
-                                  {getProdutoNome(item.produto_id)} · Quantidade: {item.quantidade} ·{" "}
-                                  {formatCurrency(Number(item.total_item || 0))}
+                                  <span className="font-semibold text-[#0f172a]">
+                                    {getProdutoNome(item.produto_id)}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-[#64748b]">
+                                    Tamanho / variação: {getVariacaoNome(item.variacao_id)} ·
+                                    Quantidade: {item.quantidade} · {formatCurrency(Number(item.total_item || 0))}
+                                  </span>
                                 </div>
                               ))}
                             </div>
                           </div>
                         </div>
 
-                        {venda.status === "concluida" && (
-                          <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[190px]">
+                        <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[190px]">
+                          <Link
+                            href={`/dashboard/vendas/${venda.id}`}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-bold text-[#1d4ed8] transition hover:bg-[#dbeafe]"
+                          >
+                            <Eye className="h-4 w-4" /> Ver detalhes
+                          </Link>
+                          {venda.status === "concluida" ? (
+                            <>
                             <button
                               type="button"
                               onClick={() => abrirDevolucao(venda.id)}
@@ -1592,8 +1764,9 @@ export default function VendasPage() {
                                 Cancelar venda
                               </button>
                             )}
-                          </div>
-                        )}
+                            </>
+                          ) : null}
+                        </div>
                       </div>
 
                       {/* Painel de devolução parcial */}
