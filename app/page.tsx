@@ -25,6 +25,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 const WHATSAPP = (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "");
 const CONTATO_EMAIL = process.env.NEXT_PUBLIC_CONTATO_EMAIL || "";
@@ -92,8 +93,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-[#dfe7f2] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#155eef] text-white shadow-[0_8px_20px_rgba(21,94,239,0.25)]"><Store className="h-5 w-5" /></span>
-            <span><span className="block text-xl font-black leading-none tracking-tight">Nexo</span><span className="mt-1 block text-[9px] font-extrabold uppercase tracking-[0.32em] text-[#7b8aa3]">Gestão</span></span>
+            <NexoLogo priority className="h-10 w-auto sm:h-11" />
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-bold text-[#4b5b73] lg:flex">
@@ -258,7 +258,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-[#dfe7f2] bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><div className="flex items-center gap-2 text-[#14213a]"><Store className="h-5 w-5 text-[#155eef]" /><span className="font-black">Nexo Gestão</span></div><p className="text-xs text-[#7b8aa3]">© {new Date().getFullYear()} Nexo. Gestão para o comércio físico.</p></div></footer>
+      <footer className="border-t border-[#dfe7f2] bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><NexoLogo className="h-10 w-auto" /><p className="text-xs text-[#7b8aa3]">© {new Date().getFullYear()} Nexo. Gestão para o comércio físico.</p></div></footer>
     </div>
   );
 }

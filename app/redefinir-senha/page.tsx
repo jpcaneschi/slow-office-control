@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 export default function RedefinirSenhaPage() {
   const router = useRouter();
@@ -59,9 +60,9 @@ export default function RedefinirSenhaPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1e40af] to-[#2563eb] p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
-        <p className="text-center text-[26px] font-black leading-none tracking-tight text-[#2563eb]">
-          Nexo
-        </p>
+        <div className="flex justify-center">
+          <NexoLogo priority className="h-12 w-auto" />
+        </div>
         <h1 className="mt-6 text-center text-xl font-black text-[#0f172a]">
           Criar nova senha
         </h1>

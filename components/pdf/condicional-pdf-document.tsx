@@ -1,11 +1,23 @@
 import {
   Document,
+  Image as PdfImage,
   Page,
   Text,
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
+import nexoLogo from "@/public/nexo-gestao-horizontal.png";
 import { formatDataBR } from "@/lib/datas";
+
+const nexoLogoAsset = nexoLogo as unknown;
+const NEXO_LOGO_SRC =
+  typeof nexoLogoAsset === "string"
+    ? nexoLogoAsset.startsWith("/public/") && typeof process !== "undefined"
+      ? `${process.cwd()}${nexoLogoAsset}`
+      : nexoLogoAsset
+    : nexoLogoAsset && typeof nexoLogoAsset === "object" && "src" in nexoLogoAsset
+      ? String(nexoLogoAsset.src)
+      : "";
 
 type PdfItem = {
   nome: string;
@@ -61,6 +73,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   brandBlock: { flex: 1 },
+  logo: { width: 92, height: 28, objectFit: "contain", objectPosition: "left", marginBottom: 8 },
   eyebrow: {
     fontSize: 8.5,
     textTransform: "uppercase",
@@ -217,6 +230,7 @@ export function CondicionalPdfDocument({
 
           <View style={styles.header}>
             <View style={styles.brandBlock}>
+              {NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={styles.logo} /> : null}
               <Text style={styles.eyebrow}>{nomeLoja}</Text>
               <Text style={styles.title}>Termo de Condicional</Text>
               <Text style={styles.subtitle}>

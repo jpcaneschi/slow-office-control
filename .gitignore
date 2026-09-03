@@ -39,6 +39,7 @@ yarn-error.log*
 # ferramentas locais e referências (não versionar)
 .claude/
 /modelo-dashboard.png/
+/supabase/.temp/
 
 # typescript
 *.tsbuildinfo

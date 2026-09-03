@@ -37,6 +37,7 @@ import { RoleProvider, usePapel } from "@/components/dashboard/role-context";
 import { RouteGuard } from "@/components/dashboard/route-guard";
 import { podeAcessar } from "@/lib/permissoes";
 import { rotaBloqueadaPorModulo } from "@/lib/modulos";
+import { NexoLogo } from "@/components/brand/nexo-logo";
 
 type NavItem = {
   href: string;
@@ -230,12 +231,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <aside className="relative hidden w-[260px] shrink-0 overflow-hidden bg-gradient-to-b from-[#1e40af] to-[#2563eb] xl:flex xl:flex-col">
           {/* Logo */}
           <div className="px-6 pt-7 pb-6">
-            <p className="text-[30px] font-black leading-none tracking-tight text-white">
-              Nexo
-            </p>
-            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
-              Gestão
-            </p>
+            <div className="inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
+              <NexoLogo priority className="h-11 w-auto" />
+            </div>
           </div>
 
           {/* Navegação */}
@@ -268,13 +266,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             />
             <aside className="absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
               <div className="flex items-start justify-between px-6 pt-6 pb-5">
-                <div>
-                  <p className="text-[30px] font-black leading-none tracking-tight text-white">
-                    Nexo
-                  </p>
-                  <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.42em] text-white/70">
-                    Gestão
-                  </p>
+                <div className="inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
+                  <NexoLogo className="h-10 w-auto" />
                 </div>
                 <button
                   onClick={() => setMobileNavOpen(false)}

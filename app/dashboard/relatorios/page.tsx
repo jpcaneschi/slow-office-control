@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { RelatoriosFinanceiros } from "@/components/dashboard/relatorios-financeiros";
 import { hojeISO, primeiroDiaMesISO } from "@/lib/datas";
 import { compartilharPdfWhatsApp } from "@/lib/whatsapp-utils";
 import {
@@ -278,9 +279,9 @@ export default function RelatoriosPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
-          eyebrow="Documentos"
+          eyebrow="Análises e documentos"
           title="Relatórios / PDFs"
-          description="Documentos avulsos e atalhos para relatórios que usam os dados oficiais do sistema."
+          description="Fechamento diário, semanal, mensal ou personalizado, calendário anual e documentos oficiais."
         />
         <Link
           href="/dashboard"
@@ -288,6 +289,17 @@ export default function RelatoriosPage() {
         >
           Voltar
         </Link>
+      </div>
+
+      <RelatoriosFinanceiros loja={loja} />
+
+      <div className="pt-2">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[#2563eb]">
+          Outros documentos
+        </p>
+        <h2 className="mt-1 text-2xl font-black tracking-tight text-[#0f172a]">
+          Comprovantes avulsos
+        </h2>
       </div>
 
       <div className="rounded-[28px] border border-[#bfdbfe] bg-[#eff6ff] p-5">
