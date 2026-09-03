@@ -23,8 +23,6 @@ type RankingCliente = {
   ultima_compra: string | null;
 };
 
-type Ordenacao = "valor" | "compras";
-
 const inputClass =
   "w-full rounded-xl border border-[#dfe6f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10";
 
@@ -61,7 +59,6 @@ export function RankingClientes() {
   const [mes, setMes] = useState(mesAtual);
   const [inicio, setInicio] = useState(periodoInicial.inicio);
   const [fim, setFim] = useState(periodoInicial.fim);
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>("valor");
   const [ranking, setRanking] = useState<RankingCliente[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -106,13 +103,12 @@ export function RankingClientes() {
 
   const rankingOrdenado = useMemo(
     () =>
-      [...ranking].sort((a, b) => {
-        if (ordenacao === "compras") {
-          return b.compras - a.compras || b.total_gasto - a.total_gasto;
-        }
-        return b.total_gasto - a.total_gasto || b.compras - a.compras;
-      }),
-    [ordenacao, ranking]
+      [...ranking].sort(
+        (a, b) =>
+          b.total_gasto - a.total_gasto ||
+          a.cliente_nome.localeCompare(b.cliente_nome, "pt-BR")
+      ),
+    [ranking]
   );
 
   function aplicarMes(novoMes: string) {
@@ -143,29 +139,12 @@ export function RankingClientes() {
               Ranking de clientes
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#dbeafe]">
-              Veja quem mais gastou, quem comprou mais vezes e o ticket médio no período escolhido.
+              Veja os clientes ordenados exclusivamente pelo valor total gasto no período escolhido.
             </p>
           </div>
-          <div className="inline-flex w-fit rounded-full border border-white/25 bg-white/10 p-1">
-            <button
-              type="button"
-              onClick={() => setOrdenacao("valor")}
-              className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
-                ordenacao === "valor" ? "bg-white text-[#0b3c91]" : "text-white"
-              }`}
-            >
-              Mais gastaram
-            </button>
-            <button
-              type="button"
-              onClick={() => setOrdenacao("compras")}
-              className={`rounded-full px-3.5 py-2 text-xs font-black transition ${
-                ordenacao === "compras" ? "bg-white text-[#0b3c91]" : "text-white"
-              }`}
-            >
-              Mais compraram
-            </button>
-          </div>
+          <span className="inline-flex w-fit rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-black text-white">
+            Ordenado por valor gasto
+          </span>
         </div>
       </div>
 
@@ -278,12 +257,10 @@ export function RankingClientes() {
                       <Icone className="h-5 w-5 shrink-0 text-[#f59e0b]" />
                     </div>
                     <p className="mt-4 text-xl font-black text-[#0b3c91]">
-                      {ordenacao === "valor" ? brl(cliente.total_gasto) : `${cliente.compras} compras`}
+                      {brl(cliente.total_gasto)}
                     </p>
                     <p className="mt-1 text-xs text-[#64748b]">
-                      {ordenacao === "valor"
-                        ? `${cliente.compras} compras · ticket ${brl(cliente.ticket_medio)}`
-                        : `${brl(cliente.total_gasto)} gastos no período`}
+                      {cliente.compras} compras · ticket {brl(cliente.ticket_medio)}
                     </p>
                   </Link>
                 );

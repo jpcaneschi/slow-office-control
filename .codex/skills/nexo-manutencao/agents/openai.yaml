@@ -1,0 +1,7 @@
+interface:
+  display_name: "Guardião Nexo"
+  short_description: "Audita e mantém o Nexo com segurança"
+  brand_color: "#2563EB"
+  default_prompt: "Use $nexo-manutencao para auditar e manter o Nexo Gestão sem misturar organizações nem sobrescrever dados operacionais."
+policy:
+  allow_implicit_invocation: true

@@ -5,6 +5,7 @@ import {
   podeGerenciarEquipe,
   podeVerCusto,
   podeCancelarVenda,
+  podeTrocarItensVenda,
 } from "@/lib/permissoes";
 
 describe("normalizarPapel", () => {
@@ -61,5 +62,11 @@ describe("capacidades", () => {
     expect(podeCancelarVenda("gerente")).toBe(true);
     expect(podeCancelarVenda("caixa")).toBe(false);
     expect(podeCancelarVenda("financeiro")).toBe(false);
+  });
+  it("só dono e gerente trocam itens de uma venda", () => {
+    expect(podeTrocarItensVenda("owner")).toBe(true);
+    expect(podeTrocarItensVenda("gerente")).toBe(true);
+    expect(podeTrocarItensVenda("caixa")).toBe(false);
+    expect(podeTrocarItensVenda("financeiro")).toBe(false);
   });
 });

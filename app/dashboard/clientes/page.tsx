@@ -186,7 +186,7 @@ export default function ClientesPage() {
         <PageHeader
           eyebrow="Cadastro"
           title="Clientes"
-          description="Cadastro, histórico e ranking dos clientes que mais compram."
+          description="Cadastro, histórico e ranking por valor total gasto."
         />
         <Link
           href="/dashboard"

@@ -95,3 +95,8 @@ export function podeVerCusto(papel: Papel): boolean {
 export function podeCancelarVenda(papel: Papel): boolean {
   return papel === "owner" || papel === "gerente";
 }
+
+/** Trocas alteram estoque e o custo histórico da venda — só dono/gerente. */
+export function podeTrocarItensVenda(papel: Papel): boolean {
+  return papel === "owner" || papel === "gerente";
+}
