@@ -549,7 +549,9 @@ export function VendaTrocaModal({
           <button
             type="button"
             onClick={confirmarTroca}
-            disabled={salvando || loading || !totais.valoresCompativeis}
+            disabled={
+              salvando || loading || !idempotencyKey || !totais.valoresCompativeis
+            }
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}

@@ -94,7 +94,7 @@ const cardClass =
 export default function VendaDetalhePage() {
   const params = useParams();
   const id = String(params.id);
-  const { papel } = usePapel();
+  const { papel, carregando: papelCarregando } = usePapel();
 
   const [venda, setVenda] = useState<Venda | null>(null);
   const [itens, setItens] = useState<Item[]>([]);
@@ -218,7 +218,10 @@ export default function VendaDetalhePage() {
 
   const dataHora = venda ? formatDataHoraBR(venda.created_at) : "";
   const itensAtuais = itens.filter((item) => Number(item.quantidade || 0) > 0);
-  const podeTrocar = venda?.status === "concluida" && podeTrocarItensVenda(papel);
+  const podeTrocar =
+    !papelCarregando &&
+    venda?.status === "concluida" &&
+    podeTrocarItensVenda(papel);
   const itensParaTroca: ItemAtualTroca[] = itensAtuais.map((item) => ({
     id: item.id,
     produto_id: item.produto_id,
