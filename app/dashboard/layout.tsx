@@ -132,7 +132,7 @@ function NavSections({
       {gruposVisiveis.map((grupo, i) => (
         <div key={i} className="space-y-1">
           {grupo.titulo && (
-            <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+            <p className="nexo-sidebar-section-title px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
               {grupo.titulo}
             </p>
           )}
@@ -144,7 +144,7 @@ function NavSections({
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                className={`nexo-sidebar-nav-item flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                   active
                     ? "nexo-nav-active bg-white text-[#2563eb] shadow-[0_8px_18px_rgba(0,0,0,0.18)]"
                     : "text-white/80 hover:bg-white/10 hover:text-white"
@@ -234,7 +234,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <div className="min-h-screen">
       <div className="flex min-h-screen">
         {/* ─── Menu lateral (azul) ─────────────────────────────────────── */}
-        <aside className="relative hidden w-[260px] shrink-0 overflow-hidden bg-gradient-to-b from-[#1e40af] to-[#2563eb] xl:flex xl:flex-col">
+        <aside className="nexo-sidebar relative hidden w-[260px] shrink-0 overflow-hidden bg-gradient-to-b from-[#1e40af] to-[#2563eb] xl:flex xl:flex-col">
           {/* Logo */}
           <div className="px-6 pt-7 pb-6">
             <div className="nexo-logo-surface inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
@@ -247,7 +247,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/* Ondinha decorativa no rodapé */}
           <svg
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-32 w-full text-white/10"
+            className="nexo-sidebar-wave pointer-events-none absolute inset-x-0 bottom-0 h-32 w-full text-white/10"
             viewBox="0 0 400 120"
             fill="none"
             preserveAspectRatio="none"
@@ -270,7 +270,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               className="absolute inset-0 bg-black/40"
               onClick={() => setMobileNavOpen(false)}
             />
-            <aside className="absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
+            <aside className="nexo-sidebar absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
               <div className="flex items-start justify-between px-6 pt-6 pb-5">
                 <div className="nexo-logo-surface inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
                   <NexoLogo className="h-10 w-auto" />
@@ -278,7 +278,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <button
                   onClick={() => setMobileNavOpen(false)}
                   aria-label="Fechar menu"
-                  className="rounded-lg p-1.5 text-white/80 transition hover:bg-white/10"
+                  className="nexo-sidebar-close rounded-lg p-1.5 text-white/80 transition hover:bg-white/10"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -294,7 +294,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* ─── Coluna principal ────────────────────────────────────────── */}
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           {/* Cabeçalho */}
-          <header className="sticky top-0 z-30 border-b border-[#e8ecf4] bg-white/85 backdrop-blur-xl">
+          <header className="nexo-dashboard-header sticky top-0 z-30 border-b border-[#e8ecf4] bg-white/85 backdrop-blur-xl">
             <div className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-4 sm:gap-4 md:px-8">
               <button
                 onClick={() => setMobileNavOpen(true)}
