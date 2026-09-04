@@ -82,6 +82,302 @@ a,
   opacity: 1;
   transform: none;
 }
+
+/* ─── Preferências da dashboard ─────────────────────────────────────────── */
+.nexo-sensitive-value {
+  display: inline-block;
+  min-width: 3.5ch;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+html[data-nexo-values="hidden"] .nexo-dashboard .nexo-sensitive-value,
+html[data-nexo-values="hidden"] .nexo-dashboard .nexo-auto-sensitive-value {
+  filter: blur(5px);
+  user-select: none;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard {
+  --background: #0b1120;
+  --surface: #111827;
+  --border: #273449;
+  --foreground: #f8fafc;
+  --text-muted: #a8b4c7;
+  --text-faint: #7f8da3;
+  color-scheme: dark;
+  background-color: #0b1120 !important;
+  color: #f8fafc !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-white,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-white\/85,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-white\/90,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-white\/95 {
+  background-color: #111827 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f4f6fb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f8fafc\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f8fafc\]\/70,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f8fafc\]\/80,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#e2e8f0\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#eef2f7\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fafbfc\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fbfcfe\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fffaf5\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fcfaff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f1f5f9\] {
+  background-color: #172033 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#eff6ff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#eff6ff\]\/40,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#eef4ff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#dbeafe\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f0f9ff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f8fbff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-blue-50 {
+  background-color: #10213d !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f0fdf4\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#f0fdf4\]\/60,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#dcfce7\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-green-50,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-emerald-50,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-emerald-50\/60,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-emerald-100 {
+  background-color: #0f2d22 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fef2f2\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fee2e2\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-red-50,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-red-50\/60,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-red-100 {
+  background-color: #35171d !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fffbeb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fef3c7\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fefce8\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fef08a\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-amber-50,
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-amber-100 {
+  background-color: #33260f !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#fff7ed\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#ffedd5\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-orange-50 {
+  background-color: #352013 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#faf5ff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-purple-50 {
+  background-color: #29193b !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#0f172a\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#334155\] {
+  color: #f8fafc !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#475569\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#64748b\] {
+  color: #a8b4c7 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#94a3b8\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#cbd5e1\] {
+  color: #7f8da3 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#2563eb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#1d4ed8\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#1e40af\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#1e3a8a\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#0b3c91\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-blue-700 {
+  color: #60a5fa !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#15803d\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#16a34a\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-green-700,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-emerald-600,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-emerald-700,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#166534\] {
+  color: #4ade80 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#b91c1c\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#dc2626\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#7f1d1d\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-red-600,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-red-700 {
+  color: #f87171 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#92400e\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#b45309\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#a16207\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#78350f\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#9a3412\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#c2410c\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#ea580c\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#f59e0b\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#92400e\]\/80,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-amber-500,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-amber-700,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-amber-800,
+html[data-nexo-theme="dark"] .nexo-dashboard .text-orange-700 {
+  color: #fbbf24 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#7c3aed\],
+html[data-nexo-theme="dark"] .nexo-dashboard .text-\[\#7e22ce\] {
+  color: #c4b5fd !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e8ecf4\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e5eaf2\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dfe6f1\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#eef2f7\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#f1f5f9\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e2e8f0\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dbe3ef\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dbe4f0\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dfe6f0\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e8edf5\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dce4f2\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#cbd5e1\],
+html[data-nexo-theme="dark"] .nexo-dashboard .divide-\[\#eef2f7\] > :not(:last-child),
+html[data-nexo-theme="dark"] .nexo-dashboard .divide-\[\#f1f5f9\] > :not(:last-child) {
+  border-color: #273449 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#bfdbfe\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dbeafe\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#93b4f7\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#93b4f8\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#93b4fb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#c7d7fb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dbe7fb\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e0f2fe\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-blue-100,
+html[data-nexo-theme="dark"] .nexo-dashboard .border-blue-200 {
+  border-color: #24436f !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#fecaca\] {
+  border-color: #65303a !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#bbf7d0\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#dcfce7\] {
+  border-color: #245743 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#fde68a\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#fed7aa\] {
+  border-color: #655023 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#e9d5ff\],
+html[data-nexo-theme="dark"] .nexo-dashboard .border-\[\#c084fc\] {
+  border-color: #513a74 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-red-100,
+html[data-nexo-theme="dark"] .nexo-dashboard .border-red-200 {
+  border-color: #65303a !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-emerald-200 {
+  border-color: #245743 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .border-amber-200,
+html[data-nexo-theme="dark"] .nexo-dashboard .border-amber-300 {
+  border-color: #655023 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard input:not([type="checkbox"]):not([type="radio"]),
+html[data-nexo-theme="dark"] .nexo-dashboard select,
+html[data-nexo-theme="dark"] .nexo-dashboard textarea {
+  border-color: #334155 !important;
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard input::placeholder,
+html[data-nexo-theme="dark"] .nexo-dashboard textarea::placeholder {
+  color: #64748b !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard option {
+  background-color: #111827;
+  color: #f8fafc;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#f4f6fb\]:hover,
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#f8fafc\]:hover,
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#f1f5f9\]:hover {
+  background-color: #1e293b !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-white:hover {
+  background-color: #182235 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#eff6ff\]:hover,
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#dbeafe\]:hover {
+  background-color: #17345d !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#fef2f2\]:hover,
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#fee2e2\]:hover {
+  background-color: #462027 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#dcfce7\]:hover {
+  background-color: #164332 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#fef3c7\]:hover,
+html[data-nexo-theme="dark"] .nexo-dashboard .hover\:bg-\[\#ffedd5\]:hover {
+  background-color: #483517 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .bg-\[\#0f172a\] {
+  background-color: #2563eb !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .recharts-cartesian-grid line {
+  stroke: #273449 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .recharts-text {
+  fill: #94a3b8 !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .nexo-logo-surface,
+html[data-nexo-theme="dark"] .nexo-dashboard .nexo-nav-active {
+  background-color: #ffffff !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard .nexo-nav-active {
+  color: #2563eb !important;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard,
+html[data-nexo-theme="dark"] .nexo-dashboard * {
+  scrollbar-color: #475569 transparent;
+}
+
+html[data-nexo-theme="dark"] .nexo-dashboard *::-webkit-scrollbar-thumb {
+  background-color: #475569;
+}
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     opacity: 1;

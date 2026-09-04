@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, ArrowDownRight, ChevronRight, type LucideIcon } from "lucide-react";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 type MetricCardProps = {
   icon: LucideIcon;
@@ -74,7 +75,7 @@ export function MetricCard({
             {title}
           </p>
           <p className="mt-1 break-words text-[clamp(1.125rem,1.2vw,1.5rem)] font-black leading-tight tracking-tight text-[#0f172a] sm:whitespace-nowrap">
-            {value}
+            {value.includes("R$") ? <SensitiveValue>{value}</SensitiveValue> : value}
           </p>
         </div>
       </div>

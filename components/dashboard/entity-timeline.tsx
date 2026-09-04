@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/vendas-utils";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 export type TimelineItem = {
   id: string;
@@ -93,7 +94,7 @@ export function EntityTimeline({
               </div>
               {item.valor != null && Number(item.valor) !== 0 && (
                 <p className="shrink-0 text-sm font-black text-[#0f172a]">
-                  {formatCurrency(Number(item.valor))}
+                  <SensitiveValue>{formatCurrency(Number(item.valor))}</SensitiveValue>
                 </p>
               )}
             </div>

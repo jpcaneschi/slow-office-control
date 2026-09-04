@@ -27,6 +27,7 @@ import {
   type ProdutoEstoqueStatus,
   type VariacaoEstoque,
 } from "@/lib/estoque-utils";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 type Produto = ProdutoEstoqueStatus;
 type Condicional = { status: string; data_limite: string | null };
@@ -241,7 +242,11 @@ export function TasksAlerts() {
                   <span className="block truncate text-xs text-[#64748b]">{a.subtitle}</span>
                 </span>
                 <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: `${a.tint}1a`, color: a.tint }}>
-                  {a.badge}
+                  {a.badge.includes("R$") ? (
+                    <SensitiveValue>{a.badge}</SensitiveValue>
+                  ) : (
+                    a.badge
+                  )}
                 </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-[#cbd5e1]" />
               </Link>

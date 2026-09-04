@@ -38,6 +38,10 @@ import { RouteGuard } from "@/components/dashboard/route-guard";
 import { podeAcessar } from "@/lib/permissoes";
 import { rotaBloqueadaPorModulo } from "@/lib/modulos";
 import { NexoLogo } from "@/components/brand/nexo-logo";
+import {
+  DashboardPreferenceControls,
+  DashboardPreferencesProvider,
+} from "@/components/dashboard/dashboard-preferences";
 
 type NavItem = {
   href: string;
@@ -142,7 +146,7 @@ function NavSections({
                 onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                   active
-                    ? "bg-white text-[#2563eb] shadow-[0_8px_18px_rgba(0,0,0,0.18)]"
+                    ? "nexo-nav-active bg-white text-[#2563eb] shadow-[0_8px_18px_rgba(0,0,0,0.18)]"
                     : "text-white/80 hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -169,7 +173,7 @@ function MobileBottomNav({
       !rotaBloqueadaPorModulo(item.href, modulos)
   );
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
+    <nav className="nexo-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
       <div
         className="grid gap-1"
         style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
@@ -220,18 +224,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthGuard>
-    <AccessGuard>
-    <SubscriptionGuard>
-    <RoleProvider>
-    <PeriodProvider>
-    <div className="min-h-screen bg-[#f4f6fb] text-[#0f172a]">
+    <DashboardPreferencesProvider>
+      <div className="nexo-dashboard min-h-screen bg-[#f4f6fb] text-[#0f172a]">
+        <AuthGuard>
+          <AccessGuard>
+            <SubscriptionGuard>
+              <RoleProvider>
+                <PeriodProvider>
+                  <div className="min-h-screen">
       <div className="flex min-h-screen">
         {/* ─── Menu lateral (azul) ─────────────────────────────────────── */}
         <aside className="relative hidden w-[260px] shrink-0 overflow-hidden bg-gradient-to-b from-[#1e40af] to-[#2563eb] xl:flex xl:flex-col">
           {/* Logo */}
           <div className="px-6 pt-7 pb-6">
-            <div className="inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
+            <div className="nexo-logo-surface inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
               <NexoLogo priority className="h-11 w-auto" />
             </div>
           </div>
@@ -266,7 +272,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             />
             <aside className="absolute left-0 top-0 flex h-full w-[264px] flex-col overflow-y-auto bg-gradient-to-b from-[#1e40af] to-[#2563eb]">
               <div className="flex items-start justify-between px-6 pt-6 pb-5">
-                <div className="inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
+                <div className="nexo-logo-surface inline-flex rounded-2xl bg-white px-3 py-2 shadow-sm">
                   <NexoLogo className="h-10 w-auto" />
                 </div>
                 <button
@@ -305,6 +311,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <GlobalSearch />
 
               <div className="ml-auto flex items-center gap-3">
+                <DashboardPreferenceControls />
+
                 {/* Seletor de período global */}
                 <div className="hidden sm:block">
                   <PeriodFilter />
@@ -330,11 +338,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <MobileBottomNav isActive={isActive} />
         </div>
       </div>
-    </div>
-    </PeriodProvider>
-    </RoleProvider>
-    </SubscriptionGuard>
-    </AccessGuard>
-    </AuthGuard>
+                  </div>
+                </PeriodProvider>
+              </RoleProvider>
+            </SubscriptionGuard>
+          </AccessGuard>
+        </AuthGuard>
+      </div>
+    </DashboardPreferencesProvider>
   );
 }

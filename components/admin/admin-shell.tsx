@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { NexoLogo } from "@/components/brand/nexo-logo";
+import { DashboardPreferenceControls } from "@/components/dashboard/dashboard-preferences";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -27,7 +28,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-[#dfe6f1] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/admin" className="flex min-w-0 items-center gap-3">
-            <NexoLogo priority className="h-10 w-auto shrink-0" />
+            <span className="nexo-logo-surface inline-flex shrink-0 rounded-xl bg-white px-2 py-1">
+              <NexoLogo priority className="h-8 w-auto" />
+            </span>
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-[10px] font-black uppercase tracking-[0.15em] text-[#2563eb]">
@@ -41,6 +44,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+            <DashboardPreferenceControls />
             <span className="hidden max-w-56 truncate text-xs font-semibold text-[#64748b] md:block">
               {email}
             </span>

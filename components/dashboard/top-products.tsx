@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { formatCurrency } from "@/lib/vendas-utils";
 import type { ProdutoMaisVendido } from "@/lib/mais-vendidos-utils";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 export function TopProducts({
   produtos,
@@ -44,7 +45,8 @@ export function TopProducts({
                   {produto.nome}
                 </p>
                 <p className="shrink-0 text-xs text-[#64748b]">
-                  <b className="text-[#0f172a]">{produto.quantidade}</b> un. · {formatCurrency(produto.faturamento)}
+                  <b className="text-[#0f172a]">{produto.quantidade}</b> un. ·{" "}
+                  <SensitiveValue>{formatCurrency(produto.faturamento)}</SensitiveValue>
                 </p>
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eff6ff]">

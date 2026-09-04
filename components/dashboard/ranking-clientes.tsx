@@ -7,19 +7,16 @@ import {
   Crown,
   LoaderCircle,
   Medal,
-  ReceiptText,
-  ShoppingBag,
   Trophy,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDataBR, hojeISO, parseDataLocal, toISOLocal } from "@/lib/datas";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 type RankingCliente = {
   cliente_id: string;
   cliente_nome: string;
   total_gasto: number;
-  compras: number;
-  ticket_medio: number;
   ultima_compra: string | null;
 };
 
@@ -86,8 +83,6 @@ export function RankingClientes() {
           cliente_id: String(linha.cliente_id || ""),
           cliente_nome: String(linha.cliente_nome || "Cliente"),
           total_gasto: numero(linha.total_gasto),
-          compras: numero(linha.compras),
-          ticket_medio: numero(linha.ticket_medio),
           ultima_compra: linha.ultima_compra
             ? String(linha.ultima_compra).slice(0, 10)
             : null,
@@ -257,10 +252,10 @@ export function RankingClientes() {
                       <Icone className="h-5 w-5 shrink-0 text-[#f59e0b]" />
                     </div>
                     <p className="mt-4 text-xl font-black text-[#0b3c91]">
-                      {brl(cliente.total_gasto)}
+                      <SensitiveValue>{brl(cliente.total_gasto)}</SensitiveValue>
                     </p>
                     <p className="mt-1 text-xs text-[#64748b]">
-                      {cliente.compras} compras · ticket {brl(cliente.ticket_medio)}
+                      Valor total gasto no período
                     </p>
                   </Link>
                 );
@@ -268,12 +263,10 @@ export function RankingClientes() {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[#e8edf5]">
-              <div className="hidden grid-cols-[58px_1fr_140px_110px_130px_110px] gap-3 bg-[#f8fafc] px-4 py-3 text-[10px] font-black uppercase tracking-wide text-[#64748b] md:grid">
+              <div className="hidden grid-cols-[58px_1fr_160px_120px] gap-3 bg-[#f8fafc] px-4 py-3 text-[10px] font-black uppercase tracking-wide text-[#64748b] md:grid">
                 <span>Posição</span>
                 <span>Cliente</span>
                 <span className="text-right">Total gasto</span>
-                <span className="text-right">Compras</span>
-                <span className="text-right">Ticket médio</span>
                 <span className="text-right">Última</span>
               </div>
               <div className="divide-y divide-[#eef2f7]">
@@ -281,7 +274,7 @@ export function RankingClientes() {
                   <Link
                     key={cliente.cliente_id}
                     href={`/dashboard/clientes/${cliente.cliente_id}`}
-                    className="grid gap-3 p-4 transition hover:bg-[#f8fbff] md:grid-cols-[58px_1fr_140px_110px_130px_110px] md:items-center"
+                    className="grid gap-3 p-4 transition hover:bg-[#f8fbff] md:grid-cols-[58px_1fr_160px_120px] md:items-center"
                   >
                     <span className="text-xs font-black text-[#2563eb]">#{indice + 1}</span>
                     <span className="min-w-0 truncate text-sm font-black text-[#0f172a]">
@@ -289,18 +282,8 @@ export function RankingClientes() {
                     </span>
                     <div className="flex items-center justify-between gap-3 md:block md:text-right">
                       <span className="text-[10px] font-bold uppercase text-[#94a3b8] md:hidden">Total gasto</span>
-                      <span className="text-sm font-black text-[#0b3c91]">{brl(cliente.total_gasto)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 md:block md:text-right">
-                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] md:hidden">Compras</span>
-                      <span className="inline-flex items-center gap-1 text-sm font-bold text-[#475569] md:justify-end">
-                        <ShoppingBag className="h-3.5 w-3.5" /> {cliente.compras}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 md:block md:text-right">
-                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] md:hidden">Ticket médio</span>
-                      <span className="inline-flex items-center gap-1 text-sm font-bold text-[#475569] md:justify-end">
-                        <ReceiptText className="h-3.5 w-3.5" /> {brl(cliente.ticket_medio)}
+                      <span className="text-sm font-black text-[#0b3c91]">
+                        <SensitiveValue>{brl(cliente.total_gasto)}</SensitiveValue>
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 text-xs text-[#64748b] md:block md:text-right">
