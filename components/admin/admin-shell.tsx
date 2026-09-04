@@ -24,8 +24,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen min-w-0 bg-[#f4f6fb] text-[#0f172a]">
-      <header className="sticky top-0 z-30 border-b border-[#dfe6f1] bg-white/95 backdrop-blur-xl">
+    <div className="nexo-admin-shell min-h-screen min-w-0 bg-[#f4f6fb] text-[#0f172a]">
+      <header className="nexo-dashboard-header sticky top-0 z-30 border-b border-[#dfe6f1] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/admin" className="flex min-w-0 items-center gap-3">
             <span className="nexo-logo-surface inline-flex shrink-0 rounded-xl bg-white px-2 py-1">
