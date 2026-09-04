@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import {
+  DASHBOARD_THEME_STORAGE_KEY,
+  DASHBOARD_VALUES_STORAGE_KEY,
+} from "@/lib/dashboard-preferences";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,6 +30,16 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const dashboardPreferencesScript = `(() => {
+  try {
+    const root = document.documentElement;
+    const theme = localStorage.getItem(${JSON.stringify(DASHBOARD_THEME_STORAGE_KEY)});
+    const values = localStorage.getItem(${JSON.stringify(DASHBOARD_VALUES_STORAGE_KEY)});
+    root.dataset.nexoTheme = theme === "dark" ? "dark" : "light";
+    root.dataset.nexoValues = values === "hidden" ? "hidden" : "visible";
+  } catch (_) {}
+})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,8 +48,17 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
+      data-nexo-theme="light"
+      data-nexo-values="visible"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          id="nexo-dashboard-preferences"
+          dangerouslySetInnerHTML={{ __html: dashboardPreferencesScript }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

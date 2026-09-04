@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List, Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -144,7 +145,7 @@ export function AgendaOperacao({ compact = false }: { compact?: boolean }) {
 }
 
 function ItemLinha({item,onEdit}:{item:Item;onEdit:()=>void}){
-  const corpo=<div className="flex items-start justify-between gap-3 rounded-2xl bg-[#f8fafc] p-3"><div className="flex min-w-0 gap-2"><span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor:cores[item.tipo]||cores.evento}}/><div className="min-w-0"><p className="text-sm font-black text-[#0f172a]">{item.titulo}</p>{item.detalhe&&<p className="mt-0.5 text-xs text-[#64748b]">{item.detalhe}</p>}<span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${["pago","recebido"].includes(item.status)?"bg-emerald-100 text-emerald-700":item.status==="atrasado"?"bg-red-100 text-red-700":"bg-amber-100 text-amber-700"}`}>{item.status.replaceAll("_"," ")}</span></div></div>{item.valor!==null&&<p className="shrink-0 text-sm font-black text-[#0f172a]">{brl(item.valor)}</p>}</div>;
+  const corpo=<div className="flex items-start justify-between gap-3 rounded-2xl bg-[#f8fafc] p-3"><div className="flex min-w-0 gap-2"><span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor:cores[item.tipo]||cores.evento}}/><div className="min-w-0"><p className="text-sm font-black text-[#0f172a]">{item.titulo}</p>{item.detalhe&&<p className="mt-0.5 text-xs text-[#64748b]">{item.detalhe}</p>}<span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${["pago","recebido"].includes(item.status)?"bg-emerald-100 text-emerald-700":item.status==="atrasado"?"bg-red-100 text-red-700":"bg-amber-100 text-amber-700"}`}>{item.status.replaceAll("_"," ")}</span></div></div>{item.valor!==null&&<p className="shrink-0 text-sm font-black text-[#0f172a]"><SensitiveValue>{brl(item.valor)}</SensitiveValue></p>}</div>;
   if(item.manual)return <button className="w-full text-left" onClick={onEdit}>{corpo}</button>;
   if(item.href)return <Link href={item.href} className="block">{corpo}</Link>;
   return corpo;

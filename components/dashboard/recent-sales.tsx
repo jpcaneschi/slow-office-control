@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/vendas-utils";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 export type VendaRow = {
   id: string;
@@ -160,7 +161,7 @@ export function RecentSales({
                       </span>
                     </td>
                     <td className="px-2 py-2.5 font-semibold text-[#0f172a]">
-                      {formatCurrency(v.valor)}
+                      <SensitiveValue>{formatCurrency(v.valor)}</SensitiveValue>
                     </td>
                     <td className="px-2 py-2.5">
                       <StatusBadge status={v.status} />
@@ -181,7 +182,9 @@ export function RecentSales({
           </span>
           <span className="text-[#64748b]">
             Recebido:{" "}
-            <span className="font-bold text-[#0f172a]">{formatCurrency(totalValor)}</span>
+            <span className="font-bold text-[#0f172a]">
+              <SensitiveValue>{formatCurrency(totalValor)}</SensitiveValue>
+            </span>
           </span>
         </div>
       )}

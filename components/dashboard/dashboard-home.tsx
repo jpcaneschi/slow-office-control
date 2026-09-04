@@ -25,6 +25,7 @@ import { usePapel } from "@/components/dashboard/role-context";
 import { podeAcessar } from "@/lib/permissoes";
 import { TopProducts } from "@/components/dashboard/top-products";
 import { rankearProdutosMaisVendidos } from "@/lib/mais-vendidos-utils";
+import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 type Venda = {
   id: string;
@@ -431,7 +432,7 @@ export function DashboardHome() {
               </p>
             </div>
             <p className="text-xl font-black text-[#dc2626]">
-              {formatCurrency(resumoPeriodo.despesas_pagas)}
+              <SensitiveValue>{formatCurrency(resumoPeriodo.despesas_pagas)}</SensitiveValue>
             </p>
           </div>
 
@@ -451,7 +452,7 @@ export function DashboardHome() {
                       </p>
                     </div>
                     <strong className="shrink-0 text-sm text-[#b91c1c]">
-                      {formatCurrency(item.valor)}
+                      <SensitiveValue>{formatCurrency(item.valor)}</SensitiveValue>
                     </strong>
                   </div>
                 </div>
