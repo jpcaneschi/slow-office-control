@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Banknote,
   CalendarDays,
   Crown,
+  HandCoins,
   LoaderCircle,
   Medal,
   Trophy,
@@ -16,8 +18,10 @@ import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 type RankingCliente = {
   cliente_id: string;
   cliente_nome: string;
-  total_gasto: number;
-  ultima_compra: string | null;
+  recebido_vendas: number;
+  recebido_promissorias: number;
+  total_recebido: number;
+  ultimo_recebimento: string | null;
 };
 
 const inputClass =
@@ -68,11 +72,14 @@ export function RankingClientes() {
 
     setCarregando(true);
     setErro("");
-    const { data, error } = await supabase.rpc("ranking_clientes_periodo", {
-      p_inicio: inicio,
-      p_fim: fim,
-      p_limite: 200,
-    });
+    const { data, error } = await supabase.rpc(
+      "ranking_clientes_recebimentos_periodo",
+      {
+        p_inicio: inicio,
+        p_fim: fim,
+        p_limite: 200,
+      }
+    );
 
     if (error) {
       setErro(error.message);
@@ -82,9 +89,11 @@ export function RankingClientes() {
         ((data || []) as Record<string, unknown>[]).map((linha) => ({
           cliente_id: String(linha.cliente_id || ""),
           cliente_nome: String(linha.cliente_nome || "Cliente"),
-          total_gasto: numero(linha.total_gasto),
-          ultima_compra: linha.ultima_compra
-            ? String(linha.ultima_compra).slice(0, 10)
+          recebido_vendas: numero(linha.recebido_vendas),
+          recebido_promissorias: numero(linha.recebido_promissorias),
+          total_recebido: numero(linha.total_recebido),
+          ultimo_recebimento: linha.ultimo_recebimento
+            ? String(linha.ultimo_recebimento).slice(0, 10)
             : null,
         }))
       );
@@ -100,7 +109,7 @@ export function RankingClientes() {
     () =>
       [...ranking].sort(
         (a, b) =>
-          b.total_gasto - a.total_gasto ||
+          b.total_recebido - a.total_recebido ||
           a.cliente_nome.localeCompare(b.cliente_nome, "pt-BR")
       ),
     [ranking]
@@ -131,14 +140,15 @@ export function RankingClientes() {
               <Trophy className="h-4 w-4" /> Relacionamento
             </div>
             <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-              Ranking de clientes
+              Clientes que mais pagaram
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#dbeafe]">
-              Veja os clientes ordenados exclusivamente pelo valor total gasto no período escolhido.
+              Ranking pelo dinheiro que realmente entrou no período. Compras em
+              promissória contam somente conforme cada pagamento recebido.
             </p>
           </div>
           <span className="inline-flex w-fit rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-black text-white">
-            Ordenado por valor gasto
+            Ordenado por caixa recebido
           </span>
         </div>
       </div>
@@ -215,6 +225,31 @@ export function RankingClientes() {
           </span>
         </div>
 
+        <div className="grid gap-3 rounded-2xl border border-[#dbe7fb] bg-[#f8fbff] p-4 text-sm text-[#475569] sm:grid-cols-2">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#2563eb] shadow-sm">
+              <Banknote className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="font-black text-[#0f172a]">Vendas e entradas</p>
+              <p className="mt-0.5 text-xs leading-5">
+                Entram na data em que o valor foi recebido pela loja.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#16a34a] shadow-sm">
+              <HandCoins className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="font-black text-[#0f172a]">Promissórias</p>
+              <p className="mt-0.5 text-xs leading-5">
+                Cada parcela aparece somente no mês em que foi paga.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {erro && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
             {erro}
@@ -227,7 +262,7 @@ export function RankingClientes() {
           </div>
         ) : rankingOrdenado.length === 0 ? (
           <div className="rounded-2xl bg-[#f8fafc] p-6 text-center text-sm text-[#64748b]">
-            Nenhuma venda vinculada a cliente neste período.
+            Nenhum recebimento vinculado a cliente neste período.
           </div>
         ) : (
           <>
@@ -252,43 +287,71 @@ export function RankingClientes() {
                       <Icone className="h-5 w-5 shrink-0 text-[#f59e0b]" />
                     </div>
                     <p className="mt-4 text-xl font-black text-[#0b3c91]">
-                      <SensitiveValue>{brl(cliente.total_gasto)}</SensitiveValue>
+                      <SensitiveValue>{brl(cliente.total_recebido)}</SensitiveValue>
                     </p>
                     <p className="mt-1 text-xs text-[#64748b]">
-                      Valor total gasto no período
+                      Recebido no período
                     </p>
+                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#dbe7fb] pt-3 text-xs">
+                      <div>
+                        <p className="text-[#64748b]">Vendas</p>
+                        <p className="mt-0.5 font-black text-[#0f172a]">
+                          <SensitiveValue>{brl(cliente.recebido_vendas)}</SensitiveValue>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#64748b]">Promissórias</p>
+                        <p className="mt-0.5 font-black text-[#0f172a]">
+                          <SensitiveValue>{brl(cliente.recebido_promissorias)}</SensitiveValue>
+                        </p>
+                      </div>
+                    </div>
                   </Link>
                 );
               })}
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-[#e8edf5]">
-              <div className="hidden grid-cols-[58px_1fr_160px_120px] gap-3 bg-[#f8fafc] px-4 py-3 text-[10px] font-black uppercase tracking-wide text-[#64748b] md:grid">
+              <div className="hidden grid-cols-[58px_minmax(170px,1fr)_135px_135px_150px_120px] gap-3 bg-[#f8fafc] px-4 py-3 text-[10px] font-black uppercase tracking-wide text-[#64748b] lg:grid">
                 <span>Posição</span>
                 <span>Cliente</span>
-                <span className="text-right">Total gasto</span>
-                <span className="text-right">Última</span>
+                <span className="text-right">Vendas</span>
+                <span className="text-right">Promissórias</span>
+                <span className="text-right">Total recebido</span>
+                <span className="text-right">Último receb.</span>
               </div>
               <div className="divide-y divide-[#eef2f7]">
                 {rankingOrdenado.map((cliente, indice) => (
                   <Link
                     key={cliente.cliente_id}
                     href={`/dashboard/clientes/${cliente.cliente_id}`}
-                    className="grid gap-3 p-4 transition hover:bg-[#f8fbff] md:grid-cols-[58px_1fr_160px_120px] md:items-center"
+                    className="grid gap-3 p-4 transition hover:bg-[#f8fbff] lg:grid-cols-[58px_minmax(170px,1fr)_135px_135px_150px_120px] lg:items-center"
                   >
                     <span className="text-xs font-black text-[#2563eb]">#{indice + 1}</span>
                     <span className="min-w-0 truncate text-sm font-black text-[#0f172a]">
                       {cliente.cliente_nome}
                     </span>
-                    <div className="flex items-center justify-between gap-3 md:block md:text-right">
-                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] md:hidden">Total gasto</span>
-                      <span className="text-sm font-black text-[#0b3c91]">
-                        <SensitiveValue>{brl(cliente.total_gasto)}</SensitiveValue>
+                    <div className="flex items-center justify-between gap-3 lg:block lg:text-right">
+                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] lg:hidden">Vendas e entradas</span>
+                      <span className="text-sm font-bold text-[#475569]">
+                        <SensitiveValue>{brl(cliente.recebido_vendas)}</SensitiveValue>
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 text-xs text-[#64748b] md:block md:text-right">
-                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] md:hidden">Última compra</span>
-                      <span>{cliente.ultima_compra ? formatDataBR(cliente.ultima_compra) : "—"}</span>
+                    <div className="flex items-center justify-between gap-3 lg:block lg:text-right">
+                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] lg:hidden">Promissórias pagas</span>
+                      <span className="text-sm font-bold text-[#475569]">
+                        <SensitiveValue>{brl(cliente.recebido_promissorias)}</SensitiveValue>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 lg:block lg:text-right">
+                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] lg:hidden">Total recebido</span>
+                      <span className="text-sm font-black text-[#0b3c91]">
+                        <SensitiveValue>{brl(cliente.total_recebido)}</SensitiveValue>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-xs text-[#64748b] lg:block lg:text-right">
+                      <span className="text-[10px] font-bold uppercase text-[#94a3b8] lg:hidden">Último recebimento</span>
+                      <span>{cliente.ultimo_recebimento ? formatDataBR(cliente.ultimo_recebimento) : "—"}</span>
                     </div>
                   </Link>
                 ))}

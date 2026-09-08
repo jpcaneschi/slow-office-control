@@ -30,12 +30,29 @@ type DashboardPreferencesContextValue = {
 const DashboardPreferencesContext =
   createContext<DashboardPreferencesContextValue | null>(null);
 
+const THEME_TRANSITION_DURATION_MS = 180;
+let themeTransitionTimeout: number | undefined;
+
 function aplicarPreferenciasNoDocumento(
   theme: DashboardTheme,
-  valoresVisiveis: boolean
+  valoresVisiveis: boolean,
+  animarTema = false
 ) {
-  document.documentElement.dataset.nexoTheme = theme;
-  document.documentElement.dataset.nexoValues =
+  const root = document.documentElement;
+
+  if (animarTema && root.dataset.nexoTheme !== theme) {
+    root.dataset.nexoThemeTransition = "active";
+    // Garante que o navegador capture o tema atual antes de animar o próximo.
+    void root.offsetWidth;
+    window.clearTimeout(themeTransitionTimeout);
+    themeTransitionTimeout = window.setTimeout(() => {
+      delete root.dataset.nexoThemeTransition;
+      themeTransitionTimeout = undefined;
+    }, THEME_TRANSITION_DURATION_MS + 60);
+  }
+
+  root.dataset.nexoTheme = theme;
+  root.dataset.nexoValues =
     serializarVisibilidadeValores(valoresVisiveis);
 }
 
@@ -113,6 +130,14 @@ export function DashboardPreferencesProvider({ children }: { children: ReactNode
     return () => window.removeEventListener("storage", sincronizarEntreAbas);
   }, []);
 
+  useEffect(
+    () => () => {
+      window.clearTimeout(themeTransitionTimeout);
+      delete document.documentElement.dataset.nexoThemeTransition;
+    },
+    []
+  );
+
   useEffect(() => {
     const dashboard = document.querySelector(".nexo-dashboard");
     if (!dashboard) return;
@@ -158,9 +183,13 @@ export function DashboardPreferencesProvider({ children }: { children: ReactNode
   const setTheme = useCallback((nextTheme: DashboardTheme) => {
     setThemeState(nextTheme);
     window.localStorage.setItem(DASHBOARD_THEME_STORAGE_KEY, nextTheme);
-    aplicarPreferenciasNoDocumento(nextTheme, normalizarVisibilidadeValores(
-      document.documentElement.dataset.nexoValues
-    ));
+    aplicarPreferenciasNoDocumento(
+      nextTheme,
+      normalizarVisibilidadeValores(
+        document.documentElement.dataset.nexoValues
+      ),
+      true
+    );
   }, []);
 
   const setValoresVisiveis = useCallback((visible: boolean) => {
@@ -229,7 +258,7 @@ export function DashboardPreferenceControls() {
 
   return (
     <div
-      className="flex shrink-0 items-center gap-1 rounded-xl border border-[#e8ecf4] bg-white p-1 shadow-sm"
+      className="nexo-preference-controls flex shrink-0 items-center gap-1 rounded-xl border border-[#e8ecf4] bg-white p-1 shadow-sm"
       role="group"
       aria-label="Preferências de visualização"
     >
@@ -239,7 +268,7 @@ export function DashboardPreferenceControls() {
         aria-label={privacyLabel}
         title={privacyLabel}
         aria-pressed={!valoresVisiveis}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#475569] transition hover:bg-[#f4f6fb] hover:text-[#2563eb]"
+        className="nexo-preference-button inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#475569] transition hover:bg-[#f4f6fb] hover:text-[#2563eb]"
       >
         {valoresVisiveis ? (
           <Eye className="h-[18px] w-[18px]" />
@@ -247,14 +276,17 @@ export function DashboardPreferenceControls() {
           <EyeOff className="h-[18px] w-[18px]" />
         )}
       </button>
-      <span className="h-5 w-px bg-[#e8ecf4]" aria-hidden="true" />
+      <span
+        className="nexo-preference-separator h-5 w-px bg-[#e8ecf4]"
+        aria-hidden="true"
+      />
       <button
         type="button"
         onClick={() => setTheme(theme === "light" ? "dark" : "light")}
         aria-label={themeLabel}
         title={themeLabel}
         aria-pressed={theme === "dark"}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#475569] transition hover:bg-[#f4f6fb] hover:text-[#2563eb]"
+        className="nexo-preference-button nexo-theme-button inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#475569] transition hover:bg-[#f4f6fb] hover:text-[#2563eb]"
       >
         {theme === "light" ? (
           <Moon className="h-[18px] w-[18px]" />
