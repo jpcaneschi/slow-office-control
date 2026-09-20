@@ -593,51 +593,15 @@ export default function ProdutosPage() {
 
   async function excluirProduto(id: string) {
     setErro("");
-    // Não excluir fisicamente produto com histórico — preferir inativar
-    // (preserva vendas/movimentações e não quebra relatórios).
-    const { count: cItens } = await supabase
-      .from("venda_itens")
-      .select("id", { count: "exact", head: true })
-      .eq("produto_id", id);
-    const { count: cMov } = await supabase
-      .from("estoque_movimentacoes")
-      .select("id", { count: "exact", head: true })
-      .eq("produto_id", id);
-    if ((cItens || 0) > 0 || (cMov || 0) > 0) {
-      const inativar = window.confirm(
-        "Este produto tem histórico (vendas/movimentações) e não pode ser excluído sem perder esse histórico.\n\nDeseja INATIVAR o produto? (ele some das listagens de venda, mas o histórico é preservado)"
-      );
-      if (!inativar) return;
-      const { error: eInat } = await supabase
-        .from("produtos")
-        .update({ status: "inativo" })
-        .eq("id", id);
-      if (eInat) {
-        setErro(eInat.message);
-        return;
-      }
-      if (editandoId === id) limparFormulario();
-      await carregarDados();
-      return;
-    }
-
-    const confirmar = window.confirm("Tem certeza que deseja excluir este produto?");
+    const confirmar = window.confirm("Arquivar este produto? O histórico e as movimentações serão preservados.");
     if (!confirmar) return;
 
-    const produtoAlvo = produtos.find((p) => p.id === id);
-    const { error } = await supabase.from("produtos").delete().eq("id", id);
+    const { error } = await supabase.rpc("arquivar_produto_seguro", { p_produto_id: id });
 
     if (error) {
       setErro(error.message);
       return;
     }
-
-    await supabase.rpc("log_auditoria", {
-      p_acao: "produto_excluido",
-      p_entidade: "produtos",
-      p_registro_id: id,
-      p_dados: { nome: produtoAlvo?.nome ?? null },
-    });
 
     if (editandoId === id) {
       limparFormulario();

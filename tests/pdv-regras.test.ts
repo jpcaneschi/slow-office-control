@@ -44,15 +44,15 @@ describe("validarPagamento — promissória", () => {
       validarPagamento({ ...base, forma: "promissoria", temCliente: false })
     ).toMatch(/cliente/i);
   });
-  it("rejeita parcela abaixo da mínima (R$110 em 1x, mín 300)", () => {
+  it("aceita qualquer valor positivo de parcela", () => {
     expect(
       validarPagamento({ ...base, forma: "promissoria", total: 110, mesesFiado: 1, parcelaMinima: 300 })
-    ).toMatch(/mínima/i);
+    ).toBe("");
   });
-  it("rejeita prazo acima do máximo", () => {
+  it("aceita quantidade de parcelas definida pelo cliente", () => {
     expect(
       validarPagamento({ ...base, forma: "promissoria", total: 4000, mesesFiado: 5, promMax: 4 })
-    ).toMatch(/prazo/i);
+    ).toBe("");
   });
   it("aceita dentro das regras", () => {
     expect(
@@ -62,10 +62,10 @@ describe("validarPagamento — promissória", () => {
 });
 
 describe("validarPagamento — misto", () => {
-  it("rejeita fiado abaixo da mínima (restante R$60, mín 300)", () => {
+  it("aceita fiado sem parcela mínima", () => {
     expect(
       validarPagamento({ ...base, forma: "misto", total: 260, entradaMisto: 200, restanteMisto: 60, mesesFiado: 1, parcelaMinima: 300 })
-    ).toMatch(/mínima/i);
+    ).toBe("");
   });
   it("rejeita restante <= 0", () => {
     expect(

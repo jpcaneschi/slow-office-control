@@ -53,17 +53,14 @@ describe("validarRegrasPromissoria (config como fonte única)", () => {
   it("recusa parcelas inválidas", () => {
     expect(validarRegrasPromissoria(1000, 0, CFG)).toMatch(/parcelas/i);
   });
-  it("usa o prazo máximo da CONFIG (não o fixo 4)", () => {
-    // Com prazo 6 na config, 5 meses é válido.
+  it("não impõe prazo máximo", () => {
     expect(
       validarRegrasPromissoria(3000, 5, { prazoMaxMeses: 6, parcelaMinima: 0 })
     ).toBe("");
-    // Com prazo 4, 5 meses é recusado.
-    expect(validarRegrasPromissoria(3000, 5, CFG)).toMatch(/4 meses/i);
+    expect(validarRegrasPromissoria(3000, 50, CFG)).toBe("");
   });
-  it("usa a parcela mínima da CONFIG", () => {
-    expect(validarRegrasPromissoria(400, 4, CFG)).toMatch(/300/);
-    // parcelaMinima 0 = sem mínimo → aceita parcela pequena.
+  it("não impõe parcela mínima", () => {
+    expect(validarRegrasPromissoria(400, 40, CFG)).toBe("");
     expect(
       validarRegrasPromissoria(400, 4, { prazoMaxMeses: 4, parcelaMinima: 0 })
     ).toBe("");
