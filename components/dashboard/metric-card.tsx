@@ -4,6 +4,7 @@ import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
 
 type MetricCardProps = {
   icon: LucideIcon;
+  compact?: boolean;
   /** cor de destaque em hex, ex: "#2563eb" */
   tint: string;
   title: string;
@@ -52,6 +53,7 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
 
 export function MetricCard({
   icon: Icon,
+  compact = false,
   tint,
   title,
   value,
@@ -102,6 +104,8 @@ export function MetricCard({
         </div>
       )}
 
+      {typeof delta !== "number" && deltaLabel && <p className="mt-2 text-xs text-[#64748b]">{deltaLabel}</p>}
+
       {spark && spark.length > 1 && (
         <div className="mt-2">
           <Sparkline points={spark} color={tint} />
@@ -111,7 +115,7 @@ export function MetricCard({
   );
 
   const baseClass =
-    "relative block h-full min-w-0 rounded-3xl border border-[#eef2f7] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-5";
+    `${compact ? "nexo-metric-compact" : ""} relative block h-full min-w-0 rounded-3xl border border-[#eef2f7] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-5`;
 
   if (href) {
     return (
