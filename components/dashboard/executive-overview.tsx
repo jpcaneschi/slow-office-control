@@ -1,48 +1,31 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { BarChart3, Boxes, Tags, TrendingUp } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { BarChart3, Boxes, Tags, TrendingUp, ReceiptText, Package } from "lucide-react";
 import { formatCurrency } from "@/lib/vendas-utils";
+import { SensitiveValue, useDashboardPreferences } from "./dashboard-preferences";
+import { DashboardCard } from "./dashboard-card";
+import styles from "./dashboard-overview.module.css";
 
 type Venda = {
-  id: string;
-  forma_pagamento: string;
-  total: number | null;
-  status: string;
-  data_venda: string;
+  id: string; forma_pagamento: string; total: number | null;
+  status: string; data_venda: string;
 };
 type Item = { venda_id: string; produto_id: string; quantidade: number; total_item: number };
 type Produto = { id: string; nome: string; marca: string | null };
+const CORES = ["#2563eb", "#06b6d4", "#6366f1", "#60a5fa", "#0e7490", "#a5b4fc"];
+const PAGAMENTOS: Record<string, string> = {
+  pix: "Pix", dinheiro: "Dinheiro", debito: "Débito", credito: "Crédito",
+  cartao_credito: "Crédito", cartao_debito: "Débito", promissoria: "Promissória",
+  crediario: "Crediário", misto: "Misto",
+};
 
-const CORES = ["#2563eb", "#06b6d4", "#8b5cf6", "#22c55e", "#f59e0b"];
-
-export function ExecutiveOverview({
-  vendas,
-  itens,
-  produtos,
-  despesas,
-  inicio,
-  fim,
-}: {
-  vendas: Venda[];
-  itens: Item[];
-  produtos: Produto[];
-  despesas: number;
-  inicio: string;
-  fim: string;
+export function ExecutiveOverview({ vendas, itens, produtos, despesas, inicio, fim, loading = false, children }: {
+  vendas: Venda[]; itens: Item[]; produtos: Produto[]; despesas: number;
+  inicio: string; fim: string; loading?: boolean; children?: ReactNode;
 }) {
+  const { valoresVisiveis } = useDashboardPreferences();
   const dados = useMemo(() => {
     const concluidas = vendas.filter(
       (v) => v.status === "concluida" && v.data_venda >= inicio && v.data_venda <= fim
@@ -83,72 +66,84 @@ export function ExecutiveOverview({
     };
   }, [vendas, itens, produtos, despesas, inicio, fim]);
 
+  const ticket = dados.pedidos ? dados.receita / dados.pedidos : 0;
+  const metrics = [
+    { label: "Pedidos", value: String(dados.pedidos), icon: BarChart3 },
+    { label: "Peças vendidas", value: String(dados.unidades), icon: Boxes },
+    { label: "Faturamento", value: formatCurrency(dados.receita), icon: TrendingUp, money: true },
+    { label: "Resultado simples", value: formatCurrency(dados.resultado), icon: Tags, money: true },
+    { label: "Ticket médio", value: formatCurrency(ticket), icon: ReceiptText, money: true },
+    { label: "Peças por pedido", value: dados.pedidos ? (dados.unidades / dados.pedidos).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—", icon: Package },
+  ];
+
   return (
-    <section className="overflow-hidden rounded-[30px] border border-slate-800 bg-[#07111f] text-white shadow-2xl shadow-blue-950/20">
-      <div className="flex flex-col gap-2 border-b border-white/10 bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-50">Visão executiva</p>
-          <h2 className="text-xl font-black">Performance da Slow Office</h2>
-        </div>
-        <p className="text-xs font-semibold text-blue-50">{inicio.split("-").reverse().join("/")} — {fim.split("-").reverse().join("/")}</p>
-      </div>
-
-      <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1.35fr_0.8fr]">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              ["Pedidos", String(dados.pedidos), BarChart3],
-              ["Peças vendidas", String(dados.unidades), Boxes],
-              ["Faturamento", formatCurrency(dados.receita), TrendingUp],
-              ["Resultado simples", formatCurrency(dados.resultado), Tags],
-            ].map(([rotulo, valor, Icone]) => {
-              const Icon = Icone as typeof BarChart3;
-              return <div key={String(rotulo)} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-                <Icon size={17} className="text-cyan-300" />
-                <p className="mt-3 text-xs font-bold text-slate-400">{String(rotulo)}</p>
-                <p className="mt-1 text-lg font-black tracking-tight">{String(valor)}</p>
-              </div>;
-            })}
+    <div className={styles.overview} aria-busy={loading}>
+      <section className={styles.metrics} aria-label="Indicadores do período">
+        {metrics.map(({ label, value, icon: Icon, money }) => (
+          <div className={styles.metric} key={label}>
+            <div className={styles.metricHeading}><span>{label}</span><Icon size={16} aria-hidden="true" /></div>
+            <p className={styles.metricValue}>{loading ? "…" : money ? <SensitiveValue>{value}</SensitiveValue> : value}</p>
           </div>
+        ))}
+      </section>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div><p className="font-black">Evolução de vendas</p><p className="text-xs text-slate-400">Valor vendido por dia</p></div>
+      <DashboardCard title="Resumo do período" className={styles.summary}>
+        <dl className={styles.summaryRows}>
+          {[
+            { label: "Faturamento", value: dados.receita, sign: "", className: "" },
+            { label: "Despesas pagas", value: despesas, sign: "−", className: "" },
+            { label: "Resultado simples", value: dados.resultado, sign: "=", className: styles.summaryResult },
+          ].map(({ label, value, sign, className }) => (
+            <div key={label} className={`${styles.summaryRow} ${className}`}>
+              <span className={styles.summarySign} aria-hidden="true">{sign || "R$"}</span>
+              <div><dt>{label}</dt><dd>{loading ? "…" : <SensitiveValue>{formatCurrency(value)}</SensitiveValue>}</dd></div>
             </div>
-            <div className="h-56">
+          ))}
+        </dl>
+        <p className={styles.note}>Faturamento menos despesas pagas. Não desconta o custo dos produtos.</p>
+      </DashboardCard>
+
+      <DashboardCard title="Mix de pagamentos" subtitle="Valor dos pedidos por forma de pagamento" className={styles.payments}>
+        {loading ? <p className={styles.empty}>Carregando pagamentos…</p> : dados.pagamentos.length === 0 ? <p className={styles.empty}>Sem vendas no período.</p> : (
+          <div className={styles.paymentContent}>
+            <div className={styles.donut} role="img" aria-label="Distribuição dos pagamentos; valores na legenda">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dados.dias}>
-                  <defs><linearGradient id="receitaBlue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#38bdf8" stopOpacity={0.55}/><stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/></linearGradient></defs>
-                  <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false}/>
-                  <XAxis dataKey="data" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} width={52}/>
-                  <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }}/>
-                  <Area type="monotone" dataKey="valor" stroke="#38bdf8" strokeWidth={3} fill="url(#receitaBlue)"/>
-                </AreaChart>
+                <PieChart>
+                  <Pie data={dados.pagamentos} dataKey="valor" nameKey="nome" innerRadius="62%" outerRadius="88%" paddingAngle={2} stroke="var(--surface)" strokeWidth={2} isAnimationActive={false}>
+                    {dados.pagamentos.map((p, i) => <Cell key={p.nome} fill={CORES[i % CORES.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [valoresVisiveis ? formatCurrency(Number(value)) : "••••", PAGAMENTOS[String(name)] || String(name)]} contentStyle={{ background: "var(--surface)", color: "var(--foreground)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }} itemStyle={{ color: "var(--foreground)" }} />
+                </PieChart>
               </ResponsiveContainer>
             </div>
+            <ul className={styles.legend}>
+              {dados.pagamentos.map((p, i) => (
+                <li key={p.nome}>
+                  <span className={styles.legendName}><i style={{ background: CORES[i % CORES.length] }} />{PAGAMENTOS[p.nome] || p.nome.replaceAll("_", " ") || "Não informado"}</span>
+                  <strong><SensitiveValue>{formatCurrency(p.valor)}</SensitiveValue><small>{dados.receita > 0 ? `${(p.valor / dados.receita * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "—"}</small></strong>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
+      </DashboardCard>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="font-black">Mix de pagamentos</p>
-            <div className="mt-2 h-44">
-              <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={dados.pagamentos} dataKey="valor" nameKey="nome" innerRadius={42} outerRadius={68} paddingAngle={3}>{dados.pagamentos.map((_, i) => <Cell key={i} fill={CORES[i % CORES.length]}/>)}</Pie><Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }}/></PieChart></ResponsiveContainer>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="font-black">Marcas com maior retorno</p>
-            <div className="mt-4 space-y-3">
-              {dados.marcas.map((marca, i) => <div key={marca.nome}>
-                <div className="flex items-center justify-between gap-3 text-xs"><span className="truncate font-bold text-slate-300">{i + 1}. {marca.nome}</span><strong>{formatCurrency(marca.receita)}</strong></div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${Math.max(8, (marca.receita / Math.max(dados.marcas[0]?.receita || 1, 1)) * 100)}%` }}/></div>
-              </div>)}
-              {dados.marcas.length === 0 && <p className="text-sm text-slate-400">Sem vendas no período.</p>}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+      <div className={styles.sales}>{children}</div>
+      <DashboardCard title="Marcas com maior retorno" subtitle="Valor vendido no período" className={styles.brands}>
+        {loading ? <p className={styles.empty}>Carregando marcas…</p> : dados.marcas.length === 0 ? <p className={styles.empty}>Sem vendas no período.</p> : (
+          <ol className={styles.brandList}>
+            {dados.marcas.map((marca, i) => (
+              <li key={marca.nome}>
+                <span className={styles.rank}>{String(i + 1).padStart(2, "0")}</span>
+                <div className={styles.brandDetail}>
+                  <div className={styles.brandHeading}><span>{marca.nome}</span><strong><SensitiveValue>{formatCurrency(marca.receita)}</SensitiveValue></strong></div>
+                  <div className={styles.track}><div style={{ width: `${Math.max(0, marca.receita / Math.max(dados.marcas[0]?.receita || 1, 1) * 100)}%` }} /></div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </DashboardCard>
+    </div>
   );
 }

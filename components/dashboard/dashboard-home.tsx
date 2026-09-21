@@ -26,6 +26,7 @@ import { podeAcessar } from "@/lib/permissoes";
 import { TopProducts } from "@/components/dashboard/top-products";
 import { rankearProdutosMaisVendidos } from "@/lib/mais-vendidos-utils";
 import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
+import { PeriodFilter } from "./period-filter";
 import { ExecutiveOverview } from "@/components/dashboard/executive-overview";
 
 type Venda = {
@@ -350,14 +351,17 @@ export function DashboardHome() {
   const vendasRecebidas = Number(resumoPeriodo.vendas_periodo || 0);
 
   return (
-    <div className="space-y-6">
+    <div className="nexo-home space-y-4">
       {erro && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Não foi possível carregar alguns dados: {erro}
         </div>
       )}
 
-      <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} />
+      <div className="nexo-home-toolbar">
+        <div><h2>Visão geral</h2><p suppressHydrationWarning>{dataBR(period.inicio)} — {dataBR(period.fim)}</p></div>
+        <PeriodFilter />
+      </div>
 
       <ExecutiveOverview
         vendas={vendas}
@@ -366,10 +370,14 @@ export function DashboardHome() {
         despesas={resumoPeriodo.despesas_pagas}
         inicio={period.inicio}
         fim={period.fim}
-      />
+        loading={loading}
+      >
+        <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} compact />
+      </ExecutiveOverview>
 
-      <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-6">
+      <section className="nexo-financial-metrics grid grid-cols-2 items-stretch gap-3 lg:grid-cols-3 2xl:grid-cols-6">
         <MetricCard
+          compact
           icon={ShoppingCart}
           tint="#2563eb"
           title={janela.ehHoje ? "Vendas da loja hoje" : "Vendas da loja"}
@@ -380,6 +388,7 @@ export function DashboardHome() {
         />
 
         <MetricCard
+          compact
           icon={CircleDollarSign}
           tint="#16a34a"
           title="Ganhos de serviços"
@@ -391,6 +400,7 @@ export function DashboardHome() {
 
         {podeVerFinanceiro && (
           <MetricCard
+            compact
             icon={ReceiptText}
             tint="#dc2626"
             title="Despesas pagas"
@@ -403,6 +413,7 @@ export function DashboardHome() {
 
         {podeVerFinanceiro && (
           <MetricCard
+            compact
             icon={CircleDollarSign}
             tint="#7c3aed"
             title="Faturamento do mês"
@@ -414,6 +425,7 @@ export function DashboardHome() {
         )}
 
         <MetricCard
+          compact
           icon={Wallet}
           tint="#0891b2"
           title="Contas a receber"
@@ -423,6 +435,7 @@ export function DashboardHome() {
         />
 
         <MetricCard
+          compact
           icon={FileText}
           tint="#ea580c"
           title="Condicionais em aberto"
