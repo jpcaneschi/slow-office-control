@@ -103,10 +103,10 @@ export default function ClientesPage() {
   }
 
   async function excluirCliente(id: string) {
-    const confirmar = window.confirm("Tem certeza que deseja excluir este cliente?");
+    const confirmar = window.confirm("Arquivar este cliente? O histórico de vendas e promissórias será preservado.");
     if (!confirmar) return;
 
-    const { error } = await supabase.from("clientes").delete().eq("id", id);
+    const { error } = await supabase.rpc("arquivar_cliente_seguro", { p_cliente_id: id });
 
     if (error) {
       setErro(error.message);

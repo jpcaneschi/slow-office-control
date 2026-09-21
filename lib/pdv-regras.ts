@@ -33,13 +33,7 @@ export function validarPagamento(p: ParamsPagamento): string {
 
   if (p.forma === "promissoria") {
     if (!p.temCliente) return "Venda no fiado exige um cliente identificado.";
-    if (p.mesesFiado > p.promMax) {
-      return `O prazo máximo da promissória é de ${p.promMax} meses.`;
-    }
     if (p.mesesFiado < 1) return "Informe as parcelas da promissória.";
-    if (p.total / p.mesesFiado < p.parcelaMinima) {
-      return "A parcela está abaixo da mínima configurada.";
-    }
   }
 
   if (p.forma === "misto") {
@@ -48,13 +42,10 @@ export function validarPagamento(p: ParamsPagamento): string {
     if (p.restanteMisto <= 0) {
       return "No misto, o valor no fiado deve ser maior que zero.";
     }
-    if (p.mesesFiado > p.promMax) {
-      return `O prazo máximo do fiado é de ${p.promMax} meses.`;
-    }
-    if (p.restanteMisto / p.mesesFiado < p.parcelaMinima) {
-      return "A parcela do fiado está abaixo da mínima configurada.";
-    }
   }
+
+  void p.parcelaMinima;
+  void p.promMax;
 
   return "";
 }

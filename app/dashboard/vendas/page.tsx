@@ -87,6 +87,7 @@ type Venda = {
   observacao: string | null;
   status: string;
   created_at: string;
+  data_venda: string;
 };
 
 type VendaItem = {
@@ -166,6 +167,10 @@ export default function VendasPage() {
     { forma: "dinheiro", valor: "", parcelas: "1", taxa: "0" },
   ]);
   const [observacao, setObservacao] = useState("");
+  const [dataVenda, setDataVenda] = useState(() => {
+    const agora = new Date();
+    return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+  });
 
   // Devolução parcial de venda
   const [devolvendoId, setDevolvendoId] = useState<string | null>(null);
@@ -199,7 +204,8 @@ export default function VendasPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("vendas")
-        .select("id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, valor_recebido, valor_liquido, entrada_forma, observacao, status, created_at")
+        .select("id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, valor_recebido, valor_liquido, entrada_forma, observacao, status, created_at, data_venda")
+        .order("data_venda", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase
         .from("venda_itens")
@@ -287,7 +293,7 @@ export default function VendasPage() {
 
   const vendasNoPeriodo = useMemo(() => {
     return vendas.filter((v) => {
-      const t = new Date(v.created_at).getTime();
+      const t = new Date(`${v.data_venda || v.created_at.slice(0, 10)}T12:00:00`).getTime();
       return t >= janela.ini && t < janela.fim;
     });
   }, [vendas, janela]);
@@ -766,11 +772,17 @@ export default function VendasPage() {
         p_entrada_forma: formaPagamento === "misto" ? entradaFormaMisto : null,
         p_idempotency_key: idempKey,
       });
-      const { error: rpcError } = await chamada;
+      const { data: vendaCriadaId, error: rpcError } = await chamada;
 
       if (rpcError) {
         throw new Error(rpcError.message);
       }
+
+      const { error: dataError } = await supabase.rpc("definir_data_venda", {
+        p_venda_id: vendaCriadaId,
+        p_data_venda: dataVenda,
+      });
+      if (dataError) throw new Error(`Venda salva, mas a data não pôde ser definida: ${dataError.message}`);
 
       limparFormulario();
       await carregarDados();
@@ -961,6 +973,20 @@ export default function VendasPage() {
                     automática.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#475569]">Data real da venda</label>
+                <input
+                  type="date"
+                  value={dataVenda}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setDataVenda(e.target.value)}
+                  className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
+                />
+                <p className="mt-1.5 text-xs text-[#64748b]">
+                  Use a data em que a venda realmente aconteceu, mesmo que esteja lançando depois.
+                </p>
               </div>
 
               <div>
@@ -1236,7 +1262,6 @@ export default function VendasPage() {
                       <input
                         type="number"
                         min="1"
-                        max={maxParcelasCfg}
                         value={mesesPromissoria}
                         onChange={(e) => setMesesPromissoria(e.target.value)}
                         className="w-full rounded-2xl border border-[#fde68a] bg-white px-4 py-3 text-[#0f172a] outline-none"
@@ -1676,10 +1701,7 @@ export default function VendasPage() {
                           </p>
 
                           <p className="text-sm font-bold text-[#334155]">
-                            Data: {new Date(venda.created_at).toLocaleString("pt-BR", {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })}
+                            Data da venda: {venda.data_venda.split("-").reverse().join("/")}
                           </p>
 
                           <p className="text-sm text-[#64748b]">

@@ -78,15 +78,15 @@ export function obterCorStatus(status: string) {
 }
 
 export type ConfigPromissoria = {
-  /** Prazo máximo em meses (configuracoes.promissoria_prazo_meses). */
+  /** Mantido por compatibilidade com configurações antigas. */
   prazoMaxMeses: number;
-  /** Parcela mínima em R$ (configuracoes.parcela_minima). */
+  /** Mantido por compatibilidade com configurações antigas. */
   parcelaMinima: number;
 };
 
 /**
- * Valida a promissória usando a CONFIG da loja (fonte única), não valores fixos.
- * O backend deve validar de novo — aqui é a UX amigável.
+ * Valida somente integridade. A Slow Office não limita quantidade nem valor
+ * mínimo de parcelas; o cliente e a loja definem livremente o acordo.
  */
 export function validarRegrasPromissoria(
   valorTotal: number,
@@ -101,19 +101,7 @@ export function validarRegrasPromissoria(
     return "Informe uma quantidade de parcelas válida.";
   }
 
-  if (parcelas > config.prazoMaxMeses) {
-    return `O prazo máximo para dividir é de ${config.prazoMaxMeses} ${
-      config.prazoMaxMeses === 1 ? "mês" : "meses"
-    }.`;
-  }
-
-  const valorParcela = calcularParcelaSugerida(valorTotal, parcelas);
-
-  if (config.parcelaMinima > 0 && valorParcela < config.parcelaMinima) {
-    return `A parcela mínima deve ser de ${formatCurrency(
-      config.parcelaMinima
-    )} por mês.`;
-  }
+  void config;
 
   return "";
 }

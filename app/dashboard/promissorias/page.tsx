@@ -29,7 +29,7 @@ type Promissoria = {
   id: string; cliente_id: string; valor_total: number; valor_produtos: number; entrada_valor: number;
   acrescimo_tipo: string | null; acrescimo_valor: number; acrescimo_percentual: number;
   parcelas: number; status: string; observacao: string | null; data_vencimento: string | null;
-  data_primeira_parcela: string | null; created_at: string;
+  data_primeira_parcela: string | null; created_at: string; venda_id: string | null;
 };
 type Pagamento = { id: string; promissoria_id: string; valor: number; data: string; forma_pagamento: string | null; tipo: string };
 type ItemProm = {
@@ -107,7 +107,7 @@ export default function PromissoriasPage() {
       supabase.from("clientes").select("id,nome,cpf,telefone").order("nome"),
       supabase.from("produtos").select("id,nome,marca,preco,estoque,tem_variacoes,status").order("nome"),
       supabase.from("produto_variacoes").select("id,produto_id,tamanho,cor,preco,estoque,status"),
-      supabase.from("promissorias").select("id,cliente_id,valor_total,valor_produtos,entrada_valor,acrescimo_tipo,acrescimo_valor,acrescimo_percentual,parcelas,status,observacao,data_vencimento,data_primeira_parcela,created_at").order("created_at", { ascending: false }),
+      supabase.from("promissorias").select("id,cliente_id,valor_total,valor_produtos,entrada_valor,acrescimo_tipo,acrescimo_valor,acrescimo_percentual,parcelas,status,observacao,data_vencimento,data_primeira_parcela,created_at,venda_id").order("created_at", { ascending: false }),
       supabase.from("promissoria_pagamentos").select("id,promissoria_id,valor,data,forma_pagamento,tipo").order("data"),
       supabase.from("promissoria_itens").select("id,promissoria_id,produto_id,variacao_id,quantidade,preco_unitario,preco_original,desconto_tipo,desconto_valor,desconto_percentual"),
     ]);
@@ -388,6 +388,17 @@ export default function PromissoriasPage() {
     setValorPagamento((a) => ({ ...a, [prom.id]: "" })); await carregarDados();
   }
   async function marcarComoAtrasado(id: string) { const { error } = await supabase.from("promissorias").update({ status: "atrasado" }).eq("id", id); if (error) setErro(error.message); else await carregarDados(); }
+  async function cancelarPromissoria(item: Promissoria) {
+    const motivo = window.prompt("Informe o motivo do cancelamento. O histórico será preservado:");
+    if (!motivo?.trim()) return;
+    const { error } = await supabase.rpc("cancelar_promissoria_seguro", {
+      p_promissoria_id: item.id,
+      p_motivo: motivo.trim(),
+    });
+    if (error) return setErro(error.message);
+    if (editandoId === item.id) limparFormulario();
+    await carregarDados();
+  }
 
   async function gerarArquivo(item: Promissoria, cliente: Cliente) {
     const ips = itensPorPromissoria.get(item.id) || [];
@@ -621,6 +632,11 @@ export default function PromissoriasPage() {
                         <button type="button" onClick={()=>baixar(item,cliente)} disabled={baixandoPdf===item.id} aria-label="Baixar PDF" className="rounded-xl border bg-white p-2.5 disabled:opacity-50"><Download size={16}/></button>
                         <button type="button" onClick={()=>whatsapp(item,cliente)} disabled={baixandoPdf===item.id} aria-label="Compartilhar no WhatsApp" className="rounded-xl border bg-white p-2.5 disabled:opacity-50"><MessageCircle size={16}/></button>
                       </div>
+                      {!['pago','cancelado'].includes(item.status) && recebimentos.length === 0 && (
+                        <button type="button" onClick={()=>cancelarPromissoria(item)} className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                          <Trash2 size={15}/>Cancelar promissória
+                        </button>
+                      )}
                       {saldo > 0 && (
                         <>
                           <div className="grid gap-2 sm:grid-cols-[1fr_120px] lg:grid-cols-1">

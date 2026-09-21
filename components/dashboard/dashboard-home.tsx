@@ -26,6 +26,7 @@ import { podeAcessar } from "@/lib/permissoes";
 import { TopProducts } from "@/components/dashboard/top-products";
 import { rankearProdutosMaisVendidos } from "@/lib/mais-vendidos-utils";
 import { SensitiveValue } from "@/components/dashboard/dashboard-preferences";
+import { ExecutiveOverview } from "@/components/dashboard/executive-overview";
 
 type Venda = {
   id: string;
@@ -35,6 +36,7 @@ type Venda = {
   valor_recebido: number | null;
   status: string;
   created_at: string;
+  data_venda: string;
 };
 type Cliente = { id: string; nome: string };
 type Condicional = { id: string; status: string };
@@ -120,7 +122,7 @@ export function DashboardHome() {
   const [itens, setItens] = useState<
     { venda_id: string; produto_id: string; quantidade: number; total_item: number }[]
   >([]);
-  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([]);
+  const [produtos, setProdutos] = useState<{ id: string; nome: string; marca: string | null }[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [pagamentosEquipe, setPagamentosEquipe] = useState<PagamentoFuncionario[]>([]);
@@ -144,12 +146,13 @@ export function DashboardHome() {
     const [v, c, cond, i, p, f, d, pg, vl, pp, mes, periodoRes] = await Promise.all([
       supabase
         .from("vendas")
-        .select("id,cliente_id,forma_pagamento,total,valor_recebido,status,created_at")
+        .select("id,cliente_id,forma_pagamento,total,valor_recebido,status,created_at,data_venda")
+        .order("data_venda", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase.from("clientes").select("id,nome"),
       supabase.from("condicionais").select("id,status"),
       supabase.from("venda_itens").select("venda_id,produto_id,quantidade,total_item"),
-      supabase.from("produtos").select("id,nome"),
+      supabase.from("produtos").select("id,nome,marca"),
       supabase.from("funcionarios").select("id,nome"),
       supabase
         .from("despesas")
@@ -236,7 +239,7 @@ export function DashboardHome() {
   );
 
   const qtdPeriodo = vendas.filter((v) => {
-    const t = new Date(v.created_at).getTime();
+    const t = new Date(`${v.data_venda}T12:00:00`).getTime();
     return v.status === "concluida" && t >= janela.inicio.getTime() && t < janela.fim.getTime();
   }).length;
 
@@ -250,7 +253,7 @@ export function DashboardHome() {
               ? Math.max(0, Math.min(Number(v.total || 0), Number(v.valor_recebido || 0)))
               : Number(v.total || 0),
         status: v.status,
-        created_at: v.created_at,
+        created_at: `${v.data_venda}T12:00:00`,
         contarPedido: true,
       })),
       ...pagamentosPromissoria.map((pg) => ({
@@ -279,12 +282,12 @@ export function DashboardHome() {
     () =>
       vendas
         .filter((v) => {
-          const t = new Date(v.created_at).getTime();
+          const t = new Date(`${v.data_venda}T12:00:00`).getTime();
           return t >= janela.inicio.getTime() && t < janela.fim.getTime();
         })
         .slice(0, 8)
         .map((v) => {
-          const d = new Date(v.created_at);
+          const d = new Date(`${v.data_venda}T12:00:00`);
           return {
             id: v.id,
             cliente: (v.cliente_id && clienteNome.get(v.cliente_id)) || "Sem cliente",
@@ -355,6 +358,15 @@ export function DashboardHome() {
       )}
 
       <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} />
+
+      <ExecutiveOverview
+        vendas={vendas}
+        itens={itens}
+        produtos={produtos}
+        despesas={resumoPeriodo.despesas_pagas}
+        inicio={period.inicio}
+        fim={period.fim}
+      />
 
       <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-6">
         <MetricCard

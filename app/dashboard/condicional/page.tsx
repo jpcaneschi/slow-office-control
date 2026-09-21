@@ -283,7 +283,7 @@ export default function CondicionalPage() {
   }
 
   const condicionaisFiltrados = useMemo(() => {
-    if (filtroStatus === "todos") return condicionais;
+    if (filtroStatus === "todos") return condicionais.filter((i) => i.status !== "arquivado");
     if (filtroStatus === "atrasado")
       return condicionais.filter(
         (i) =>
@@ -572,6 +572,17 @@ export default function CondicionalPage() {
       return;
     }
 
+    await carregarDados();
+  }
+
+  async function arquivarCondicional(condicionalId: string) {
+    const motivo = window.prompt("Informe o motivo. Se estiver aberto, as peças voltarão ao estoque:");
+    if (!motivo?.trim()) return;
+    const { error } = await supabase.rpc("arquivar_condicional_seguro", {
+      p_condicional_id: condicionalId,
+      p_motivo: motivo.trim(),
+    });
+    if (error) return setErro(error.message);
     await carregarDados();
   }
 
@@ -901,6 +912,7 @@ export default function CondicionalPage() {
                   { v: "aberto", l: "Abertos" },
                   { v: "atrasado", l: "Atrasados" },
                   { v: "finalizado", l: "Finalizados" },
+                  { v: "arquivado", l: "Arquivados" },
                 ].map((f) => (
                   <button
                     key={f.v}
@@ -1183,6 +1195,15 @@ export default function CondicionalPage() {
                                 Finalizar
                               </button>
                             </>
+                          )}
+                          {!condicional.venda_id && condicional.status !== "arquivado" && (
+                            <button
+                              type="button"
+                              onClick={() => arquivarCondicional(condicional.id)}
+                              className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                            >
+                              Excluir / arquivar
+                            </button>
                           )}
                         </div>
                       </div>
