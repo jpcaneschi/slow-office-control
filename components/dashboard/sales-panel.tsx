@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
@@ -19,7 +19,6 @@ import {
   formatBR,
   type PresetKey,
 } from "./period-context";
-import { supabase } from "@/lib/supabase";
 
 export type VendaLite = {
   total: number | null;
@@ -126,28 +125,10 @@ export function SalesPanel({
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [vendasReais, setVendasReais] = useState<VendaLite[] | null>(null);
-  const [loadingVendasReais, setLoadingVendasReais] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
-  const carregarVendasReais = useCallback(async () => {
-    setLoadingVendasReais(true);
-    const { data, error } = await supabase
-      .from("vendas")
-      .select("total,status,created_at")
-      .order("created_at", { ascending: true });
-
-    if (!error) {
-      setVendasReais((data as VendaLite[] | null) || []);
-    }
-    setLoadingVendasReais(false);
-  }, []);
-
-  useEffect(() => {
-    setMounted(true);
-    carregarVendasReais();
-  }, [carregarVendasReais]);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -172,8 +153,8 @@ export function SalesPanel({
   // O gráfico representa o valor integral dos pedidos vendidos na data da venda.
   // Recebimentos posteriores de promissória ficam nos cards financeiros, não aqui.
   const fonteGrafico = useMemo(
-    () => vendasReais ?? vendas.filter((v) => v.contarPedido !== false),
-    [vendasReais, vendas]
+    () => vendas.filter((v) => v.contarPedido !== false),
+    [vendas]
   );
 
   const data = useMemo(
@@ -182,7 +163,7 @@ export function SalesPanel({
   );
   const temDados = data.some((d) => d.pedidos > 0 || d.faturamento > 0);
   const currentLabel = mounted ? labelForPeriod(period) : "Período";
-  const carregandoGrafico = loading || loadingVendasReais;
+  const carregandoGrafico = loading;
 
   function exportarCSV() {
     const linhas = [
@@ -206,7 +187,6 @@ export function SalesPanel({
 
   function atualizarTudo() {
     onRefresh?.();
-    carregarVendasReais();
     setMoreOpen(false);
   }
 
@@ -226,7 +206,7 @@ export function SalesPanel({
             </span>
           </div>
           <p className="mt-1.5 text-[11px] text-[#94a3b8]">
-            Mostra o valor integral vendido na data da venda. Recebimentos de promissórias aparecem nos cards financeiros quando o dinheiro entra.
+            Valor cheio dos pedidos na data da venda. Recebimentos são exibidos separadamente.
           </p>
         </div>
 

@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   agruparMovimentosPorDia,
   normalizarResumo,
+  nomeFormaPagamento,
   periodoDoPreset,
   type MovimentoFinanceiro,
 } from "@/lib/relatorios-financeiros";
 
 describe("relatórios financeiros", () => {
+  it("exibe formas atuais e aliases de cartão com nomes legíveis", () => {
+    expect(nomeFormaPagamento("cartao")).toBe("Cartão");
+    expect(nomeFormaPagamento("multiplo")).toBe("Pagamento dividido");
+    expect(nomeFormaPagamento("cartao_credito")).toBe("Crédito");
+    expect(nomeFormaPagamento("debito")).toBe("Débito");
+    expect(nomeFormaPagamento(null)).toBe("Não informado");
+  });
   it("calcula o mês anterior completo, inclusive fevereiro bissexto", () => {
     expect(periodoDoPreset("mes_anterior", "2028-03-15")).toEqual({
       inicio: "2028-02-01",

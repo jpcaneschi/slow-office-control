@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CircleDollarSign,
   FileText,
-  ReceiptText,
   ShoppingCart,
   Wallet,
 } from "lucide-react";
@@ -64,7 +63,6 @@ type Vale = {
   data: string;
   observacao: string | null;
 };
-type PagamentoPromissoria = { id: string; valor: number; data: string };
 type ResumoMes = {
   movimentacao_mes: number;
   contas_receber: number;
@@ -128,7 +126,6 @@ export function DashboardHome() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [pagamentosEquipe, setPagamentosEquipe] = useState<PagamentoFuncionario[]>([]);
   const [vales, setVales] = useState<Vale[]>([]);
-  const [pagamentosPromissoria, setPagamentosPromissoria] = useState<PagamentoPromissoria[]>([]);
   const [resumoMes, setResumoMes] = useState<ResumoMes>(resumoMesVazio);
   const [resumoPeriodo, setResumoPeriodo] = useState<ResumoPeriodo>(resumoPeriodoVazio);
   const [loading, setLoading] = useState(true);
@@ -144,7 +141,7 @@ export function DashboardHome() {
       "0"
     )}-01`;
 
-    const [v, c, cond, i, p, f, d, pg, vl, pp, mes, periodoRes] = await Promise.all([
+    const [v, c, cond, i, p, f, d, pg, vl, mes, periodoRes] = await Promise.all([
       supabase
         .from("vendas")
         .select("id,cliente_id,forma_pagamento,total,valor_recebido,status,created_at,data_venda")
@@ -162,10 +159,6 @@ export function DashboardHome() {
         .from("pagamentos_funcionario")
         .select("id,funcionario_id,valor_liquido,data_pagamento"),
       supabase.from("vales").select("id,funcionario_id,valor,data,observacao"),
-      supabase
-        .from("promissoria_pagamentos")
-        .select("id,valor,data,promissorias!inner(status)")
-        .neq("promissorias.status", "cancelado"),
       supabase.rpc("resumo_financeiro_mes", { p_competencia: competencia }),
       supabase.rpc("resumo_operacao_periodo", {
         p_inicio: period.inicio,
@@ -183,7 +176,6 @@ export function DashboardHome() {
       d.error ||
       pg.error ||
       vl.error ||
-      pp.error ||
       mes.error ||
       periodoRes.error;
     if (err) setErro(err.message);
@@ -197,7 +189,6 @@ export function DashboardHome() {
     setDespesas((d.data as Despesa[] | null) || []);
     setPagamentosEquipe((pg.data as PagamentoFuncionario[] | null) || []);
     setVales((vl.data as Vale[] | null) || []);
-    setPagamentosPromissoria((pp.data as unknown as PagamentoPromissoria[] | null) || []);
 
     const linhaMes = Array.isArray(mes.data) ? mes.data[0] : mes.data;
     setResumoMes({
@@ -245,26 +236,13 @@ export function DashboardHome() {
   }).length;
 
   const vendasLite: VendaLite[] = useMemo(
-    () => [
-      ...vendas.map((v) => ({
-        total:
-          v.forma_pagamento === "promissoria"
-            ? 0
-            : v.forma_pagamento === "misto"
-              ? Math.max(0, Math.min(Number(v.total || 0), Number(v.valor_recebido || 0)))
-              : Number(v.total || 0),
-        status: v.status,
-        created_at: `${v.data_venda}T12:00:00`,
-        contarPedido: true,
-      })),
-      ...pagamentosPromissoria.map((pg) => ({
-        total: Number(pg.valor || 0),
-        status: "concluida",
-        created_at: `${pg.data}T12:00:00`,
-        contarPedido: false,
-      })),
-    ],
-    [vendas, pagamentosPromissoria]
+    () => vendas.map((v) => ({
+      total: Number(v.total || 0),
+      status: v.status,
+      created_at: `${v.data_venda}T12:00:00`,
+      contarPedido: true,
+    })),
+    [vendas],
   );
 
   const maisVendidos = useMemo(
@@ -291,7 +269,7 @@ export function DashboardHome() {
           const d = new Date(`${v.data_venda}T12:00:00`);
           return {
             id: v.id,
-            cliente: (v.cliente_id && clienteNome.get(v.cliente_id)) || "Sem cliente",
+            cliente: (v.cliente_id && clienteNome.get(v.cliente_id)) || "Cliente avulso",
             pagamento: v.forma_pagamento,
             valor: Number(v.total || 0),
             status: v.status,
@@ -371,18 +349,19 @@ export function DashboardHome() {
         inicio={period.inicio}
         fim={period.fim}
         loading={loading}
+        podeVerFinanceiro={podeVerFinanceiro}
       >
         <SalesPanel vendas={vendasLite} loading={loading} onRefresh={carregar} compact />
       </ExecutiveOverview>
 
-      <section className="nexo-financial-metrics grid grid-cols-2 items-stretch gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+      <section aria-label="Recebimentos e pendências" className="nexo-financial-metrics grid grid-cols-2 items-stretch gap-3 xl:grid-cols-4">
         <MetricCard
           compact
           icon={ShoppingCart}
           tint="#2563eb"
-          title={janela.ehHoje ? "Vendas da loja hoje" : "Vendas da loja"}
+          title="Recebido de vendas"
           value={loading ? "…" : formatCurrency(vendasRecebidas)}
-          deltaLabel={`recebido · ${labelForPeriod(period)}`}
+          deltaLabel={`inclui promissórias · ${labelForPeriod(period)}`}
           href="/dashboard/vendas"
           ariaLabel="Ver vendas da loja"
         />
@@ -398,37 +377,12 @@ export function DashboardHome() {
           ariaLabel="Ver ganhos de serviços"
         />
 
-        {podeVerFinanceiro && (
-          <MetricCard
-            compact
-            icon={ReceiptText}
-            tint="#dc2626"
-            title="Despesas pagas"
-            value={loading ? "…" : formatCurrency(resumoPeriodo.despesas_pagas)}
-            deltaLabel={labelForPeriod(period)}
-            href="/dashboard/financeiro"
-            ariaLabel="Ver despesas pagas"
-          />
-        )}
-
-        {podeVerFinanceiro && (
-          <MetricCard
-            compact
-            icon={CircleDollarSign}
-            tint="#7c3aed"
-            title="Faturamento do mês"
-            value={loading ? "…" : formatCurrency(resumoMes.movimentacao_mes)}
-            deltaLabel="entradas + serviços + saídas pagas"
-            href="/dashboard/financeiro"
-            ariaLabel="Ver faturamento e movimentação"
-          />
-        )}
-
         <MetricCard
           compact
           icon={Wallet}
           tint="#0891b2"
           title="Contas a receber"
+          deltaLabel="Saldo em aberto de promissórias"
           value={loading ? "…" : formatCurrency(resumoMes.contas_receber)}
           href="/dashboard/promissorias?status=em_aberto"
           ariaLabel="Ver promissórias a receber"
@@ -439,6 +393,7 @@ export function DashboardHome() {
           icon={FileText}
           tint="#ea580c"
           title="Condicionais em aberto"
+          deltaLabel="Peças aguardando definição de compra"
           value={loading ? "…" : String(condicionaisAbertas)}
           href="/dashboard/condicional?status=aberto"
           ariaLabel="Ver condicionais em aberto"
