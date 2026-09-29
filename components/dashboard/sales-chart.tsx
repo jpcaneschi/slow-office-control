@@ -17,6 +17,7 @@ import {
   calcularEscalaGrafico,
   formatarEixoBrl,
 } from "@/lib/grafico-vendas-utils";
+import { SensitiveValue, useDashboardPreferences } from "./dashboard-preferences";
 
 export type SalesPoint = {
   dia: string;
@@ -44,20 +45,21 @@ function CustomTooltip({
       <p className="text-xs font-bold text-[#0f172a]">{label}</p>
       <p className="mt-1 text-xs text-[#64748b]">
         Vendas:{" "}
-        <span className="font-semibold text-[#0f172a]">{brl(d.faturamento)}</span>
+        <span className="font-semibold text-[#0f172a]"><SensitiveValue>{brl(d.faturamento)}</SensitiveValue></span>
       </p>
       <p className="text-xs text-[#64748b]">
         Pedidos: <span className="font-semibold text-[#0f172a]">{d.pedidos}</span>
       </p>
       <p className="text-xs text-[#64748b]">
         Ticket médio:{" "}
-        <span className="font-semibold text-[#0f172a]">{brl(ticket)}</span>
+        <span className="font-semibold text-[#0f172a]"><SensitiveValue>{brl(ticket)}</SensitiveValue></span>
       </p>
     </div>
   );
 }
 
-export function SalesChart({ data }: { data: SalesPoint[] }) {
+export function SalesChart({ data, dense = false }: { data: SalesPoint[]; dense?: boolean }) {
+  const { valoresVisiveis } = useDashboardPreferences();
   const containerRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
 
@@ -90,7 +92,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
         : 38;
 
   return (
-    <div ref={containerRef} className="h-[250px] min-w-0 w-full sm:h-[340px]">
+    <div ref={containerRef} className={`min-w-0 w-full ${dense ? "h-[250px]" : "h-[250px] sm:h-[340px]"}`}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={data}
@@ -107,12 +109,12 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             </linearGradient>
           </defs>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="dia"
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#64748b", fontSize: compact ? 9 : 11 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
             minTickGap={compact ? 28 : 16}
             dy={6}
           />
@@ -121,8 +123,8 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             width={compact ? 56 : 72}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#94a3b8", fontSize: compact ? 9 : 11 }}
-            tickFormatter={formatarEixoBrl}
+            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            tickFormatter={(v) => valoresVisiveis ? formatarEixoBrl(v) : "•••"}
             domain={[0, escalaFat.max]}
             ticks={escalaFat.ticks}
           />
@@ -132,7 +134,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             width={compact ? 20 : 28}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: "#94a3b8", fontSize: compact ? 9 : 11 }}
+            tick={{ fill: "var(--text-muted)", fontSize: 11 }}
             domain={[0, escalaPed.max]}
             ticks={escalaPed.ticks}
             allowDecimals={false}
@@ -145,7 +147,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             yAxisId="left"
             dataKey="faturamento"
             radius={[8, 8, 0, 0]}
-            barSize={barSize}
+            barSize={dense ? Math.min(barSize, 12) : barSize}
             fill="url(#barFat)"
           >
             {data.map((d) => (
@@ -154,7 +156,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
                 fill={d.faturamento === maxFat ? "#2563eb" : "url(#barFat)"}
               />
             ))}
-            {!many && !compact && (
+            {!many && !compact && !dense && valoresVisiveis && (
               <LabelList
                 dataKey="faturamento"
                 position="top"
@@ -172,7 +174,7 @@ export function SalesChart({ data }: { data: SalesPoint[] }) {
             dot={many || compact ? false : { r: 4, fill: "#ffffff", stroke: "#2563eb", strokeWidth: 2 }}
             activeDot={{ r: 6 }}
           >
-            {!many && !compact && (
+            {!many && !compact && !dense && valoresVisiveis && (
               <LabelList
                 dataKey="pedidos"
                 position="top"

@@ -225,7 +225,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <DashboardPreferencesProvider>
-      <div className="nexo-dashboard min-h-screen bg-[#f4f6fb] text-[#0f172a]">
+      <div data-dashboard-home={pathname === "/dashboard" ? "true" : undefined} className="nexo-dashboard min-h-screen bg-[#f4f6fb] text-[#0f172a]">
         <AuthGuard>
           <AccessGuard>
             <SubscriptionGuard>
@@ -314,7 +314,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <DashboardPreferenceControls />
 
                 {/* Seletor de período global */}
-                <div className="hidden sm:block">
+                <div className={pathname === "/dashboard" ? "hidden" : "hidden sm:block"}>
                   <PeriodFilter />
                 </div>
 

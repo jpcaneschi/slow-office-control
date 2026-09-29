@@ -115,10 +115,12 @@ export function SalesPanel({
   vendas,
   loading,
   onRefresh,
+  compact = false,
 }: {
   vendas: VendaLite[];
   loading: boolean;
   onRefresh?: () => void;
+  compact?: boolean;
 }) {
   const { period, setPeriod } = usePeriod();
   const [open, setOpen] = useState(false);
@@ -209,10 +211,10 @@ export function SalesPanel({
   }
 
   return (
-    <section className="min-w-0 rounded-3xl border border-[#eef2f7] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-5">
+    <section className={`${compact ? "nexo-sales-compact" : ""} min-w-0 rounded-3xl border border-[#eef2f7] bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.05)] sm:p-5`}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-[#0f172a]">Pedidos vendidos no período</h3>
+          <h3 className="text-base font-bold text-[#0f172a]">Evolução das vendas</h3>
           <div className="mt-2 flex items-center gap-4 text-xs text-[#64748b]">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[#3b82f6]" />
@@ -229,7 +231,7 @@ export function SalesPanel({
         </div>
 
         <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
-          <div ref={menuRef} className="relative">
+          <div ref={menuRef} className={compact ? "hidden" : "relative"}>
             <button
               onClick={() => {
                 setOpen((o) => !o);
@@ -329,13 +331,13 @@ export function SalesPanel({
       </div>
 
       {carregandoGrafico ? (
-        <div className="flex h-[260px] w-full items-center justify-center sm:h-[340px]">
+        <div className={`flex w-full items-center justify-center ${compact ? "h-[250px]" : "h-[260px] sm:h-[340px]"}`}>
           <div className="h-full w-full animate-pulse rounded-xl bg-[#f1f5f9]" />
         </div>
       ) : temDados ? (
-        <SalesChart data={data} />
+        <SalesChart data={data} dense={compact} />
       ) : (
-        <div className="flex h-[260px] w-full flex-col items-center justify-center gap-2 text-center sm:h-[340px]">
+        <div className={`flex w-full flex-col items-center justify-center gap-2 text-center ${compact ? "h-[250px]" : "h-[260px] sm:h-[340px]"}`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f1f5f9] text-[#94a3b8]">
             <BarChart3 className="h-6 w-6" />
           </span>

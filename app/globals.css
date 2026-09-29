@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/* Dashboard home: density is scoped so other operational screens retain their layout. */
+.nexo-home-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.nexo-home-toolbar > div:first-child { min-width: 0; }
+.nexo-home-toolbar > div:last-child { margin-left: auto; max-width: 100%; }
+.nexo-home-toolbar h2 { font-size: 14px; font-weight: 700; }
+.nexo-home-toolbar p { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.nexo-home .nexo-sales-compact { border-radius: 12px; padding: 16px; border-color: var(--border); box-shadow: none; }
+.nexo-home .nexo-sales-compact h3 { font-size: 14px; }
+.nexo-home .nexo-sales-compact > div:first-child { flex-wrap: nowrap; gap: 8px; margin-bottom: 8px; }
+.nexo-home .nexo-sales-compact > div:first-child > div:last-child { width: auto; flex-shrink: 0; }
+.nexo-home .nexo-sales-compact > div:first-child p { font-size: 12px; line-height: 1.5; }
+.nexo-home .nexo-sales-compact button { min-height: 40px; min-width: 40px; }
+.nexo-home .nexo-metric-compact { padding: 14px; border-radius: 12px; box-shadow: none; }
+.nexo-home .nexo-metric-compact:hover { transform: none; }
+.nexo-home .nexo-metric-compact > div:first-child { gap: 8px; flex-direction: column; }
+.nexo-home .nexo-metric-compact > div:first-child > span { height: 26px; width: 26px; border-radius: 6px; }
+.nexo-home .nexo-metric-compact > div:first-child svg { height: 16px; width: 16px; }
+.nexo-home .nexo-metric-compact > div:first-child > div { padding-right: 0; width: 100%; }
+.nexo-home .nexo-metric-compact p:first-child { min-height: 0; font-size: 12px; line-height: 1.4; }
+.nexo-home .nexo-metric-compact > div:first-child > div > p:nth-child(2) { font-size: clamp(16px, 1.3vw, 22px); white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.nexo-home > section { border-radius: 12px; box-shadow: none; }
+.nexo-dashboard[data-dashboard-home] main { padding-top: 16px; }
+.nexo-dashboard[data-dashboard-home] main > div { max-width: 1920px; }
+.nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div { padding-top: 10px; padding-bottom: 10px; gap: 8px; }
+.nexo-dashboard[data-dashboard-home] .nexo-dashboard-header h1 { font-size: 22px; }
+@media (min-width: 1280px) {
+  .nexo-dashboard[data-dashboard-home] > div > div > aside.nexo-sidebar { width: 230px; }
+  .nexo-dashboard[data-dashboard-home] main { padding-left: 20px; padding-right: 20px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-sidebar nav { padding-left: 12px; padding-right: 12px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-sidebar-nav-item { border-radius: 10px; padding: 9px 12px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-sidebar-wave { display: none; }
+}
+@media (max-width: 767px) {
+  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div { padding-left: 12px; padding-right: 12px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header h1 { font-size: 18px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div > div:last-child { gap: 4px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header button { min-height: 40px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-preference-controls { gap: 0; padding: 0; }
+  .nexo-dashboard[data-dashboard-home] .nexo-preference-button { width: 36px; }
+  .nexo-dashboard[data-dashboard-home] main { padding-left: 12px; padding-right: 12px; }
+}
+
 /* ─── Sistema de design — Slow Office Control (tema claro / azul) ───────────── */
 :root {
   /* superfícies */

@@ -1,0 +1,58 @@
+.overview { display: grid; gap: 14px; min-width: 0; }
+.card, .metric { min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--foreground); }
+.card { padding: 14px; }
+.cardHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.cardHeading h2 { font-size: 14px; font-weight: 700; line-height: 1.4; }
+.cardHeading p, .note { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.cardHeading p { margin-top: 4px; }
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.metric { padding: 14px; min-height: 88px; transition: border-color 160ms ease; }
+.metric:hover { border-color: var(--brand); }
+.metricHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; color: var(--text-muted); font-size: 12px; line-height: 1.35; }
+.metricHeading svg { flex-shrink: 0; color: var(--brand); }
+.metricValue { margin-top: 10px; font-size: clamp(17px, 1.55vw, 25px); line-height: 1.2; font-weight: 750; letter-spacing: -.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.summaryRows { display: grid; gap: 8px; }
+.summaryRow { display: flex; gap: 12px; align-items: center; border-radius: 8px; padding: 8px 12px; background: color-mix(in srgb, var(--brand) 7%, var(--surface)); }
+.summaryRow dt { font-size: 12px; color: var(--text-muted); }
+.summaryRow dd { line-height: 1.25; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summarySign { width: 24px; flex-shrink: 0; text-align: center; font-size: 16px; font-weight: 600; color: var(--brand); }
+.summaryResult { background: var(--brand); color: #fff; }
+.summaryResult dt, .summaryResult .summarySign { color: #fff; }
+.note { margin-top: 10px; }
+.paymentContent { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.donut { height: 166px; width: 166px; flex: 0 0 166px; margin: auto; }
+.legend { flex: 1 1 200px; min-width: 0; display: grid; gap: 10px; }
+.legend li { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 12px; }
+.legendName { display: flex; align-items: center; gap: 7px; min-width: 0; overflow-wrap: anywhere; color: var(--text-muted); }
+.legendName i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.legend strong { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; }
+.legend small { display: block; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
+.sales { min-width: 0; }
+.sales > section { height: 100%; }
+.brandList { display: grid; gap: 18px; }
+.brandList li { display: flex; gap: 10px; align-items: flex-start; }
+.rank { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.brandDetail { flex: 1; min-width: 0; }
+.brandHeading { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.brandHeading > span { overflow-wrap: anywhere; }
+.brandHeading strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.brandDetail small { font-size: 12px; color: var(--text-muted); }
+.track { height: 4px; margin: 7px 0 3px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.track > div { height: 100%; border-radius: inherit; background: var(--brand); }
+.empty { display: grid; place-content: center; min-height: 180px; color: var(--text-muted); font-size: 13px; text-align: center; }
+@media (min-width: 768px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sales { grid-column: 1 / -1; }
+  .brands { grid-column: 1 / -1; }
+}
+@media (min-width: 1280px) {
+  .overview { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; }
+  .metrics { grid-column: span 4; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary { grid-column: span 3; }
+  .payments { grid-column: span 5; }
+  .sales { grid-column: span 8; }
+  .brands { grid-column: span 4; }
+  .paymentContent { min-height: 208px; }
+}
+@media (prefers-reduced-motion: reduce) { .metric { transition: none; } }
