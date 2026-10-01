@@ -1,3 +1,5 @@
+import { proximoDiaUtil } from "@/lib/dias-uteis";
+
 export type FrequenciaPagamento = "mensal" | "quinzenal" | "semanal";
 
 export type ConfigAgendaPagamento = {
@@ -5,6 +7,9 @@ export type ConfigAgendaPagamento = {
   dia_pagamento: number | null | undefined;
   dia_pagamento_2?: number | null | undefined;
   dia_semana_pagamento?: number | null | undefined;
+  ajustar_dia_util?: boolean;
+  feriados_pagamento?: string[];
+  primeira_competencia_pagamento?: string | null;
 };
 
 export type ParcelaAgenda = {
@@ -49,6 +54,7 @@ export function gerarDatasPagamentoMes(
   const { ano, mes } = partesData(competenciaISO);
   const ultimo = ultimoDiaMes(ano, mes);
   const competencia = isoData(ano, mes, 1);
+  if (config.primeira_competencia_pagamento && competencia < competenciaDeData(config.primeira_competencia_pagamento)) return [];
   const frequencia = config.frequencia_pagamento || "mensal";
   const datas: string[] = [];
 
@@ -75,7 +81,7 @@ export function gerarDatasPagamentoMes(
 
   return datas.map((data_pagamento, indice) => ({
     competencia,
-    data_pagamento,
+    data_pagamento: config.ajustar_dia_util ? proximoDiaUtil(data_pagamento, config.feriados_pagamento) : data_pagamento,
     parcela_numero: indice + 1,
     total_parcelas: datas.length,
   }));
@@ -88,7 +94,8 @@ export function gerarProximosPagamentos(
 ): ParcelaAgenda[] {
   const inicio = aPartirISO.slice(0, 10);
   const encontrados: ParcelaAgenda[] = [];
-  let competencia = competenciaDeData(inicio);
+  // A parcela do mês anterior pode ter sido adiada para este mês.
+  let competencia = config.ajustar_dia_util ? proximaCompetencia(competenciaDeData(inicio), -1) : competenciaDeData(inicio);
 
   for (let i = 0; i < 18 && encontrados.length < quantidade; i += 1) {
     const agenda = gerarDatasPagamentoMes(config, competencia);

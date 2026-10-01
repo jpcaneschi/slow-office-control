@@ -9,6 +9,7 @@ import {
   RelatorioFinanceiroPdf,
 } from "@/components/pdf/relatorios-pdf";
 import { PromissoriaAcordoPdf } from "@/components/pdf/promissoria-acordo-pdf";
+import { CondicionalPdfDocument } from "@/components/pdf/condicional-pdf-document";
 
 // Render de verdade (Área #11): garante que os PDFs geram sem erro depois de
 // remover o letterSpacing e itemizar a folha. Um PDF válido começa com "%PDF-".
@@ -19,6 +20,16 @@ async function pdfOk(el: React.ReactElement) {
 }
 
 describe("relatorios-pdf — render", () => {
+  it("condicional extenso com fonte incorporada e caracteres acentuados", async () => {
+    await pdfOk(React.createElement(CondicionalPdfDocument, { nomeLoja: "Loja de Demonstração", clienteNome: "Cliente de Demonstração", responsavel: "Não informado", dataSaida: "2026-10-01", dataLimite: "2026-10-05", itens: Array.from({ length: 14 }, (_, i) => ({ nome: `Camiseta de demonstração ${i + 1} · Preta · GG`, quantidade: 1 })) }));
+  }, 20000);
+  it("exporta um mês extenso sem falha de paginação", async () => {
+    await pdfOk(React.createElement(RelatorioFinanceiroPdf, {
+      loja: "Loja de Demonstração", periodoInicio: "2026-09-01", periodoFim: "2026-09-30",
+      resumo: { vendas_brutas: 20000, vendas_quantidade: 65, entradas_vendas: 20000, recebimentos_promissorias: 0, receita_servicos: 0, entradas_total: 20000, despesas_operacionais_pagas: 5000, compras_pagas: 10000, folha_vales_pagos: 0, saidas_total: 15000, resultado_caixa: 5000, despesas_pendentes: 0 },
+      movimentos: Array.from({ length: 130 }, (_, i) => ({ id: `linha-${i}`, data: `2026-09-${String(i % 30 + 1).padStart(2, "0")}`, natureza: i % 2 ? "entrada" as const : "venda" as const, tipo: i % 2 ? "recebimento_venda" : "venda", descricao: "Venda para cliente de demonstração", detalhe: "2x Camiseta com descrição extensa, cor preta e tamanho GG · 1x Camiseta de outra marca, off-white, M · 1x Short preto, G", forma_pagamento: "cartao", valor: 549.8, status: "concluida" })),
+    }));
+  }, 20000);
   it("recibo de folha itemizado", async () => {
     await pdfOk(
       React.createElement(FolhaSalarialPdf, {

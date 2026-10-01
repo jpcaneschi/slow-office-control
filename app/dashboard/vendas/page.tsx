@@ -32,6 +32,8 @@ import {
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 import { QuickSearchSelect } from "@/components/dashboard/quick-search-select";
+import { CalculadoraVenda } from "@/components/dashboard/calculadora-venda";
+import { hojeISO } from "@/lib/datas";
 import {
   resumirRecebimentos,
   vendaCorrespondeFiltro,
@@ -133,6 +135,7 @@ export default function VendasPage() {
   const [salvando, setSalvando] = useState(false);
 
   const [clienteId, setClienteId] = useState("");
+  const [identificarCliente, setIdentificarCliente] = useState(false);
   const [responsavel, setResponsavel] = useState("");
   const [responsaveisConfig, setResponsaveisConfig] = useState<string[]>([]);
   const [funcionariosLista, setFuncionariosLista] = useState<
@@ -622,6 +625,8 @@ export default function VendasPage() {
 
   function limparFormulario() {
     setClienteId("");
+    setIdentificarCliente(false);
+    setDataVenda(hojeISO());
     setResponsavel("");
     setFormaPagamento("pix");
     setValorRecebido("");
@@ -650,11 +655,6 @@ export default function VendasPage() {
 
     if (itensRascunho.length === 0) {
       setErro("Adicione ao menos um item.");
-      return;
-    }
-
-    if (!responsavel) {
-      setErro("Informe o responsável.");
       return;
     }
 
@@ -733,7 +733,7 @@ export default function VendasPage() {
       const chamada = formaPagamento === "multiplo"
         ? supabase.rpc("criar_venda_multiforma", {
             p_cliente_id: clienteId || null,
-            p_responsavel: responsavel,
+            p_responsavel: responsavel.trim() || "Não informado",
             p_funcionario_id: funcMatch ? funcMatch.id : null,
             p_desconto: descontoManualNumero,
             p_observacao: observacao.trim() || null,
@@ -748,7 +748,7 @@ export default function VendasPage() {
           })
         : supabase.rpc("criar_venda", {
         p_cliente_id: clienteId || null,
-        p_responsavel: responsavel,
+        p_responsavel: responsavel.trim() || "Não informado",
         p_funcionario_id: funcMatch ? funcMatch.id : null,
         p_forma_pagamento: formaPagamento,
         p_parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
@@ -938,7 +938,17 @@ export default function VendasPage() {
             </h2>
 
             <div className="mt-5 space-y-4">
-              <QuickSearchSelect
+              <p className="text-xs font-bold uppercase tracking-wide text-[#64748b]">Cliente e data</p>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Identificação do cliente">
+                {[{ identificado: false, texto: "Cliente avulso" }, { identificado: true, texto: "Identificar cliente" }].map((modo) => (
+                  <button key={modo.texto} type="button" aria-pressed={identificarCliente === modo.identificado}
+                    onClick={() => { setIdentificarCliente(modo.identificado); setClienteId(""); }}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold ${identificarCliente === modo.identificado ? "border-blue-300 bg-blue-50 text-blue-700" : "border-[#e8ecf4] text-[#475569]"}`}>
+                    {modo.texto}
+                  </button>
+                ))}
+              </div>
+              {identificarCliente ? <QuickSearchSelect
                 label="Cliente"
                 value={clienteId}
                 options={opcoesClientes}
@@ -946,15 +956,16 @@ export default function VendasPage() {
                 placeholder="Busque por nome, sobrenome, CPF, telefone ou e-mail"
                 emptyMessage="Nenhum cliente encontrado. Use venda avulsa ou cadastre o cliente."
                 hint="Digite qualquer trecho para localizar rapidamente um cliente já cadastrado."
-              />
+              /> : <p className="text-xs text-[#64748b]">Venda avulsa selecionada. Identifique o cliente quando precisar vincular seu cadastro.</p>}
 
               <div>
-                <label className="mb-2 block text-sm text-[#475569]">Responsável</label>
+                <label htmlFor="vendedor-venda" className="mb-2 block text-sm text-[#475569]">Vendedor (opcional)</label>
                 <input
+                  id="vendedor-venda"
                   list="responsaveis-lista"
                   value={responsavel}
                   onChange={(e) => setResponsavel(e.target.value)}
-                  placeholder="Nome do vendedor(a)"
+                  placeholder="Informar vendedor, se desejar"
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
                 <datalist id="responsaveis-lista">
@@ -980,7 +991,7 @@ export default function VendasPage() {
                 <input
                   type="date"
                   value={dataVenda}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={hojeISO()}
                   onChange={(e) => setDataVenda(e.target.value)}
                   className="w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none"
                 />
@@ -1442,9 +1453,11 @@ export default function VendasPage() {
               Resumo da venda
             </h2>
 
+            <div className="mt-4"><CalculadoraVenda total={totalRascunho} /></div>
+
             <div className="mt-5 grid gap-3 text-sm text-[#475569]">
               <p>Cliente: {getClienteNome(clienteId || null)}</p>
-              <p>Responsável: {responsavel}</p>
+              {responsavel.trim() && <p>Vendedor: {responsavel}</p>}
               <p>Pagamento: {rotuloFormaPagamento(formaPagamento)}</p>
               <p>Subtotal: {formatCurrency(subtotalRascunho)}</p>
               <p>Desconto manual: {formatCurrency(descontoManualNumero)}</p>

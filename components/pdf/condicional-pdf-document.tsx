@@ -5,9 +5,14 @@ import {
   Text,
   View,
   StyleSheet,
+  Font,
 } from "@react-pdf/renderer";
 import nexoLogo from "@/public/nexo-gestao-horizontal.png";
 import { formatDataBR } from "@/lib/datas";
+import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
+
+Font.register({ family: "DejaVuCondicional", fonts: [{ src: PDF_FONT_REGULAR, fontWeight: 400 }, { src: PDF_FONT_BOLD, fontWeight: 700 }] });
+Font.registerHyphenationCallback((word) => [word]);
 
 const nexoLogoAsset = nexoLogo as unknown;
 const NEXO_LOGO_SRC =
@@ -51,7 +56,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 60,
     paddingHorizontal: 44,
-    fontFamily: "Helvetica",
+    fontFamily: "DejaVuCondicional",
     fontSize: 10,
   },
   shell: {
@@ -77,13 +82,12 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 8.5,
     textTransform: "uppercase",
-    letterSpacing: 1.4,
     color: "#555555",
     marginBottom: 8,
   },
   title: {
     fontSize: 22,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuCondicional", fontWeight: 700,
     color: "#000000",
     marginBottom: 6,
   },
@@ -105,11 +109,10 @@ const styles = StyleSheet.create({
   codeLabel: {
     fontSize: 8,
     textTransform: "uppercase",
-    letterSpacing: 1,
     color: "#666666",
     marginBottom: 4,
   },
-  codeValue: { fontSize: 12, fontFamily: "Helvetica-Bold", color: "#000000" },
+  codeValue: { fontSize: 12, fontFamily: "DejaVuCondicional", fontWeight: 700, color: "#000000" },
   infoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -127,22 +130,20 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 8,
     textTransform: "uppercase",
-    letterSpacing: 0.9,
     color: "#666666",
     marginBottom: 6,
   },
   infoValue: {
     fontSize: 12,
     color: "#000000",
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuCondicional", fontWeight: 700,
     marginBottom: 3,
   },
   infoHint: { fontSize: 9, color: "#555555", lineHeight: 1.4 },
   sectionTitle: {
     fontSize: 10,
     textTransform: "uppercase",
-    letterSpacing: 1,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuCondicional", fontWeight: 700,
     color: "#000000",
     marginBottom: 10,
   },
@@ -169,9 +170,8 @@ const styles = StyleSheet.create({
   th: {
     fontSize: 8.5,
     color: "#ffffff",
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuCondicional", fontWeight: 700,
     textTransform: "uppercase",
-    letterSpacing: 0.7,
   },
   td: { fontSize: 10, color: "#111111", lineHeight: 1.45 },
   notesBox: {
@@ -183,9 +183,8 @@ const styles = StyleSheet.create({
   notesTitle: {
     fontSize: 9.5,
     color: "#000000",
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "DejaVuCondicional", fontWeight: 700,
     textTransform: "uppercase",
-    letterSpacing: 0.8,
     marginBottom: 8,
   },
   notesText: { fontSize: 9.5, color: "#111111", lineHeight: 1.6 },
