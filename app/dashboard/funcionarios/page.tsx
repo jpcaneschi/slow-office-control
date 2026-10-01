@@ -28,6 +28,9 @@ type Funcionario = {
   dia_pagamento: number;
   dia_pagamento_2: number;
   dia_semana_pagamento: number;
+  ajustar_dia_util: boolean;
+  feriados_pagamento: string[];
+  primeira_competencia_pagamento: string | null;
   vale_recorrente_valor: number;
   vale_recorrente_dia: number;
   vale_recorrente_ativo: boolean;
@@ -98,6 +101,7 @@ export default function FuncionariosPage() {
   const [descontosVale, setDescontosVale] = useState<ValeDesconto[]>([]);
   const [vendas, setVendas] = useState<VendaLite[]>([]);
   const [despesas, setDespesas] = useState<DespesaLite[]>([]);
+  const [comissoesFechadas, setComissoesFechadas] = useState<{ funcionario_id: string; competencia_pagamento: string; base_valor: number; percentual: number; valor: number }[]>([]);
   const [atendServico, setAtendServico] = useState<
     { funcionario_id: string | null; valor: number; percentual_loja: number; data: string }[]
   >([]);
@@ -118,6 +122,9 @@ export default function FuncionariosPage() {
   const [diaPagamento, setDiaPagamento] = useState("5");
   const [diaPagamento2, setDiaPagamento2] = useState("30");
   const [diaSemanaPagamento, setDiaSemanaPagamento] = useState("5");
+  const [ajustarDiaUtil, setAjustarDiaUtil] = useState(false);
+  const [feriadosPagamento, setFeriadosPagamento] = useState("");
+  const [primeiraCompetencia, setPrimeiraCompetencia] = useState("");
   const [valeRecorrenteAtivo, setValeRecorrenteAtivo] = useState(false);
   const [valeRecorrenteValor, setValeRecorrenteValor] = useState("0");
   const [valeRecorrenteDia, setValeRecorrenteDia] = useState("5");
@@ -135,10 +142,10 @@ export default function FuncionariosPage() {
     setLoading(true);
     setErro("");
     await supabase.rpc("gerar_vales_recorrentes", { p_competencia: period.inicio });
-    const [funcRes, valesRes, descontosRes, vendasRes, servRes, despesasRes] = await Promise.all([
+    const [funcRes, valesRes, descontosRes, vendasRes, servRes, despesasRes, comissoesRes] = await Promise.all([
       supabase
         .from("funcionarios")
-        .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao, telefone, comissao_base, frequencia_pagamento, dia_pagamento, dia_pagamento_2, dia_semana_pagamento, vale_recorrente_valor, vale_recorrente_dia, vale_recorrente_ativo")
+        .select("id, nome, comissao_percentual, salario_fixo, ativo, observacao, telefone, comissao_base, frequencia_pagamento, dia_pagamento, dia_pagamento_2, dia_semana_pagamento, ajustar_dia_util, feriados_pagamento, primeira_competencia_pagamento, vale_recorrente_valor, vale_recorrente_dia, vale_recorrente_ativo")
         .order("created_at", { ascending: true }),
       supabase.from("vales").select("id, funcionario_id, valor, data, observacao"),
       supabase
@@ -147,8 +154,9 @@ export default function FuncionariosPage() {
       supabase.from("vendas").select("id, funcionario_id, total, status, created_at"),
       supabase.from("atendimentos_servico").select("funcionario_id, valor, percentual_loja, data"),
       supabase.from("despesas").select("valor, data"),
+      supabase.from("comissoes_fechadas").select("funcionario_id, competencia_pagamento, base_valor, percentual, valor"),
     ]);
-    const primeiroErro = funcRes.error || valesRes.error || descontosRes.error || vendasRes.error || servRes.error || despesasRes.error;
+    const primeiroErro = funcRes.error || valesRes.error || descontosRes.error || vendasRes.error || servRes.error || despesasRes.error || comissoesRes.error;
     if (primeiroErro) setErro(primeiroErro.message);
     setFuncionarios((funcRes.data as Funcionario[] | null) || []);
     setVales((valesRes.data as Vale[] | null) || []);
@@ -156,6 +164,7 @@ export default function FuncionariosPage() {
     setVendas((vendasRes.data as VendaLite[] | null) || []);
     setAtendServico(servRes.data || []);
     setDespesas((despesasRes.data as DespesaLite[] | null) || []);
+    setComissoesFechadas(comissoesRes.data || []);
     setLoading(false);
   }
 
@@ -173,10 +182,13 @@ export default function FuncionariosPage() {
           dia_pagamento: Number(diaPagamento || 5),
           dia_pagamento_2: Number(diaPagamento2 || 30),
           dia_semana_pagamento: Number(diaSemanaPagamento || 5),
+          ajustar_dia_util: ajustarDiaUtil,
+          feriados_pagamento: feriadosPagamento.split(/[\s,;]+/).filter(Boolean),
+          primeira_competencia_pagamento: primeiraCompetencia ? `${primeiraCompetencia}-01` : null,
         },
         competenciaAtual
       ),
-    [frequenciaPagamento, diaPagamento, diaPagamento2, diaSemanaPagamento, competenciaAtual]
+    [frequenciaPagamento, diaPagamento, diaPagamento2, diaSemanaPagamento, competenciaAtual, ajustarDiaUtil, feriadosPagamento, primeiraCompetencia]
   );
 
   const funcionarioVale = funcionarios.find((f) => f.id === valeFuncId);
@@ -197,6 +209,9 @@ export default function FuncionariosPage() {
     setDiaPagamento("5");
     setDiaPagamento2("30");
     setDiaSemanaPagamento("5");
+    setAjustarDiaUtil(false);
+    setFeriadosPagamento("");
+    setPrimeiraCompetencia("");
     setValeRecorrenteAtivo(false);
     setValeRecorrenteValor("0");
     setValeRecorrenteDia("5");
@@ -214,6 +229,9 @@ export default function FuncionariosPage() {
     setDiaPagamento(String(f.dia_pagamento || 5));
     setDiaPagamento2(String(f.dia_pagamento_2 || 30));
     setDiaSemanaPagamento(String(f.dia_semana_pagamento ?? 5));
+    setAjustarDiaUtil(f.ajustar_dia_util);
+    setFeriadosPagamento((f.feriados_pagamento || []).join(", "));
+    setPrimeiraCompetencia(f.primeira_competencia_pagamento?.slice(0, 7) || "");
     setValeRecorrenteAtivo(Boolean(f.vale_recorrente_ativo));
     setValeRecorrenteValor(String(f.vale_recorrente_valor || 0));
     setValeRecorrenteDia(String(f.vale_recorrente_dia || 5));
@@ -239,6 +257,11 @@ export default function FuncionariosPage() {
       return;
     }
     const pct = Number(comissao || 0);
+    const feriados = feriadosPagamento.split(/[\s,;]+/).filter(Boolean);
+    if (feriados.some((dia) => !/^\d{4}-\d{2}-\d{2}$/.test(dia) || !Number.isFinite(Date.parse(`${dia}T12:00:00Z`)) || new Date(`${dia}T12:00:00Z`).toISOString().slice(0, 10) !== dia)) {
+      setErro("Confira os feriados: use datas válidas no formato AAAA-MM-DD.");
+      return;
+    }
     if (pct < 0 || pct > 100) {
       setErro("A comissão deve ficar entre 0 e 100%.");
       return;
@@ -260,6 +283,9 @@ export default function FuncionariosPage() {
       dia_pagamento: Math.min(31, Math.max(1, Number(diaPagamento) || (frequenciaPagamento === "quinzenal" ? 15 : 5))),
       dia_pagamento_2: Math.min(31, Math.max(1, Number(diaPagamento2) || 30)),
       dia_semana_pagamento: Math.min(6, Math.max(0, Number(diaSemanaPagamento) || 0)),
+      ajustar_dia_util: ajustarDiaUtil,
+      feriados_pagamento: feriadosPagamento.split(/[\s,;]+/).filter(Boolean),
+      primeira_competencia_pagamento: primeiraCompetencia ? `${primeiraCompetencia}-01` : null,
       vale_recorrente_ativo: valeRecorrenteAtivo,
       vale_recorrente_valor: Math.max(0, Number(valeRecorrenteValor) || 0),
       vale_recorrente_dia: Math.min(31, Math.max(1, Number(valeRecorrenteDia) || 5)),
@@ -370,9 +396,10 @@ export default function FuncionariosPage() {
       { vendaNoPeriodo, dataNoPeriodo }
     );
     return funcionarios.map((f) => {
+      const snapshot = comissoesFechadas.find((c) => c.funcionario_id === f.id && c.competencia_pagamento === `${period.inicio.slice(0, 7)}-01`);
       const a = calcularAcerto(
-        f,
-        { vendas, servicos: atendServico, vales: valesParaAcerto, resultadoLoja },
+        snapshot ? { ...f, comissao_percentual: Number(snapshot.percentual) } : f,
+        { vendas, servicos: atendServico, vales: valesParaAcerto, resultadoLoja: { ...resultadoLoja, lucroFechado: snapshot ? Number(snapshot.base_valor) : undefined } },
         { vendaNoPeriodo, dataNoPeriodo }
       );
       return {
@@ -388,7 +415,7 @@ export default function FuncionariosPage() {
         baseTipo: a.baseTipo,
       };
     });
-  }, [funcionarios, vendas, valesParaAcerto, atendServico, despesas, janela]);
+  }, [funcionarios, vendas, valesParaAcerto, atendServico, despesas, janela, comissoesFechadas, period.inicio]);
 
   const inputCls =
     "w-full rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] px-4 py-3 text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10";
@@ -476,6 +503,19 @@ export default function FuncionariosPage() {
                   </div>
                 )}
 
+                <label className="mt-3 flex items-center gap-2 text-sm text-[#1e40af]">
+                  <input type="checkbox" checked={ajustarDiaUtil} onChange={(e) => setAjustarDiaUtil(e.target.checked)} />
+                  Adiar para o próximo dia útil
+                </label>
+                {ajustarDiaUtil && <div className="mt-3">
+                  <label htmlFor="feriados-pagamento" className="mb-1 block text-xs text-[#475569]">Feriados locais e móveis</label>
+                  <textarea id="feriados-pagamento" rows={2} value={feriadosPagamento} onChange={(e) => setFeriadosPagamento(e.target.value)} placeholder="2026-10-07, 2026-12-08" className={inputCls} />
+                  <p className="mt-1 text-xs text-[#64748b]">Sábados, domingos e feriados nacionais fixos já são considerados. Informe as outras datas no formato AAAA-MM-DD, separadas por vírgula, e revise o calendário a cada ano.</p>
+                </div>}
+                <div className="mt-3">
+                  <label htmlFor="primeira-competencia" className="mb-1 block text-xs text-[#475569]">Primeiro mês de pagamento (opcional)</label>
+                  <input id="primeira-competencia" type="month" value={primeiraCompetencia} onChange={(e) => setPrimeiraCompetencia(e.target.value)} className={inputCls} />
+                </div>
                 <div className="mt-3 rounded-xl border border-[#bfdbfe] bg-white p-3">
                   <p className="text-xs font-bold uppercase tracking-wide text-[#1d4ed8]">Prévia deste mês</p>
                   <div className="mt-2 flex flex-wrap gap-2">

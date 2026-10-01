@@ -35,6 +35,9 @@ type Funcionario = {
   dia_pagamento: number | null;
   dia_pagamento_2: number | null;
   dia_semana_pagamento: number | null;
+  ajustar_dia_util: boolean;
+  feriados_pagamento: string[];
+  primeira_competencia_pagamento: string | null;
   ativo: boolean | null;
 };
 
@@ -218,7 +221,7 @@ export default function FolhaPage() {
       supabase
         .from("funcionarios")
         .select(
-          "id, nome, telefone, comissao_percentual, salario_fixo, comissao_base, frequencia_pagamento, dia_pagamento, dia_pagamento_2, dia_semana_pagamento, ativo"
+          "id, nome, telefone, comissao_percentual, salario_fixo, comissao_base, frequencia_pagamento, dia_pagamento, dia_pagamento_2, dia_semana_pagamento, ajustar_dia_util, feriados_pagamento, primeira_competencia_pagamento, ativo"
         )
         .order("nome"),
       supabase
@@ -298,7 +301,7 @@ export default function FolhaPage() {
       lucro: Number(resumoFinanceiro.resultado_projetado || 0),
     };
 
-    return funcionarios.map((funcionario) => {
+    return funcionarios.filter((f) => !f.primeira_competencia_pagamento || f.primeira_competencia_pagamento <= competencia).map((funcionario) => {
       const calculado = calcularAcerto(
         funcionario,
         { vendas, servicos, vales: [], resultadoLoja: resultadoUnificado },

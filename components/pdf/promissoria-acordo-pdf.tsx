@@ -1,5 +1,9 @@
-import { Document, Image as PdfImage, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Image as PdfImage, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import nexoLogo from "@/public/nexo-gestao-horizontal.png";
+import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
+
+Font.register({ family: "DejaVuAcordo", fonts: [{ src: PDF_FONT_REGULAR, fontWeight: 400 }, { src: PDF_FONT_BOLD, fontWeight: 700 }] });
+Font.registerHyphenationCallback((word) => [word]);
 
 const nexoLogoAsset = nexoLogo as unknown;
 const NEXO_LOGO_SRC =
@@ -12,10 +16,10 @@ const NEXO_LOGO_SRC =
       : "";
 
 const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 10, color: "#0f172a", fontFamily: "Helvetica" },
+  page: { padding: 36, fontSize: 10, color: "#0f172a", fontFamily: "DejaVuAcordo" },
   header: { borderBottomWidth: 1, borderBottomColor: "#dbe3ef", paddingBottom: 14, marginBottom: 18 },
   logo: { width: 96, height: 30, objectFit: "contain", objectPosition: "left", marginBottom: 8 },
-  eyebrow: { fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: 1.2 },
+  eyebrow: { fontSize: 9, color: "#64748b", textTransform: "uppercase" },
   title: { fontSize: 22, fontWeight: 700, marginTop: 4 },
   subtitle: { fontSize: 10, color: "#64748b", marginTop: 5 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
