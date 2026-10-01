@@ -201,6 +201,12 @@ function MobileBottomNav({
   );
 }
 
+function FerramentasGestao({ pathname }: { pathname: string }) {
+  const { papel, carregando } = usePapel();
+  if (carregando || papel === "caixa") return null;
+  return <><GlobalSearch /><div className={pathname === "/dashboard" ? "hidden" : "hidden sm:block"}><PeriodFilter /></div><NotificationsBell /></>;
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
@@ -308,18 +314,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </h1>
 
               {/* Busca global */}
-              <GlobalSearch />
+              <FerramentasGestao pathname={pathname} />
 
               <div className="ml-auto flex items-center gap-3">
                 <DashboardPreferenceControls />
-
-                {/* Seletor de período global */}
-                <div className={pathname === "/dashboard" ? "hidden" : "hidden sm:block"}>
-                  <PeriodFilter />
-                </div>
-
-                {/* Notificações */}
-                <NotificationsBell />
 
                 {/* Perfil */}
                 <UserMenu />

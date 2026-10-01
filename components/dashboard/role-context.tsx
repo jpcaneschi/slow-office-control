@@ -22,7 +22,7 @@ type Ctx = {
 const RoleContext = createContext<Ctx | null>(null);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
-  const [papel, setPapel] = useState<Papel>("owner");
+  const [papel, setPapel] = useState<Papel>("caixa");
   const [modulos, setModulos] = useState<string[]>(MODULOS_PADRAO);
   const [adminPlataforma, setAdminPlataforma] = useState(false);
   const [carregando, setCarregando] = useState(true);

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Papéis e permissões (RBAC) — fonte única da verdade para o que cada função
 // pode acessar. O gate de navegação e a guarda de rota usam `podeAcessar`.
-// Enforcement de dados (RLS por papel) é um passo futuro; aqui é camada de app.
+// O banco aplica RLS por organização e papel; esta camada cuida da navegação.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Papel = "owner" | "gerente" | "caixa" | "financeiro";
@@ -18,7 +18,7 @@ export const PAPEL_LABEL: Record<Papel, string> = {
 export const PAPEL_DESCRICAO: Record<Papel, string> = {
   owner: "Acesso total, incluindo equipe e configurações.",
   gerente: "Opera tudo do dia a dia; não gerencia equipe nem a empresa.",
-  caixa: "Vendas, clientes, condicional e produtos. Sem financeiro.",
+  caixa: "Registra vendas e cadastra clientes na venda. Sem relatórios ou gestão da loja.",
   financeiro: "Financeiro, promissórias e relatórios. Sem operar o caixa.",
 };
 
@@ -43,15 +43,7 @@ const ACESSO: Record<Papel, string[]> = {
     "/dashboard/relatorios",
     "/dashboard/tarefas-alertas",
   ],
-  caixa: [
-    "/dashboard",
-    "/dashboard/vendas",
-    "/dashboard/condicional",
-    "/dashboard/clientes",
-    "/dashboard/fidelidade",
-    "/dashboard/promissorias",
-    "/dashboard/agenda",
-  ],
+  caixa: ["/dashboard/vendas"],
   financeiro: [
     "/dashboard",
     "/dashboard/financeiro",
@@ -66,7 +58,7 @@ export function normalizarPapel(valor: string | null | undefined): Papel {
   if (valor === "gerente" || valor === "caixa" || valor === "financeiro") {
     return valor;
   }
-  return "owner";
+  return valor === "owner" ? "owner" : "caixa";
 }
 
 /** O papel pode acessar a rota (pathname) informada? */
@@ -99,4 +91,9 @@ export function podeCancelarVenda(papel: Papel): boolean {
 /** Trocas alteram estoque e o custo histórico da venda — só dono/gerente. */
 export function podeTrocarItensVenda(papel: Papel): boolean {
   return papel === "owner" || papel === "gerente";
+}
+
+/** Entrada operacional de cada perfil. */
+export function rotaInicial(papel: Papel) {
+  return papel === "caixa" ? "/dashboard/vendas" : "/dashboard";
 }

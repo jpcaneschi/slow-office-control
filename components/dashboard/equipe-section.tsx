@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { linkConvite, mensagemConvite } from "@/lib/convites";
 import { usePapel } from "@/components/dashboard/role-context";
 import { expirado, formatDataBR } from "@/lib/datas";
 import {
@@ -81,7 +82,7 @@ export function EquipeSection() {
     setErro("");
     setSucesso("");
     const email = novoEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErro("Informe um e-mail válido.");
       return;
     }
@@ -90,10 +91,8 @@ export function EquipeSection() {
       return;
     }
     setSalvando(true);
-    const { error } = await supabase.from("organization_invites").insert({
-      email,
-      papel: novoPapel,
-      status: "pendente",
+    const { error } = await supabase.rpc("criar_convite_equipe", {
+      p_email: email, p_papel: novoPapel,
     });
     if (error) {
       setErro(error.message);
@@ -103,7 +102,7 @@ export function EquipeSection() {
     setNovoEmail("");
     setNovoPapel("caixa");
     setSucesso(
-      "Convite criado. Peça para a pessoa criar a conta com esse mesmo e-mail — ela entra direto na sua empresa."
+      "Convite pronto por 7 dias. Copie o link ou abra o e-mail abaixo para enviar à pessoa."
     );
     await carregar();
     setSalvando(false);
@@ -169,7 +168,7 @@ export function EquipeSection() {
     <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
       <h2 className="text-xl font-black tracking-tight text-[#0f172a]">Equipe</h2>
       <p className="mt-1 text-sm text-[#64748b]">
-        Convide sua equipe e defina o que cada pessoa pode acessar.
+        Convide por e-mail para a mesma loja. Não é preciso criar outra loja, unidade ou divisão.
       </p>
 
       {erro && (
@@ -245,7 +244,7 @@ export function EquipeSection() {
             {convites.map((c) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between gap-2 rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 py-2.5"
+                className="flex flex-col items-start justify-between gap-2 rounded-2xl border border-[#fde68a] sm:flex-row sm:items-center bg-[#fffbeb] px-4 py-2.5"
               >
                 <span className="text-sm text-[#92400e]">
                   {c.email}
@@ -262,6 +261,14 @@ export function EquipeSection() {
                     )}
                   </span>
                 </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {!expirado(c.expires_at) && <>
+                    <button type="button" onClick={async () => {
+                      try { await navigator.clipboard.writeText(mensagemConvite(linkConvite(window.location.origin, c))); setSucesso("Mensagem com o link copiada. Envie à pessoa convidada."); }
+                      catch { setErro("Não foi possível copiar. Use o botão Enviar por e-mail."); }
+                    }} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-700">Copiar convite</button>
+                    <button type="button" onClick={() => { window.location.href = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Convite para a equipe • Nexo")}&body=${encodeURIComponent(mensagemConvite(linkConvite(window.location.origin, c)))}`; }} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-700">Enviar por e-mail</button>
+                  </>}
                 <button
                   type="button"
                   onClick={() => revogarConvite(c.id)}
@@ -269,6 +276,7 @@ export function EquipeSection() {
                 >
                   Revogar
                 </button>
+                </div>
               </div>
             ))}
           </div>
@@ -303,12 +311,11 @@ export function EquipeSection() {
             disabled={salvando}
             className="rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
           >
-            {salvando ? "..." : "Convidar"}
+            {salvando ? "Criando..." : "Criar convite"}
           </button>
         </div>
         <p className="mt-2 text-xs text-[#94a3b8]">
-          A pessoa cria a conta com esse mesmo e-mail e entra direto na sua
-          empresa, com o papel escolhido.
+          {PAPEL_DESCRICAO[novoPapel]} A pessoa escolhe a própria senha e entra na loja com o acesso definido. O botão de e-mail abre seu aplicativo de e-mail para enviar o convite.
         </p>
       </div>
     </div>

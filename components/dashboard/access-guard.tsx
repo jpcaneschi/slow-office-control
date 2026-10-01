@@ -19,6 +19,8 @@ export function AccessGuard({ children }: { children: ReactNode }) {
       } = await supabase.auth.getUser();
       if (!ativo || !user) return;
 
+      const { error: conviteError } = await supabase.rpc("aceitar_convite_equipe", { p_convite_id: null });
+      if (conviteError) { router.replace("/login"); return; }
       const [pedidoRes, adminRes] = await Promise.all([
         supabase
           .from("access_requests")
