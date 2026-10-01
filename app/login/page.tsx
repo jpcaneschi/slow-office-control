@@ -6,12 +6,14 @@ import Link from "next/link";
 import { Loader2, Mail, Lock, Building2, UserRound, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { acessoPermiteEntrada, mensagemStatusAcesso } from "@/lib/acesso-utils";
+import { rotaInicial, normalizarPapel } from "@/lib/permissoes";
 import { NexoLogo } from "@/components/brand/nexo-logo";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
 
 export default function LoginPage() {
   const router = useRouter();
+  const [conviteId, setConviteId] = useState<string | null>(null);
   const [modo, setModo] = useState<"entrar" | "criar">("entrar");
   const [nome, setNome] = useState("");
   const [nomeLoja, setNomeLoja] = useState("");
@@ -50,6 +52,8 @@ export default function LoginPage() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("novo") === "1") setModo("criar");
+    const convite = p.get("convite");
+    if (convite && /^[0-9a-f-]{36}$/i.test(convite)) setConviteId(convite);
     const em = p.get("email");
     if (em) setEmail(em);
     const status = p.get("status");
@@ -59,6 +63,8 @@ export default function LoginPage() {
   }, []);
 
   async function encaminharUsuario(userId: string) {
+    const { error: conviteError } = await supabase.rpc("aceitar_convite_equipe", { p_convite_id: conviteId });
+    if (conviteError) { setErro(conviteError.message); return; }
     const [pedidoRes, adminRes] = await Promise.all([
       supabase
         .from("access_requests")
@@ -86,12 +92,12 @@ export default function LoginPage() {
 
     const { data: membro } = await supabase
       .from("organization_members")
-      .select("organization_id")
+      .select("organization_id, papel")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
 
-    router.replace(membro?.organization_id ? "/dashboard" : "/onboarding");
+    router.replace(membro?.organization_id ? rotaInicial(normalizarPapel(membro.papel)) : "/onboarding");
   }
 
   async function continuarSessaoAtual() {
@@ -146,6 +152,7 @@ export default function LoginPage() {
         email: email.trim(),
         password: senha,
         options: {
+          emailRedirectTo: `${SITE_URL || window.location.origin}/login${conviteId ? `?convite=${encodeURIComponent(conviteId)}` : ""}`,
           data: {
             nome: nome.trim(),
             nome_loja: nomeLoja.trim(),
@@ -157,12 +164,16 @@ export default function LoginPage() {
         setErro(traduzErro(error.message));
         return;
       }
+      if (data.session && conviteId && data.user) {
+        await encaminharUsuario(data.user.id);
+        return;
+      }
       if (data.session) await supabase.auth.signOut();
       setModo("entrar");
       setSenha("");
       setSenha2("");
       setAviso(
-        "Solicitação recebida! Agora nossa equipe vai analisar e liberar o acesso. Se a confirmação de e-mail estiver ativa, confirme também a mensagem recebida."
+        conviteId ? "Conta criada. Confirme a mensagem no seu e-mail, se solicitada, e entre com sua senha para acessar a loja do convite." : "Solicitação recebida! Agora nossa equipe vai analisar e liberar o acesso. Se a confirmação de e-mail estiver ativa, confirme também a mensagem recebida."
       );
     }
   }
@@ -241,12 +252,12 @@ export default function LoginPage() {
         ) : (
           <>
         <h1 className="text-center text-xl font-black text-[#0f172a]">
-          {modo === "entrar" ? "Entrar na sua conta" : "Solicitar acesso"}
+          {modo === "entrar" ? "Entrar na sua conta" : conviteId ? "Entrar na equipe" : "Solicitar acesso"}
         </h1>
         <p className="mt-1 text-center text-sm text-[#64748b]">
           {modo === "entrar"
             ? "Acesse o painel da sua empresa."
-            : "Conte quem é você. O acesso só é liberado após análise da equipe Nexo."}
+            : conviteId ? "Crie sua senha para entrar na loja que convidou você." : "Conte quem é você. O acesso só é liberado após análise da equipe Nexo."}
         </p>
 
         {aviso && (
@@ -272,7 +283,7 @@ export default function LoginPage() {
                   className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
                 />
               </Campo>
-              <Campo icon={Building2}>
+              {!conviteId && <Campo icon={Building2}>
                 <input
                   value={nomeLoja}
                   onChange={(e) => setNomeLoja(e.target.value)}
@@ -280,7 +291,7 @@ export default function LoginPage() {
                   required
                   className="w-full bg-transparent text-sm text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
                 />
-              </Campo>
+              </Campo>}
             </>
           )}
 
@@ -350,7 +361,7 @@ export default function LoginPage() {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
           >
             {carregando && <Loader2 className="h-4 w-4 animate-spin" />}
-            {modo === "entrar" ? "Entrar" : "Enviar solicitação"}
+            {modo === "entrar" ? "Entrar" : conviteId ? "Criar meu acesso" : "Enviar solicitação"}
           </button>
 
           {modo === "entrar" && (
@@ -375,12 +386,11 @@ export default function LoginPage() {
             }}
             className="font-bold text-[#2563eb] hover:underline"
           >
-            {modo === "entrar" ? "Solicitar acesso" : "Entrar"}
+            {modo === "entrar" ? conviteId ? "Criar meu acesso" : "Solicitar acesso" : "Entrar"}
           </button>
         </p>
         <p className="mt-3 text-center text-xs leading-5 text-[#94a3b8]">
-          Nenhum cadastro novo entra automaticamente. A liberação é feita pela
-          equipe Nexo.
+          {conviteId ? "Use o mesmo e-mail do convite. Seu acesso é definido pela loja; você não precisa cadastrar outra empresa." : "Nenhum cadastro novo entra automaticamente. A liberação é feita pela equipe Nexo."}
         </p>
           </>
         )}

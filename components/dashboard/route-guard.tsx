@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePapel } from "@/components/dashboard/role-context";
-import { podeAcessar } from "@/lib/permissoes";
+import { podeAcessar, rotaInicial } from "@/lib/permissoes";
 import { rotaBloqueadaPorModulo } from "@/lib/modulos";
 
 /**
@@ -19,13 +19,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     !podeAcessar(papel, pathname) ||
     rotaBloqueadaPorModulo(pathname, modulos) ||
     (pathname.startsWith("/dashboard/acessos") && !adminPlataforma);
-  const permitido = carregando || !bloqueado;
+  const permitido = !carregando && !bloqueado;
 
   useEffect(() => {
     if (!carregando && bloqueado) {
-      router.replace("/dashboard");
+      router.replace(rotaInicial(papel));
     }
-  }, [carregando, bloqueado, router]);
+  }, [carregando, bloqueado, papel, router]);
+
+  if (carregando) return <p className="py-8 text-center text-sm text-[#64748b]">Verificando permissões...</p>;
 
   if (!permitido) {
     return (

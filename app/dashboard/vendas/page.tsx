@@ -32,6 +32,7 @@ import {
 import { encontrarRegraTaxa, type RegraTaxa } from "@/lib/taxas-utils";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 import { QuickSearchSelect } from "@/components/dashboard/quick-search-select";
+import { ClienteRapido } from "@/components/dashboard/cliente-rapido";
 import { CalculadoraVenda } from "@/components/dashboard/calculadora-venda";
 import { hojeISO } from "@/lib/datas";
 import {
@@ -125,6 +126,9 @@ type ItemRascunho = {
 };
 
 export default function VendasPage() {
+  const { papel } = usePapel();
+  const modoCaixa = papel === "caixa";
+  const [confirmacao, setConfirmacao] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
@@ -280,7 +284,6 @@ export default function VendasPage() {
 
   // Filtro global de período (mesmo do Financeiro/Dashboard).
   const { period, setPeriod } = usePeriod();
-  const { papel } = usePapel();
   const podeCancelar = podeCancelarVenda(papel);
   const janela = useMemo(() => {
     const startOfDay = (d: Date) => {
@@ -295,11 +298,12 @@ export default function VendasPage() {
   }, [period]);
 
   const vendasNoPeriodo = useMemo(() => {
+    if (modoCaixa) return vendas;
     return vendas.filter((v) => {
       const t = new Date(`${v.data_venda || v.created_at.slice(0, 10)}T12:00:00`).getTime();
       return t >= janela.ini && t < janela.fim;
     });
-  }, [vendas, janela]);
+  }, [vendas, janela, modoCaixa]);
 
   const vendasFiltradas = useMemo(
     () =>
@@ -651,6 +655,7 @@ export default function VendasPage() {
   }
 
   async function salvarVenda() {
+    setConfirmacao("");
     setErro("");
 
     if (itensRascunho.length === 0) {
@@ -784,6 +789,7 @@ export default function VendasPage() {
       });
       if (dataError) throw new Error(`Venda salva, mas a data não pôde ser definida: ${dataError.message}`);
 
+      setConfirmacao("Venda registrada na loja. Estoque e sistema atualizados automaticamente.");
       limparFormulario();
       await carregarDados();
     } catch (err) {
@@ -877,9 +883,11 @@ export default function VendasPage() {
     <section className="space-y-6">
       <PageHeader
         eyebrow="Operação comercial"
-        title="Vendas"
+        title={modoCaixa ? "Caixa • nova venda" : "Vendas"}
         description="Registre vendas com itens, total, forma de pagamento e baixa automática de estoque."
       />
+
+      {confirmacao && <p role="status" className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{confirmacao}</p>}
 
       {erro && (
         <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
@@ -887,7 +895,7 @@ export default function VendasPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {!modoCaixa && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-[24px] border border-[#e8ecf4] bg-white p-4 sm:p-5">
           <p className="text-sm font-bold text-[#475569]">Vendas concluídas</p>
           <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] sm:text-3xl">
@@ -928,7 +936,7 @@ export default function VendasPage() {
             Bruto: {formatCurrency(recebimentosPeriodo.cartaoBruto)}
           </p>
         </div>
-      </div>
+      </div>}
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
@@ -958,6 +966,8 @@ export default function VendasPage() {
                 hint="Digite qualquer trecho para localizar rapidamente um cliente já cadastrado."
               /> : <p className="text-xs text-[#64748b]">Venda avulsa selecionada. Identifique o cliente quando precisar vincular seu cadastro.</p>}
 
+              {identificarCliente && <ClienteRapido clientes={clientes} onCriado={(cliente) => { setClientes((lista) => [...lista.filter((c) => c.id !== cliente.id), cliente]); setClienteId(cliente.id); }} />}
+
               <div>
                 <label htmlFor="vendedor-venda" className="mb-2 block text-sm text-[#475569]">Vendedor (opcional)</label>
                 <input
@@ -978,7 +988,7 @@ export default function VendasPage() {
                     <option key={r} value={r} />
                   ))}
                 </datalist>
-                {responsaveisConfig.length === 0 && (
+                {!modoCaixa && responsaveisConfig.length === 0 && (
                   <p className="mt-1.5 text-xs text-[#64748b]">
                     Dica: cadastre a equipe em Configurações para virar sugestão
                     automática.
@@ -1481,17 +1491,17 @@ export default function VendasPage() {
             <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-xl font-black tracking-tight text-[#0f172a]">
-                  Vendas registradas{" "}
+                  {modoCaixa ? "Meus lançamentos de hoje" : "Vendas registradas"}{" "}
                   <span className="text-sm font-semibold text-[#94a3b8]">
                     ({vendasFiltradas.length})
                   </span>
                 </h2>
                 <p className="mt-1 text-xs text-[#64748b]">
-                  Consulte por data e por cada forma realmente recebida, inclusive em pagamentos divididos.
+                  {modoCaixa ? "Confira as vendas que você lançou hoje. Os relatórios completos ficam com a gestão da loja." : "Consulte por data e por cada forma realmente recebida, inclusive em pagamentos divididos."}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-3 sm:p-4">
+              {!modoCaixa && <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-3 sm:p-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.25fr]">
                   <label className="text-xs font-bold text-[#64748b]">
                     Data inicial
@@ -1561,9 +1571,9 @@ export default function VendasPage() {
                     </button>
                   ))}
                 </div>
-              </div>
+              </div>}
 
-              <div className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
+              {!modoCaixa && <div className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
                 <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                   <button
                     type="button"
@@ -1662,7 +1672,7 @@ export default function VendasPage() {
                     )}
                   </div>
                 ) : null}
-              </div>
+              </div>}
             </div>
 
             {loading ? (

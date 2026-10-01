@@ -10,6 +10,8 @@ import {
   LogOut,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { usePapel } from "@/components/dashboard/role-context";
+import { podeAcessar } from "@/lib/permissoes";
 
 function iniciais(nome: string) {
   return (
@@ -24,6 +26,7 @@ function iniciais(nome: string) {
 
 export function UserMenu() {
   const router = useRouter();
+  const { papel } = usePapel();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -119,7 +122,7 @@ export function UserMenu() {
             <p className="truncate text-xs text-[#64748b]">{email}</p>
           </div>
 
-          {itens.map((it) => {
+          {itens.filter((it) => podeAcessar(papel, it.href)).map((it) => {
             const Icon = it.icon;
             return (
               <Link
