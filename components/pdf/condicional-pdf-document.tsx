@@ -8,7 +8,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import nexoLogo from "@/public/nexo-gestao-horizontal.png";
-import { formatDataBR } from "@/lib/datas";
+import { formatDataBR, hojeISO } from "@/lib/datas";
 import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
 
 Font.register({ family: "DejaVuCondicional", fonts: [{ src: PDF_FONT_REGULAR, fontWeight: 400 }, { src: PDF_FONT_BOLD, fontWeight: 700 }] });
@@ -27,6 +27,9 @@ const NEXO_LOGO_SRC =
 type PdfItem = {
   nome: string;
   quantidade: number;
+  precoUnitario?: number;
+  vendido?: number;
+  devolvido?: number;
 };
 
 type CondicionalPdfDocumentProps = {
@@ -38,6 +41,8 @@ type CondicionalPdfDocumentProps = {
   observacao?: string | null;
   itens: PdfItem[];
   codigo?: string;
+  status?: string;
+  atualizadoEm?: string;
 };
 
 function formatDate(value: string) {
@@ -61,8 +66,8 @@ const styles = StyleSheet.create({
   },
   shell: {
     borderWidth: 1,
-    borderColor: "#000000",
-    padding: 22,
+    borderColor: "#e2e8f0",
+    padding: 16,
     backgroundColor: "#ffffff",
   },
   topBar: {
@@ -209,6 +214,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   signatureText: { fontSize: 9, color: "#444444", textAlign: "center" },
+  pageFooter: { position: "absolute", height: 32, bottom: 22, left: 44, right: 44, fontSize: 8, color: "#64748b", textAlign: "center" },
 });
 
 export function CondicionalPdfDocument({
@@ -220,28 +226,30 @@ export function CondicionalPdfDocument({
   observacao,
   itens,
   codigo,
+  status = "aberto",
+  atualizadoEm = hojeISO(),
 }: CondicionalPdfDocumentProps) {
+  const aberto = status === "aberto";
+  const situacao = status === "recolhido" ? "Peças devolvidas" : status === "cancelado" ? "Cancelado" : !aberto ? "Finalizado" : dataLimite && dataLimite < atualizadoEm ? "Prazo de retorno vencido" : "Em condicional";
+  const brl = (valor: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
   return (
-    <Document>
+    <Document title={`${situacao} - ${clienteNome}`} author={nomeLoja}>
       <Page size="A4" style={styles.page}>
         <View style={styles.shell}>
           <View style={styles.topBar} />
 
           <View style={styles.header}>
             <View style={styles.brandBlock}>
-              {NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={styles.logo} /> : null}
-              <Text style={styles.eyebrow}>{nomeLoja}</Text>
-              <Text style={styles.title}>Termo de Condicional</Text>
+              <Text style={[styles.eyebrow, { fontSize: 13, fontWeight: 700 }]}>{nomeLoja}</Text>
+              <Text style={styles.title}>{aberto ? "Peças em condicional" : "Resumo do condicional"}</Text>
               <Text style={styles.subtitle}>
-                Documento de conferência e controle interno para peças entregues
-                em condicional. Este termo organiza os itens, prazo e
-                responsável pela liberação.
+                {situacao} · Atualizado em {formatDate(atualizadoEm)}
               </Text>
             </View>
 
             <View style={styles.codeCard}>
               <Text style={styles.codeLabel}>Código</Text>
-              <Text style={styles.codeValue}>{codigo || "S/O-COND-0001"}</Text>
+              <Text style={styles.codeValue}>{codigo || "Não informado"}</Text>
             </View>
           </View>
 
@@ -250,7 +258,6 @@ export function CondicionalPdfDocument({
               <View style={styles.infoInner}>
                 <Text style={styles.infoLabel}>Cliente</Text>
                 <Text style={styles.infoValue}>{safeText(clienteNome)}</Text>
-                <Text style={styles.infoHint}>Nome do cliente responsável pelo condicional.</Text>
               </View>
             </View>
 
@@ -258,7 +265,6 @@ export function CondicionalPdfDocument({
               <View style={styles.infoInner}>
                 <Text style={styles.infoLabel}>Responsável</Text>
                 <Text style={styles.infoValue}>{safeText(responsavel)}</Text>
-                <Text style={styles.infoHint}>Pessoa interna que liberou as peças.</Text>
               </View>
             </View>
 
@@ -272,31 +278,34 @@ export function CondicionalPdfDocument({
 
             <View style={styles.infoCard}>
               <View style={styles.infoInner}>
-                <Text style={styles.infoLabel}>Prazo limite</Text>
+                <Text style={styles.infoLabel}>{aberto ? "Prazo de retorno" : "Prazo combinado na saída"}</Text>
                 <Text style={styles.infoValue}>{formatDate(dataLimite)}</Text>
                 <Text style={styles.infoHint}>Retorno previsto para conferência.</Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Itens liberados</Text>
+          <Text style={styles.sectionTitle}>{aberto ? "Peças para sua conferência" : "Peças e resultado da conferência"}</Text>
 
           <View style={styles.itemBox}>
             <View style={styles.itemHead}>
-              <Text style={[styles.th, styles.colProduto]}>Produto</Text>
-              <Text style={[styles.th, styles.colQtd]}>Qtd</Text>
+              <Text style={[styles.th, { width: "56%" }]}>Produto / tamanho / cor</Text>
+              <Text style={[styles.th, { width: "14%", textAlign: "right" }]}>Qtd.</Text>
+              <Text style={[styles.th, { width: "30%", textAlign: "right" }]}>{aberto ? "Valor unitário" : "Compradas / devolvidas"}</Text>
             </View>
 
             {itens.map((item, index) => (
               <View
                 key={`${item.nome}-${index}`}
+                wrap={false}
                 style={[
                   styles.itemRow,
                   index === 0 ? { borderTopWidth: 0 } : {},
                 ]}
               >
-                <Text style={[styles.td, styles.colProduto]}>{item.nome}</Text>
-                <Text style={[styles.td, styles.colQtd]}>{item.quantidade}</Text>
+                <Text style={[styles.td, { width: "56%" }]}>{item.nome}</Text>
+                <Text style={[styles.td, { width: "14%", textAlign: "right" }]}>{item.quantidade}</Text>
+                <Text style={[styles.td, { width: "30%", textAlign: "right" }]}>{aberto ? item.precoUnitario != null ? brl(item.precoUnitario) : "Não informado" : item.vendido != null || item.devolvido != null ? `${item.vendido || 0} / ${item.devolvido || 0}` : "Sem detalhamento"}</Text>
               </View>
             ))}
           </View>
@@ -308,27 +317,23 @@ export function CondicionalPdfDocument({
                 ? observacao
                 : "Sem observações adicionais no momento da emissão."}
             </Text>
-            <Text style={styles.accentNote}>
-              Recomendação operacional: revisar o retorno das peças no prazo e registrar a conferência no sistema.
-            </Text>
           </View>
 
           <View style={styles.rulesBox}>
-            <Text style={styles.rulesText}>• Este termo não representa venda concluída.</Text>
-            <Text style={styles.rulesText}>• As peças foram separadas para avaliação e possível compra.</Text>
-            <Text style={styles.rulesText}>• O retorno deve ser conferido pela equipe da loja.</Text>
-            <Text style={styles.rulesText}>• Se houver conversão em venda, o registro financeiro deve ser feito separadamente.</Text>
+            <Text style={styles.rulesText}>{aberto ? "Escolha as peças que deseja comprar e devolva as demais no prazo combinado com a loja." : "Este documento registra a situação do condicional. Eventuais compras e pagamentos constam no comprovante da venda."}</Text>
+            <Text style={styles.rulesText}>Valores de peças em condicional são informativos e não representam cobrança. Fale com a loja em caso de dúvida.</Text>
           </View>
 
-          <View style={styles.footer}>
+          {aberto ? <View style={styles.footer} wrap={false}>
             <View style={styles.signature}>
               <Text style={styles.signatureText}>Assinatura / confirmação do cliente</Text>
             </View>
             <View style={styles.signature}>
               <Text style={styles.signatureText}>Responsável — {nomeLoja}</Text>
             </View>
-          </View>
+          </View> : null}
         </View>
+        <View style={styles.pageFooter} fixed>{NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={{ width: 58, height: 18, alignSelf: "center", marginBottom: 3 }}/> : null}<Text render={({ pageNumber, totalPages }) => `${nomeLoja} · ${formatDate(atualizadoEm)} · Página ${pageNumber}/${totalPages}`}>Documento gerado pelo sistema</Text></View>
       </Page>
     </Document>
   );

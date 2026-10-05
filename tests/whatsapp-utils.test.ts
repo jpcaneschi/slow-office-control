@@ -5,6 +5,9 @@ describe("links do WhatsApp", () => {
   it("normaliza telefone brasileiro com DDD", () => {
     expect(normalizarTelefoneWhatsApp("(32) 99999-1234")).toBe("5532999991234");
   });
+  it("DDD 55 também recebe o código de país", () => {
+    expect(normalizarTelefoneWhatsApp("(55) 99999-1234")).toBe("5555999991234");
+  });
 
   it("preserva código do país e codifica a mensagem", () => {
     expect(criarLinkWhatsApp("+55 32 99999-1234", "Olá! 👋")).toBe(

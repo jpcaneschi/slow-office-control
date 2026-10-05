@@ -433,8 +433,7 @@ export default function FolhaPage() {
 
   function podeProcessarComissao(
     funcionario: Funcionario,
-    acerto: AcertoMes,
-    parcela: ParcelaFolha
+    acerto: AcertoMes
   ) {
     if (
       funcionario.comissao_base === "lucro_loja" &&
@@ -521,6 +520,7 @@ export default function FolhaPage() {
           funcionario.comissao_base === "lucro_loja" || parcela.ultima ? acerto.baseComissao : 0
         }
         dataPagamento={dataPagamento}
+        pagamentoConfirmado={!!parcela.registrado}
       />
     );
     return pdf(documento as Parameters<typeof pdf>[0]).toBlob();
@@ -558,7 +558,7 @@ export default function FolhaPage() {
   ) {
     setErro("");
     setSucesso("");
-    if (!podeProcessarComissao(funcionario, acerto, parcela)) return;
+    if (!podeProcessarComissao(funcionario, acerto)) return;
 
     const chave = chaveParcela(funcionario.id, parcela.agenda.parcela_numero);
     const dataPagamento =
@@ -574,7 +574,7 @@ export default function FolhaPage() {
         if (!funcionario.telefone) {
           throw new Error("Cadastre o WhatsApp do funcionário para compartilhar.");
         }
-        const mensagem = `Olá, ${funcionario.nome}! 👋\n\nSegue o seu comprovante da ${nomeLoja}, pagamento ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas} de ${mesAnoPt(competencia)}. 📄✅\n\nValor: ${formatCurrency(Math.max(0, parcela.liquido))}.\nData: ${dataBR(dataPagamento)}.`;
+        const mensagem = `Olá, ${funcionario.nome}!\n\n${parcela.registrado ? "Seu pagamento foi registrado. Segue o comprovante" : "Segue a previsão do seu pagamento"} da ${nomeLoja}, parcela ${parcela.agenda.parcela_numero}/${parcela.agenda.total_parcelas} de ${mesAnoPt(competencia)}.\n\nValor: ${formatCurrency(Math.max(0, parcela.liquido))}.\n${parcela.registrado ? "Data do pagamento" : "Data prevista"}: ${dataBR(dataPagamento)}.${parcela.registrado ? "" : "\nEste demonstrativo não confirma recebimento. Você receberá o comprovante após o registro do pagamento."}`;
         await compartilharPdfWhatsApp({
           blob,
           nomeArquivo: nome,
@@ -598,7 +598,7 @@ export default function FolhaPage() {
   ) {
     setErro("");
     setSucesso("");
-    if (!podeProcessarComissao(funcionario, acerto, parcela)) return;
+    if (!podeProcessarComissao(funcionario, acerto)) return;
 
     const chave = chaveParcela(funcionario.id, parcela.agenda.parcela_numero);
     const dataPagamento =

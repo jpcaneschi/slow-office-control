@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, History, Loader2, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, History, Loader2, ShoppingBag, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency, rotuloFormaPagamento } from "@/lib/vendas-utils";
 import { formatDataHoraBR } from "@/lib/datas";
 import { rotuloVariacao, type Atributos } from "@/lib/variacoes-utils";
 import { usePapel } from "@/components/dashboard/role-context";
 import { podeTrocarItensVenda } from "@/lib/permissoes";
+import { carregarConfigEmpresa } from "@/lib/empresa-config";
+import { mensagemAcordo, nomeArquivoCliente } from "@/lib/comunicacao-cliente";
+import { DocumentoClienteDialog, type DocumentoCliente } from "@/components/dashboard/documento-cliente-dialog";
+import { VendaComprovantePdf } from "@/components/pdf/venda-comprovante-pdf";
 import {
   VendaTrocaModal,
   type ItemAtualTroca,
@@ -108,6 +112,8 @@ export default function VendaDetalhePage() {
   const [naoEncontrada, setNaoEncontrada] = useState(false);
   const [erro, setErro] = useState("");
   const [trocaAberta, setTrocaAberta] = useState(false);
+  const [preparandoDocumento, setPreparandoDocumento] = useState(false);
+  const [documentoCliente, setDocumentoCliente] = useState<DocumentoCliente | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -234,8 +240,53 @@ export default function VendaDetalhePage() {
     preco_unitario: Number(item.preco_unitario || 0),
   }));
 
+  async function prepararComprovante() {
+    if (!venda) return;
+    setErro(""); setPreparandoDocumento(true);
+    try {
+      const [vendaRes, itensRes, cfg] = await Promise.all([
+        supabase.from("vendas").select("*").eq("id", id).single(),
+        supabase.from("venda_itens").select("*").eq("venda_id", id),
+        carregarConfigEmpresa(),
+      ]);
+      if (vendaRes.error || itensRes.error) throw new Error("Falha ao atualizar venda.");
+      const atual = vendaRes.data as Venda & { data_venda?: string };
+      const atuais = itensRes.data as Item[];
+      const cli = atual.cliente_id ? await supabase.from("clientes").select("nome,telefone").eq("id", atual.cliente_id).maybeSingle() : { data: null, error: null };
+      if (cli.error) throw new Error("Falha ao carregar cliente.");
+      const cliente = cli.data?.nome || (atual.cliente_id ? "Cliente identificado" : "Cliente avulso");
+      let saldo: number | null = ["promissoria", "misto"].includes(atual.forma_pagamento) ? null : 0;
+      let recebido: number | null = saldo === 0 ? Number(atual.total) : null;
+      let acordoCancelado = false;
+      let mensagem = `Olá${cli.data?.nome ? `, ${cli.data.nome}` : ""}! Aqui é da ${cfg.nome_operacao}.\n\nObrigado pela compra! Segue o comprovante.\nTotal: ${formatCurrency(Number(atual.total))}.\nPagamento: ${PAGAMENTO[atual.forma_pagamento] || atual.forma_pagamento}${Number(atual.parcelas) > 1 ? ` em ${atual.parcelas}x` : ""}.\n\nSe precisar de alguma informação, estamos à disposição.`;
+      if (atual.forma_pagamento === "promissoria" || atual.forma_pagamento === "misto") {
+        const promRes = await supabase.from("promissorias").select("id,status,valor_total,entrada_valor,parcelas,data_primeira_parcela,data_vencimento").eq("venda_id", id).maybeSingle();
+        if (promRes.error) throw new Error("Falha ao atualizar o acordo.");
+        if (promRes.data) {
+          const prom = promRes.data;
+          const pgRes = await supabase.from("promissoria_pagamentos").select("valor,tipo").eq("promissoria_id", prom.id);
+          if (pgRes.error) throw new Error("Falha ao atualizar pagamentos.");
+          const pago = (pgRes.data || []).reduce((soma, linha) => soma + Number(linha.valor), 0);
+          acordoCancelado = prom.status === "cancelado";
+          saldo = prom.status === "pago" || prom.status === "cancelado" ? 0 : Math.max(0, Number(prom.valor_total) - pago);
+          recebido = pago + (atual.forma_pagamento === "misto" && !(pgRes.data || []).some((linha) => linha.tipo === "entrada") ? Number(atual.valor_recebido || 0) : 0);
+          mensagem = mensagemAcordo({ cliente, loja: cfg.nome_operacao, status: prom.status, valorTotal: Number(prom.valor_total), totalPago: pago,
+            entrada: Number(prom.entrada_valor || 0), parcelas: Number(prom.parcelas), primeiraParcela: prom.data_primeira_parcela || prom.data_vencimento });
+        } else mensagem = `Olá${cli.data?.nome ? `, ${cli.data.nome}` : ""}! Aqui é da ${cfg.nome_operacao}.\n\nSegue o comprovante da compra de ${formatCurrency(Number(atual.total))}. Precisamos conferir a posição do acordo de pagamento com a loja antes de informar o saldo restante.`;
+      }
+      if (["cancelada", "cancelado"].includes(atual.status)) mensagem = `Olá${cli.data?.nome ? `, ${cli.data.nome}` : ""}! Aqui é da ${cfg.nome_operacao}.\n\nSua venda foi cancelada. Segue o comprovante atualizado para conferência. Caso haja estorno, confirme os detalhes com a loja.`;
+      const { pdf } = await import("@react-pdf/renderer");
+      const blob = await pdf(<VendaComprovantePdf loja={cfg.nome_operacao} cliente={cliente} codigo={atual.id.slice(0,8).toUpperCase()} data={atual.data_venda || atual.created_at.slice(0,10)} status={atual.status}
+        total={Number(atual.total)} desconto={Number(atual.desconto || 0) + Number(atual.desconto_pix || 0)} forma={PAGAMENTO[atual.forma_pagamento] || atual.forma_pagamento} parcelas={Number(atual.parcelas || 1)} recebido={recebido} saldo={saldo} acordoCancelado={acordoCancelado}
+        itens={atuais.filter((item) => Number(item.quantidade) > 0).map((item) => ({ nome: produtoNome.get(item.produto_id) || "Produto", detalhe: item.variacao_id ? variacaoNome.get(item.variacao_id) : undefined, quantidade: Number(item.quantidade), unitario: Number(item.preco_unitario), total: Number(item.total_item) }))} />).toBlob();
+      setDocumentoCliente({ blob, nomeArquivo: nomeArquivoCliente("compra", cliente, id), titulo: "Comprovante da compra", telefone: cli.data?.telefone, mensagem });
+    } catch { setErro("Não foi possível preparar o comprovante atualizado. Tente novamente."); }
+    finally { setPreparandoDocumento(false); }
+  }
+
   return (
     <div className="space-y-6">
+      {documentoCliente && <DocumentoClienteDialog documento={documentoCliente} onFechar={() => setDocumentoCliente(null)} />}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#2563eb]">
@@ -246,6 +297,7 @@ export default function VendaDetalhePage() {
           </h1>
         </div>
         <div className="flex flex-col-reverse gap-2 min-[420px]:flex-row">
+          {venda && !loading && papel !== "caixa" && <button type="button" disabled={preparandoDocumento} onClick={prepararComprovante} className="flex items-center justify-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50"><FileText size={16}/>{preparandoDocumento ? "Preparando…" : "Comprovante e mensagem"}</button>}
           <Link
             href="/dashboard/vendas"
             className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e8ecf4] bg-white px-4 py-2.5 text-sm font-semibold text-[#334155] transition hover:bg-[#f4f6fb]"

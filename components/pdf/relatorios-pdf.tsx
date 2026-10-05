@@ -88,7 +88,6 @@ const styles = StyleSheet.create({
     paddingBottom: 64,
     fontFamily: "DejaVuPDF",
     fontSize: 10.5,
-    lineHeight: 1.5,
   },
   header: {
     flexDirection: "row",
@@ -218,13 +217,10 @@ const styles = StyleSheet.create({
   signText: { fontSize: 9, color: "#333333" },
   footer: {
     position: "absolute",
-    height: 24,
+    height: 16,
     bottom: 26,
     left: 46,
     right: 46,
-    borderTopWidth: 1,
-    borderTopColor: "#dddddd",
-    paddingTop: 7,
     fontSize: 7.5,
     color: "#888888",
     textAlign: "center",
@@ -247,7 +243,7 @@ function Header({
         <Text style={[styles.loja, { fontSize: 11, marginTop: 5 }]}>
           {loja || "Sua Empresa"}
         </Text>
-        <Text style={styles.lojaSub}>Documento oficial da loja</Text>
+        <Text style={styles.lojaSub}>Registro da loja</Text>
       </View>
       <View style={styles.headRight}>
         <Text style={styles.docTitle}>{titulo}</Text>
@@ -308,13 +304,13 @@ function Assinaturas({ esquerda, direita }: { esquerda: string; direita?: string
 
 function Rodape({ loja }: { loja: string }) {
   return (
-    <View style={styles.footer} fixed>
     <Text
+      style={styles.footer}
+      fixed
       render={({ pageNumber, totalPages }) =>
         `${loja || "Sua Empresa"}  ·  Documento gerado pelo sistema  ·  Página ${pageNumber}/${totalPages}`
       }
     >Documento gerado pelo sistema</Text>
-    </View>
   );
 }
 
@@ -504,6 +500,7 @@ export type FolhaProps = {
   comissaoBaseLabel?: string;
   baseComissaoValor?: number;
   dataPagamento?: string;
+  pagamentoConfirmado?: boolean;
 };
 
 export function FolhaSalarialPdf({
@@ -525,6 +522,7 @@ export function FolhaSalarialPdf({
   comissaoBaseLabel = "Vendas do funcionário",
   baseComissaoValor,
   dataPagamento,
+  pagamentoConfirmado = true,
 }: FolhaProps) {
   const ehBonificacao = comissaoBaseLabel.toLowerCase().includes("lucro mensal");
   const { linhas, totalProventos, totalDescontos, liquido } = montarFolha({
@@ -548,16 +546,17 @@ export function FolhaSalarialPdf({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Header loja={loja} titulo="Recibo de Pagamento" numero={gerarNumero("REC")} />
+        <Header loja={loja} titulo={pagamentoConfirmado ? "Recibo de Pagamento" : "Demonstrativo de Pagamento"} numero={gerarNumero(pagamentoConfirmado ? "REC" : "PREV")} />
 
         <Text style={styles.sectionTitle}>Funcionário</Text>
         <InfoGrid
+          compact
           itens={[
             { label: "Nome", value: funcionario },
             { label: "Cargo", value: cargo || "—" },
             { label: "Referência", value: referencia },
             { label: "Período apurado", value: periodo },
-            { label: "Data do pagamento", value: dataPagamento ? fmtData(dataPagamento) : "—" },
+            { label: pagamentoConfirmado ? "Data do pagamento" : "Pagamento previsto para", value: dataPagamento ? fmtData(dataPagamento) : "—" },
           ]}
         />
 
@@ -565,6 +564,7 @@ export function FolhaSalarialPdf({
           {ehBonificacao ? "Base da bonificação no período" : "Base de comissão no período"}
         </Text>
         <InfoGrid
+          compact
           itens={[
             { label: "Vendas concluídas", value: String(qtdVendas) },
             { label: comissaoBaseLabel, value: brl(baseComissaoValor ?? totalVendido) },
@@ -598,6 +598,7 @@ export function FolhaSalarialPdf({
 
         <View style={{ marginTop: 12 }}>
           <InfoGrid
+            compact
             itens={[
               { label: "Total de proventos", value: brl(totalProventos) },
               { label: "Total de descontos", value: brl(totalDescontos) },
@@ -606,11 +607,11 @@ export function FolhaSalarialPdf({
         </View>
 
         <View style={styles.totalBox}>
-          <Text style={styles.totalLabel}>Líquido a receber</Text>
+          <Text style={styles.totalLabel}>{pagamentoConfirmado ? "Líquido recebido" : "Líquido previsto"}</Text>
           <Text style={styles.totalValue}>{brl(liquido)}</Text>
         </View>
 
-        <Text style={styles.paragraph}>
+        {pagamentoConfirmado ? <><Text style={styles.paragraph}>
           Recebi de {loja || "Sua Empresa"} a importância líquida de {brl(liquido)},
           referente ao pagamento acima descrito ({referencia}), dando plena e
           geral quitação.
@@ -619,7 +620,7 @@ export function FolhaSalarialPdf({
         <Assinaturas
           esquerda="Assinatura do funcionário"
           direita="Responsável pela loja"
-        />
+        /></> : <Text style={styles.paragraph}>Pagamento ainda não registrado. Este demonstrativo apresenta a previsão dos valores e não confirma recebimento.</Text>}
         <Rodape loja={loja} />
       </Page>
     </Document>
