@@ -1,340 +1,91 @@
-import {
-  Document,
-  Image as PdfImage,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font,
-} from "@react-pdf/renderer";
-import nexoLogo from "@/public/nexo-gestao-horizontal.png";
+import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
 import { formatDataBR, hojeISO } from "@/lib/datas";
 import { PDF_FONT_BOLD, PDF_FONT_REGULAR } from "@/lib/pdf-fonts";
+import { paginarLinhas } from "@/lib/pdf-paginacao";
+import { resumirCondicional, type PecaCondicional } from "@/lib/condicional-comunicacao";
 
 Font.register({ family: "DejaVuCondicional", fonts: [{ src: PDF_FONT_REGULAR, fontWeight: 400 }, { src: PDF_FONT_BOLD, fontWeight: 700 }] });
-Font.registerHyphenationCallback((word) => [word]);
+Font.registerHyphenationCallback(word => [word]);
 
-const nexoLogoAsset = nexoLogo as unknown;
-const NEXO_LOGO_SRC =
-  typeof nexoLogoAsset === "string"
-    ? nexoLogoAsset.startsWith("/public/") && typeof process !== "undefined"
-      ? `${process.cwd()}${nexoLogoAsset}`
-      : nexoLogoAsset
-    : nexoLogoAsset && typeof nexoLogoAsset === "object" && "src" in nexoLogoAsset
-      ? String(nexoLogoAsset.src)
-      : "";
-
-type PdfItem = {
-  nome: string;
-  quantidade: number;
-  precoUnitario?: number;
-  vendido?: number;
-  devolvido?: number;
+type Props = {
+  nomeLoja: string; clienteNome: string; responsavel: string; dataSaida: string; dataLimite: string;
+  observacao?: string | null; itens: PecaCondicional[]; codigo?: string; status?: string; atualizadoEm?: string;
 };
-
-type CondicionalPdfDocumentProps = {
-  nomeLoja: string;
-  clienteNome: string;
-  responsavel: string;
-  dataSaida: string;
-  dataLimite: string;
-  observacao?: string | null;
-  itens: PdfItem[];
-  codigo?: string;
-  status?: string;
-  atualizadoEm?: string;
-};
-
-function formatDate(value: string) {
-  return formatDataBR(value);
-}
-
-function safeText(value: string | null | undefined) {
-  return value?.trim() || "Não informado";
-}
-
-// Preto & branco, para impressão em folha branca.
+const brl = (valor: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
 const styles = StyleSheet.create({
-  page: {
-    backgroundColor: "#ffffff",
-    color: "#111111",
-    paddingTop: 40,
-    paddingBottom: 60,
-    paddingHorizontal: 44,
-    fontFamily: "DejaVuCondicional",
-    fontSize: 10,
-  },
-  shell: {
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 16,
-    backgroundColor: "#ffffff",
-  },
-  topBar: {
-    height: 4,
-    width: 92,
-    backgroundColor: "#000000",
-    marginBottom: 18,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-    marginBottom: 18,
-  },
-  brandBlock: { flex: 1 },
-  logo: { width: 92, height: 28, objectFit: "contain", objectPosition: "left", marginBottom: 8 },
-  eyebrow: {
-    fontSize: 8.5,
-    textTransform: "uppercase",
-    color: "#555555",
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 22,
-    fontFamily: "DejaVuCondicional", fontWeight: 700,
-    color: "#000000",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 9.5,
-    lineHeight: 1.5,
-    color: "#444444",
-    maxWidth: 330,
-  },
-  codeCard: {
-    minWidth: 110,
-    borderWidth: 1,
-    borderColor: "#000000",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: "#ffffff",
-    alignSelf: "flex-start",
-  },
-  codeLabel: {
-    fontSize: 8,
-    textTransform: "uppercase",
-    color: "#666666",
-    marginBottom: 4,
-  },
-  codeValue: { fontSize: 12, fontFamily: "DejaVuCondicional", fontWeight: 700, color: "#000000" },
-  infoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: -5,
-    marginBottom: 16,
-  },
-  infoCard: { width: "50%", paddingHorizontal: 5, marginBottom: 10 },
-  infoInner: {
-    borderWidth: 1,
-    borderColor: "#111111",
-    padding: 12,
-    backgroundColor: "#ffffff",
-    minHeight: 74,
-  },
-  infoLabel: {
-    fontSize: 8,
-    textTransform: "uppercase",
-    color: "#666666",
-    marginBottom: 6,
-  },
-  infoValue: {
-    fontSize: 12,
-    color: "#000000",
-    fontFamily: "DejaVuCondicional", fontWeight: 700,
-    marginBottom: 3,
-  },
-  infoHint: { fontSize: 9, color: "#555555", lineHeight: 1.4 },
-  sectionTitle: {
-    fontSize: 10,
-    textTransform: "uppercase",
-    fontFamily: "DejaVuCondicional", fontWeight: 700,
-    color: "#000000",
-    marginBottom: 10,
-  },
-  itemBox: {
-    borderWidth: 1,
-    borderColor: "#000000",
-    marginBottom: 14,
-  },
-  itemHead: {
-    flexDirection: "row",
-    backgroundColor: "#000000",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  itemRow: {
-    flexDirection: "row",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#dddddd",
-  },
-  colProduto: { width: "76%", paddingRight: 8 },
-  colQtd: { width: "24%", textAlign: "right" },
-  th: {
-    fontSize: 8.5,
-    color: "#ffffff",
-    fontFamily: "DejaVuCondicional", fontWeight: 700,
-    textTransform: "uppercase",
-  },
-  td: { fontSize: 10, color: "#111111", lineHeight: 1.45 },
-  notesBox: {
-    borderWidth: 1,
-    borderColor: "#cccccc",
-    padding: 14,
-    marginBottom: 14,
-  },
-  notesTitle: {
-    fontSize: 9.5,
-    color: "#000000",
-    fontFamily: "DejaVuCondicional", fontWeight: 700,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  notesText: { fontSize: 9.5, color: "#111111", lineHeight: 1.6 },
-  accentNote: { marginTop: 10, fontSize: 8.5, color: "#555555" },
-  rulesBox: {
-    borderWidth: 1,
-    borderColor: "#cccccc",
-    padding: 14,
-    marginBottom: 16,
-  },
-  rulesText: {
-    fontSize: 9.3,
-    color: "#333333",
-    lineHeight: 1.55,
-    marginBottom: 4,
-  },
-  footer: { flexDirection: "row", gap: 14, marginTop: 20 },
-  signature: {
-    flex: 1,
-    borderTopWidth: 1,
-    borderTopColor: "#000000",
-    paddingTop: 10,
-  },
-  signatureText: { fontSize: 9, color: "#444444", textAlign: "center" },
-  pageFooter: { position: "absolute", height: 32, bottom: 22, left: 44, right: 44, fontSize: 8, color: "#64748b", textAlign: "center" },
+  page: { padding: 38, paddingBottom: 64, fontFamily: "DejaVuCondicional", fontSize: 9.5, color: "#172033", backgroundColor: "#ffffff" },
+  header: { paddingBottom: 14, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: "#dce3eb" },
+  store: { fontSize: 15, fontWeight: 700, marginBottom: 8 },
+  kicker: { fontSize: 8, color: "#64748b", textTransform: "uppercase", marginBottom: 5 },
+  title: { fontSize: 23, fontWeight: 700, marginBottom: 6 },
+  muted: { fontSize: 9, color: "#64748b" },
+  client: { fontSize: 12, fontWeight: 700, marginTop: 5 },
+  grid: { flexDirection: "row", marginVertical: 14 },
+  card: { width: "33.33%", paddingRight: 12 },
+  label: { fontSize: 8, color: "#64748b", marginBottom: 5 },
+  value: { fontSize: 11, fontWeight: 700 },
+  status: { padding: 12, borderRadius: 6, backgroundColor: "#f3f6fa", marginBottom: 16 },
+  statusTitle: { fontSize: 11, fontWeight: 700, marginBottom: 5 },
+  paragraph: { fontSize: 9.5, lineHeight: 1.5 },
+  section: { fontSize: 11, fontWeight: 700, marginBottom: 8 },
+  row: { flexDirection: "row", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#e8edf3" },
+  head: { flexDirection: "row", paddingVertical: 8, backgroundColor: "#f3f6fa", fontSize: 8, fontWeight: 700 },
+  product: { paddingHorizontal: 7, lineHeight: 1.4 },
+  number: { textAlign: "right", paddingRight: 7 },
+  note: { marginTop: 16, padding: 12, borderRadius: 6, borderWidth: 1, borderColor: "#e2e8f0" },
+  signature: { flexDirection: "row", gap: 28, marginTop: 36 },
+  sign: { width: "50%", borderTopWidth: 1, borderTopColor: "#cbd5e1", paddingTop: 7, fontSize: 8, textAlign: "center", color: "#64748b" },
+  footer: { position: "absolute", height: 26, bottom: 22, left: 38, right: 38, fontSize: 7.5, color: "#64748b", textAlign: "center" },
 });
 
-export function CondicionalPdfDocument({
-  nomeLoja,
-  clienteNome,
-  responsavel,
-  dataSaida,
-  dataLimite,
-  observacao,
-  itens,
-  codigo,
-  status = "aberto",
-  atualizadoEm = hojeISO(),
-}: CondicionalPdfDocumentProps) {
-  const aberto = status === "aberto";
-  const situacao = status === "recolhido" ? "Peças devolvidas" : status === "cancelado" ? "Cancelado" : !aberto ? "Finalizado" : dataLimite && dataLimite < atualizadoEm ? "Prazo de retorno vencido" : "Em condicional";
-  const brl = (valor: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
-  return (
-    <Document title={`${situacao} - ${clienteNome}`} author={nomeLoja}>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.shell}>
-          <View style={styles.topBar} />
-
-          <View style={styles.header}>
-            <View style={styles.brandBlock}>
-              <Text style={[styles.eyebrow, { fontSize: 13, fontWeight: 700 }]}>{nomeLoja}</Text>
-              <Text style={styles.title}>{aberto ? "Peças em condicional" : "Resumo do condicional"}</Text>
-              <Text style={styles.subtitle}>
-                {situacao} · Atualizado em {formatDate(atualizadoEm)}
-              </Text>
-            </View>
-
-            <View style={styles.codeCard}>
-              <Text style={styles.codeLabel}>Código</Text>
-              <Text style={styles.codeValue}>{codigo || "Não informado"}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoGrid}>
-            <View style={styles.infoCard}>
-              <View style={styles.infoInner}>
-                <Text style={styles.infoLabel}>Cliente</Text>
-                <Text style={styles.infoValue}>{safeText(clienteNome)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoInner}>
-                <Text style={styles.infoLabel}>Responsável</Text>
-                <Text style={styles.infoValue}>{safeText(responsavel)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoInner}>
-                <Text style={styles.infoLabel}>Saída</Text>
-                <Text style={styles.infoValue}>{formatDate(dataSaida)}</Text>
-                <Text style={styles.infoHint}>Data da liberação das peças.</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoInner}>
-                <Text style={styles.infoLabel}>{aberto ? "Prazo de retorno" : "Prazo combinado na saída"}</Text>
-                <Text style={styles.infoValue}>{formatDate(dataLimite)}</Text>
-                <Text style={styles.infoHint}>Retorno previsto para conferência.</Text>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>{aberto ? "Peças para sua conferência" : "Peças e resultado da conferência"}</Text>
-
-          <View style={styles.itemBox}>
-            <View style={styles.itemHead}>
-              <Text style={[styles.th, { width: "56%" }]}>Produto / tamanho / cor</Text>
-              <Text style={[styles.th, { width: "14%", textAlign: "right" }]}>Qtd.</Text>
-              <Text style={[styles.th, { width: "30%", textAlign: "right" }]}>{aberto ? "Valor unitário" : "Compradas / devolvidas"}</Text>
-            </View>
-
-            {itens.map((item, index) => (
-              <View
-                key={`${item.nome}-${index}`}
-                wrap={false}
-                style={[
-                  styles.itemRow,
-                  index === 0 ? { borderTopWidth: 0 } : {},
-                ]}
-              >
-                <Text style={[styles.td, { width: "56%" }]}>{item.nome}</Text>
-                <Text style={[styles.td, { width: "14%", textAlign: "right" }]}>{item.quantidade}</Text>
-                <Text style={[styles.td, { width: "30%", textAlign: "right" }]}>{aberto ? item.precoUnitario != null ? brl(item.precoUnitario) : "Não informado" : item.vendido != null || item.devolvido != null ? `${item.vendido || 0} / ${item.devolvido || 0}` : "Sem detalhamento"}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.notesBox}>
-            <Text style={styles.notesTitle}>Observações</Text>
-            <Text style={styles.notesText}>
-              {observacao?.trim()
-                ? observacao
-                : "Sem observações adicionais no momento da emissão."}
-            </Text>
-          </View>
-
-          <View style={styles.rulesBox}>
-            <Text style={styles.rulesText}>{aberto ? "Escolha as peças que deseja comprar e devolva as demais no prazo combinado com a loja." : "Este documento registra a situação do condicional. Eventuais compras e pagamentos constam no comprovante da venda."}</Text>
-            <Text style={styles.rulesText}>Valores de peças em condicional são informativos e não representam cobrança. Fale com a loja em caso de dúvida.</Text>
-          </View>
-
-          {aberto ? <View style={styles.footer} wrap={false}>
-            <View style={styles.signature}>
-              <Text style={styles.signatureText}>Assinatura / confirmação do cliente</Text>
-            </View>
-            <View style={styles.signature}>
-              <Text style={styles.signatureText}>Responsável — {nomeLoja}</Text>
-            </View>
-          </View> : null}
+export function CondicionalPdfDocument({ nomeLoja, clienteNome, responsavel, dataSaida, dataLimite, observacao, itens, codigo, status = "aberto", atualizadoEm = hojeISO() }: Props) {
+  const resumo = resumirCondicional({ status, prazo: dataLimite, itens, hoje: atualizadoEm });
+  const titulo = resumo.aberto ? "Sua seleção de peças" : resumo.etapa === "devolvido" ? "Devolução confirmada"
+    : resumo.etapa === "compra" ? "Sua escolha, registrada" : resumo.etapa === "cancelado" ? "Condicional cancelado" : "Conferência do condicional";
+  const altura = (item: PecaCondicional) => 20 + Math.ceil((item.nome.length + 4) / 36) * 14;
+  const primeira = paginarLinhas(itens, altura, 280)[0] || [];
+  const paginas = [primeira, ...paginarLinhas(itens.slice(primeira.length), altura, 440)];
+  return <Document title={`${titulo} - ${clienteNome}`} author={nomeLoja} subject="Seleção e conferência das peças em condicional">
+    {paginas.map((pecas, indice) => <Page key={indice} size="A4" style={styles.page}>
+      <View style={styles.header} wrap={false}>
+        <Text style={styles.store}>{nomeLoja || "Loja"}</Text>
+        <Text style={styles.kicker}>Atendimento em condicional · {codigo || "Código não informado"}</Text>
+        <Text style={styles.title}>{indice === 0 ? titulo : "Sua seleção · continuação"}</Text>
+        <Text style={styles.muted}>Preparado para</Text><Text style={styles.client}>{clienteNome || "Cliente"}</Text>
+      </View>
+      {indice === 0 && <>
+        <View style={styles.grid} wrap={false}>
+          <View style={styles.card}><Text style={styles.label}>Peças enviadas</Text><Text style={styles.value}>{resumo.enviado}</Text></View>
+          <View style={styles.card}><Text style={styles.label}>Data da saída</Text><Text style={styles.value}>{formatDataBR(dataSaida)}</Text></View>
+          <View style={styles.card}><Text style={styles.label}>{resumo.aberto ? "Retorno combinado" : "Prazo original"}</Text><Text style={styles.value}>{formatDataBR(dataLimite)}</Text></View>
         </View>
-        <View style={styles.pageFooter} fixed>{NEXO_LOGO_SRC ? <PdfImage src={NEXO_LOGO_SRC} style={{ width: 58, height: 18, alignSelf: "center", marginBottom: 3 }}/> : null}<Text render={({ pageNumber, totalPages }) => `${nomeLoja} · ${formatDate(atualizadoEm)} · Página ${pageNumber}/${totalPages}`}>Documento gerado pelo sistema</Text></View>
-      </Page>
-    </Document>
-  );
+        <View style={styles.status} wrap={false}><Text style={styles.statusTitle}>{resumo.rotulo}</Text><Text style={styles.paragraph}>{resumo.orientacao}</Text></View>
+      </>}
+      <Text style={styles.section}>{resumo.aberto ? "Peças para experimentar" : "Resultado por peça"}</Text>
+      <View style={styles.head} wrap={false}>
+        <Text style={{ ...styles.product, width: "50%" }}>Produto · tamanho · cor</Text>
+        <Text style={{ ...styles.number, width: "10%" }}>Qtd.</Text>
+        {resumo.aberto ? <><Text style={{ ...styles.number, width: "20%" }}>Unitário</Text><Text style={{ ...styles.number, width: "20%" }}>Referência</Text></>
+          : <><Text style={{ ...styles.number, width: "13%" }}>Compradas</Text><Text style={{ ...styles.number, width: "13%" }}>Devolvidas</Text><Text style={{ ...styles.number, width: "14%" }}>A conferir</Text></>}
+      </View>
+      {pecas.map((item, i) => {
+        const conhecido = item.vendido != null && item.devolvido != null && item.vendido >= 0 && item.devolvido >= 0 && item.vendido + item.devolvido <= item.quantidade;
+        return <View key={i} style={styles.row} wrap={false}>
+          <Text style={{ ...styles.product, width: "50%" }}>{item.nome}</Text><Text style={{ ...styles.number, width: "10%" }}>{item.quantidade}</Text>
+          {resumo.aberto ? <><Text style={{ ...styles.number, width: "20%" }}>{item.precoUnitario != null ? brl(item.precoUnitario) : "—"}</Text><Text style={{ ...styles.number, width: "20%" }}>{item.precoUnitario != null ? brl(Math.round(item.precoUnitario * 100) * item.quantidade / 100) : "—"}</Text></>
+            : <><Text style={{ ...styles.number, width: "13%" }}>{conhecido ? item.vendido : "—"}</Text><Text style={{ ...styles.number, width: "13%" }}>{conhecido ? item.devolvido : "—"}</Text><Text style={{ ...styles.number, width: "14%" }}>{conhecido ? item.quantidade - (item.vendido || 0) - (item.devolvido || 0) : "—"}</Text></>}
+        </View>;
+      })}
+      {itens.length === 0 && <Text style={{ ...styles.paragraph, marginTop: 10 }}>As peças deste registro ainda precisam ser conferidas com a loja.</Text>}
+      {indice === paginas.length - 1 && <>
+        {resumo.aberto ? <View style={styles.grid} wrap={false}><View style={{ width: "60%" }}><Text style={styles.label}>Valor de referência da seleção</Text><Text style={styles.value}>{resumo.referencia != null ? brl(resumo.referencia) : "A conferir com a loja"}</Text></View><Text style={{ ...styles.muted, width: "40%", lineHeight: 1.4 }}>Valor informativo. A compra e o pagamento serão registrados após a confirmação da sua escolha.</Text></View>
+          : resumo.detalhado && resumo.etapa !== "cancelado" && <View style={styles.grid} wrap={false}><View style={styles.card}><Text style={styles.label}>Peças compradas</Text><Text style={styles.value}>{resumo.comprado}</Text></View><View style={styles.card}><Text style={styles.label}>Peças devolvidas</Text><Text style={styles.value}>{resumo.devolvido}</Text></View><View style={styles.card}><Text style={styles.label}>A conferir</Text><Text style={styles.value}>{resumo.restante}</Text></View></View>}
+        {observacao?.trim() && <View style={styles.note}><Text style={styles.section}>Observações da loja</Text><Text style={styles.paragraph}>{observacao}</Text></View>}
+        <View style={styles.note} wrap={false}><Text style={styles.section}>{resumo.aberto ? "Como concluir sua escolha" : "Seu atendimento"}</Text><Text style={styles.paragraph}>{resumo.aberto ? "Avise a loja quais peças deseja comprar e combine o retorno das demais. Se precisar ajustar o prazo, entre em contato antes da devolução." : resumo.etapa === "compra" ? "Obrigado pela sua escolha! Guarde este resumo. Os valores efetivos, descontos e pagamentos estão no comprovante da venda." : resumo.etapa === "devolvido" ? "Obrigado por experimentar nossa seleção. Quando quiser conhecer outras peças, conte com a gente!" : resumo.orientacao}</Text></View>
+        {responsavel.trim() && responsavel !== "Não informado" && <Text style={{ ...styles.muted, marginTop: 12 }}>Atendimento: {responsavel}</Text>}
+        {resumo.aberto && <View style={styles.signature} wrap={false}><Text style={styles.sign}>Confirmação de recebimento · cliente</Text><Text style={styles.sign}>Responsável pela loja</Text></View>}
+      </>}
+      <Text style={styles.footer} fixed render={({ pageNumber, totalPages }) => `${nomeLoja || "Loja"} · ${codigo || "Condicional"} · Atualizado em ${formatDataBR(atualizadoEm)}\nNexo Gestão · Página ${pageNumber}/${totalPages}`}>Documento atualizado da loja</Text>
+    </Page>)}
+  </Document>;
 }

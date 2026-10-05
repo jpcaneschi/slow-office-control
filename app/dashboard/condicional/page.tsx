@@ -9,6 +9,7 @@ import { carregarNomesResponsaveis } from "@/lib/responsaveis";
 import { baixarPdf } from "@/lib/whatsapp-utils";
 import { mensagemCondicional, nomeArquivoCliente } from "@/lib/comunicacao-cliente";
 import { DocumentoClienteDialog, type DocumentoCliente } from "@/components/dashboard/documento-cliente-dialog";
+import { resumirCondicional } from "@/lib/condicional-comunicacao";
 import {
   hojeISO,
   somarDiasISO,
@@ -660,17 +661,22 @@ export default function CondicionalPage() {
       const itensAtuais = pecas.data as CondicionalItem[];
       const resumo = resumirFinalizacao(itensAtuais, movimentos.data as MovResumo[], vendaItens.data as VendaItemResumo[]);
       const pendentes = atual.status === "aberto" ? itensAtuais.reduce((total, item) => total + Number(item.quantidade), 0) : resumo.itens.reduce((total, item) => total + Math.max(0, item.enviado - item.vendido - item.devolvido), 0);
-      const { pdf } = await import("@react-pdf/renderer");
-      const blob = await pdf(<CondicionalPdfDocument nomeLoja={nomeOperacao} clienteNome={cliente.nome} responsavel={atual.responsavel || "Não informado"} dataSaida={atual.data_saida} dataLimite={atual.data_limite} observacao={atual.observacao} codigo={atual.id.slice(0,8).toUpperCase()} status={atual.status}
-        itens={itensAtuais.map((item) => {
+      const itensDocumento = itensAtuais.map((item) => {
           const conferido = resumo.itens.find((linha) => linha.produto_id === item.produto_id && linha.variacao_id === item.variacao_id);
-          return { nome: nomeComVariante(item.produto_id, item.variacao_id), quantidade: Number(item.quantidade), precoUnitario: Number(item.preco_unitario),
-            vendido: atual.status !== "aberto" && conferido?.estado !== "sem_movimento" ? conferido?.vendido : undefined,
+          const comprado = (vendaItens.data || []).filter(linha => linha.produto_id === item.produto_id && linha.variacao_id === item.variacao_id)
+            .reduce((total, linha) => total + Number(linha.quantidade), 0);
+          const compraConferida = !!atual.venda_id || conferido?.devolvido === Number(item.quantidade);
+          return { nome: nomeComVariante(item.produto_id, item.variacao_id), quantidade: Number(item.quantidade), precoUnitario: item.preco_unitario != null ? Number(item.preco_unitario) : null,
+            vendido: atual.status !== "aberto" && compraConferida ? comprado : undefined,
             devolvido: atual.status !== "aberto" && conferido?.estado !== "sem_movimento" ? conferido?.devolvido : undefined };
-        })} />).toBlob();
-      const nomeArquivo = nomeArquivoCliente("condicional", cliente.nome, atual.id);
-      if (compartilhar) setDocumentoCliente({ blob, nomeArquivo, titulo: "Condicional atualizado", telefone: cliente.telefone,
-        mensagem: mensagemCondicional({ cliente: cliente.nome, loja: nomeOperacao, status: atual.status, prazo: atual.data_limite, pendentes }) });
+        });
+      const codigo = atual.id.slice(0, 8).toUpperCase();
+      const posicao = resumirCondicional({ status: atual.status, prazo: atual.data_limite, itens: itensDocumento });
+      const { pdf } = await import("@react-pdf/renderer");
+      const blob = await pdf(<CondicionalPdfDocument nomeLoja={nomeOperacao} clienteNome={cliente.nome} responsavel={atual.responsavel || "Não informado"} dataSaida={atual.data_saida} dataLimite={atual.data_limite} observacao={atual.observacao} codigo={codigo} status={atual.status} itens={itensDocumento} />).toBlob();
+      const nomeArquivo = nomeArquivoCliente(`condicional-${posicao.etapa}`, cliente.nome, atual.id);
+      if (compartilhar) setDocumentoCliente({ blob, nomeArquivo, titulo: posicao.rotulo, telefone: cliente.telefone,
+        mensagem: mensagemCondicional({ cliente: cliente.nome, loja: nomeOperacao, status: atual.status, prazo: atual.data_limite, pendentes, itens: itensDocumento, codigo }) });
       else baixarPdf(blob, nomeArquivo);
     } catch { setErro("Não foi possível preparar o condicional atualizado. Tente novamente."); }
     finally { setPreparandoPdf(null); }

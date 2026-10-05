@@ -1,5 +1,6 @@
 import { formatDataBR, hojeISO } from "@/lib/datas";
 import { formatCurrency, gerarCronogramaPromissoria } from "@/lib/promissorias-utils";
+import { resumirCondicional, type PecaCondicional } from "@/lib/condicional-comunicacao";
 
 export type SituacaoAcordo = "aberto" | "parcial" | "vence_hoje" | "atrasado" | "quitado" | "cancelado";
 export type ParcelaAtualizada = {
@@ -68,16 +69,30 @@ export function mensagemAcordo({ cliente, loja, ...dados }: DadosAcordo & { clie
   return `${inicio}\n\n${abertura}\nTotal do acordo: ${formatCurrency(resumo.total)}.\nJá pago: ${formatCurrency(resumo.pago)}.\nFalta pagar: ${formatCurrency(resumo.saldo)}.${resumo.vencido > 0 ? `\nDesse saldo, ${formatCurrency(resumo.vencido)} está vencido.` : ""}${vencimento}\n\nConfira os detalhes no PDF. Se precisar conversar sobre o pagamento, fale com a gente.`;
 }
 
-export function mensagemCondicional({ cliente, loja, status, prazo, pendentes, hoje = hojeISO() }: {
-  cliente: string; loja: string; status: string; prazo: string; pendentes: number; hoje?: string;
+export function mensagemCondicional({ cliente, loja, status, prazo, pendentes, hoje = hojeISO(), itens, codigo }: {
+  cliente: string; loja: string; status: string; prazo: string; pendentes: number; hoje?: string; itens?: PecaCondicional[]; codigo?: string;
 }) {
-  const inicio = `Olá, ${cliente}! Aqui é da ${loja || "loja"}.`;
-  if (status === "cancelado") return `${inicio}\n\nSeu condicional foi cancelado. Segue o registro atualizado para conferência.`;
-  if (status === "recolhido") return `${inicio}\n\nRecebemos as peças de volta e encerramos seu condicional. Obrigado! Segue o documento atualizado para conferência.`;
-  if (status !== "aberto" && pendentes === 0) return `${inicio}\n\nSeu condicional foi finalizado. Segue o documento com as peças compradas e devolvidas. Se houve compra, o pagamento consta no comprovante da venda.`;
-  if (status !== "aberto") return `${inicio}\n\nO registro do seu condicional foi finalizado. Ainda precisamos conferir o detalhamento de ${pendentes} peça(s) com a loja. Segue o documento com a situação registrada.`;
-  const prazoTexto = prazo ? `${prazo < hoje ? "O prazo combinado foi" : prazo === hoje ? "O prazo combinado é hoje," : "O prazo combinado é"} ${formatDataBR(prazo)}.` : "Vamos combinar o prazo de retorno com você.";
-  return `${inicio}\n\nSegue a atualização do seu condicional. ${pendentes} peça(s) ainda aguardam sua decisão ou devolução.\n${prazoTexto}\n\nConte para a gente quais peças você vai ficar e quais vai devolver. Estamos à disposição!`;
+  const resumo = resumirCondicional({ status, prazo, pendentes, itens, hoje });
+  const inicio = `Olá, ${cliente.trim() || "cliente"}! Aqui é da ${loja.trim() || "loja"}.`;
+  const abertura = {
+    avaliacao: "Preparamos o resumo das peças do seu condicional. Experimente e conte para a gente o que mais gostou!",
+    amanha: "Seu prazo para concluir o condicional é amanhã. Já conseguiu escolher suas peças favoritas?",
+    hoje: "Hoje é o dia combinado para concluir seu condicional. Vamos conferir sua escolha e o retorno das demais peças?",
+    vencido: `O prazo do seu condicional encerrou em ${formatDataBR(prazo)}. Vamos organizar a conferência das peças e o retorno?`,
+    devolvido: "Recebemos as peças de volta e encerramos seu condicional. Obrigado por experimentar nossa seleção!",
+    compra: "Sua escolha foi registrada! Obrigado pela compra e pela confiança. Segue o resumo final do seu condicional.",
+    finalizado: "Seu condicional foi finalizado. Segue o registro atualizado para sua conferência.",
+    cancelado: "Seu condicional foi cancelado. Segue o registro atualizado para sua conferência. Estamos à disposição quando precisar.",
+    conferencia: "Seu condicional possui um encerramento registrado. O detalhamento das peças ainda está sendo conferido pela loja.",
+  }[resumo.etapa];
+  const selecao = resumo.aberto && itens?.length ? `\n\nSua seleção:\n${itens.slice(0, 6).map(item => `• ${item.quantidade}× ${item.nome}`).join("\n")}${itens.length > 6 ? "\nVeja a seleção completa no PDF." : ""}` : "";
+  const prazoTexto = resumo.aberto ? prazo ? `\n\n${resumo.etapa === "vencido" ? "Prazo original" : "Retorno combinado"}: ${formatDataBR(prazo)}.` : "\n\nO prazo de retorno será combinado com a loja." : "";
+  const resultado = !resumo.aberto && resumo.detalhado && resumo.etapa !== "cancelado"
+    ? `\n\nPeças compradas: ${resumo.comprado}.\nPeças devolvidas: ${resumo.devolvido}.${resumo.etapa === "conferencia" ? "\nA conferência ainda precisa ser concluída." : ""}` : "";
+  const encerramento = resumo.aberto ? "Nos avise quais peças deseja comprar e quais vai devolver. Se precisar ajustar o retorno, fale com a gente. Os valores no PDF são de referência; a compra será registrada após sua confirmação."
+    : resumo.etapa === "compra" ? "Os detalhes do pagamento estão no comprovante da venda. Esperamos ver você novamente!"
+    : resumo.etapa === "devolvido" ? "Foi um prazer atender você. Quando quiser experimentar outras peças, conte com a gente!" : "Se precisar de alguma informação, fale com a gente.";
+  return `${inicio}\n\n${abertura}${selecao}${prazoTexto}${resultado}\n\n${encerramento}\n\nSegue seu PDF${codigo ? ` · Condicional ${codigo}` : ""}.`;
 }
 
 export function nomeArquivoCliente(tipo: string, cliente: string, codigo: string) {
