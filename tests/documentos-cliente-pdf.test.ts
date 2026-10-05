@@ -28,6 +28,13 @@ const props = {
 };
 
 describe("documentos do cliente em todas as situações", () => {
+  for (const [nome, status, quantidade] of [["condicional-selecao", "aberto", 3], ["condicional-compra", "convertido", 3], ["condicional-conferencia", "convertido", 2], ["condicional-selecao-extensa", "aberto", 26]] as const) {
+    it(`renderiza ${nome} com resumo personalizado e paginação`, async () => {
+      await verificarPdf(nome, React.createElement(CondicionalPdfDocument, { nomeLoja: props.loja, clienteNome: props.cliente, responsavel: "Equipe da loja", codigo: "DEMO0002", dataSaida: "2026-10-02", dataLimite: "2026-10-06", status, atualizadoEm: "2026-10-05",
+        itens: Array.from({ length: quantidade }, (_, i) => ({ nome: `Camiseta de demonstração ${i+1} · Preta · G`, quantidade: 1, precoUnitario: nome === "condicional-conferencia" ? undefined : 189.9,
+          vendido: nome === "condicional-compra" ? i === 0 ? 1 : 0 : undefined, devolvido: nome === "condicional-compra" ? i === 0 ? 0 : 1 : undefined })) }));
+    }, 20000);
+  }
   it("acordo parcialmente pago mostra o saldo e as parcelas atuais", async () => {
     await verificarPdf("acordo-parcial", React.createElement(PromissoriaAcordoPdf, props));
   }, 20000);
