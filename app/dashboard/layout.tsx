@@ -128,7 +128,7 @@ function NavSections({
     .filter((grupo) => grupo.itens.length > 0);
 
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-8">
+    <nav aria-label="Menu principal" className="flex-1 space-y-5 overflow-y-auto px-4 pb-8">
       {gruposVisiveis.map((grupo, i) => (
         <div key={i} className="space-y-1">
           {grupo.titulo && (
@@ -143,6 +143,7 @@ function NavSections({
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 onClick={onNavigate}
                 className={`nexo-sidebar-nav-item flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                   active
@@ -173,7 +174,7 @@ function MobileBottomNav({
       !rotaBloqueadaPorModulo(item.href, modulos)
   );
   return (
-    <nav className="nexo-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
+    <nav aria-label="Acesso rápido" className="nexo-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e8ecf4] bg-white/95 px-2 py-2 backdrop-blur xl:hidden">
       <div
         className="grid gap-1"
         style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
@@ -185,6 +186,7 @@ function MobileBottomNav({
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold transition ${
                 active
                   ? "bg-[#2563eb]/10 text-[#2563eb]"
@@ -232,6 +234,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <DashboardPreferencesProvider>
       <div data-dashboard-home={pathname === "/dashboard" ? "true" : undefined} className="nexo-dashboard min-h-screen bg-[#f4f6fb] text-[#0f172a]">
+        <a href="#conteudo-principal" className="nexo-skip-link">Ir para o conteúdo</a>
         <AuthGuard>
           <AccessGuard>
             <SubscriptionGuard>
@@ -271,7 +274,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* ─── Menu lateral mobile (gaveta) ────────────────────────────── */}
         {mobileNavOpen && (
-          <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label="Menu de navegação">
             <div
               className="absolute inset-0 bg-black/40"
               onClick={() => setMobileNavOpen(false)}
@@ -305,13 +308,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <button
                 onClick={() => setMobileNavOpen(true)}
                 aria-label="Abrir menu"
+                aria-expanded={mobileNavOpen}
                 className="-ml-1 rounded-lg p-1.5 text-[#334155] transition hover:bg-[#f4f6fb] xl:hidden"
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <h1 className="max-w-[45vw] truncate text-xl font-black tracking-tight text-[#0f172a] sm:max-w-none sm:text-2xl">
+              <p className="nexo-dashboard-heading max-w-[45vw] truncate text-xl font-bold tracking-tight text-[#0f172a] sm:max-w-none sm:text-2xl">
                 {currentLabel}
-              </h1>
+              </p>
 
               {/* Busca global */}
               <FerramentasGestao pathname={pathname} />
@@ -326,7 +330,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </header>
 
           {/* Conteúdo */}
-          <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 md:px-8 xl:pb-6">
+          <main id="conteudo-principal" tabIndex={-1} className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 md:px-8 xl:pb-6">
             <div className="mx-auto min-w-0 max-w-[1600px]">
               <RouteGuard>{children}</RouteGuard>
             </div>

@@ -1,7 +1,7 @@
 export function normalizarTelefoneWhatsApp(telefone: string) {
   const numeros = telefone.replace(/\D/g, "");
   if (!numeros) return "";
-  if ((numeros.length === 10 || numeros.length === 11) && !numeros.startsWith("55")) {
+  if (numeros.length === 10 || numeros.length === 11) {
     return `55${numeros}`;
   }
   return numeros;
@@ -13,7 +13,7 @@ export function criarLinkWhatsApp(telefone: string, mensagem: string) {
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
 }
 
-function baixarBlob(blob: Blob, nomeArquivo: string) {
+export function baixarPdf(blob: Blob, nomeArquivo: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -21,7 +21,7 @@ function baixarBlob(blob: Blob, nomeArquivo: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -53,7 +53,7 @@ export async function compartilharPdfWhatsApp({
     return "compartilhado" as const;
   }
 
-  baixarBlob(blob, nomeArquivo);
+  baixarPdf(blob, nomeArquivo);
   const link = criarLinkWhatsApp(telefone, mensagem);
   if (link) window.open(link, "_blank", "noopener,noreferrer");
   return "baixado" as const;

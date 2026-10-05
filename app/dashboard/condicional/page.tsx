@@ -1,12 +1,14 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CondicionalPdfDocument } from "@/components/pdf/condicional-pdf-document";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
 import { carregarNomesResponsaveis } from "@/lib/responsaveis";
+import { baixarPdf } from "@/lib/whatsapp-utils";
+import { mensagemCondicional, nomeArquivoCliente } from "@/lib/comunicacao-cliente";
+import { DocumentoClienteDialog, type DocumentoCliente } from "@/components/dashboard/documento-cliente-dialog";
 import {
   hojeISO,
   somarDiasISO,
@@ -21,16 +23,10 @@ import {
   type VendaItemResumo,
 } from "@/lib/condicional-utils";
 
-const PDFDownloadLink = dynamic(
-  () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
-  {
-    ssr: false,
-  }
-);
-
 type Cliente = {
   id: string;
   nome: string;
+  telefone: string | null;
 };
 
 type Produto = {
@@ -118,6 +114,8 @@ export default function CondicionalPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [preparandoPdf, setPreparandoPdf] = useState<string | null>(null);
+  const [documentoCliente, setDocumentoCliente] = useState<DocumentoCliente | null>(null);
 
   const hoje = hojeISO();
 
@@ -147,7 +145,7 @@ export default function CondicionalPage() {
     setErro("");
 
     const [clientesRes, produtosRes, condicionaisRes, itensRes, configRes] = await Promise.all([
-      supabase.from("clientes").select("id, nome").order("created_at", { ascending: false }),
+      supabase.from("clientes").select("id, nome, telefone").order("created_at", { ascending: false }),
       supabase
         .from("produtos")
         .select("id, nome, preco, estoque, status, tem_variacoes")
@@ -643,6 +641,41 @@ export default function CondicionalPage() {
     await carregarDados();
   }
 
+  async function prepararDocumento(condicional: Condicional, compartilhar: boolean) {
+    setErro(""); setPreparandoPdf(condicional.id);
+    try {
+      const [registro, pecas, movimentos] = await Promise.all([
+        supabase.from("condicionais").select("*").eq("id", condicional.id).single(),
+        supabase.from("condicional_itens").select("*").eq("condicional_id", condicional.id),
+        supabase.from("estoque_movimentacoes").select("produto_id,variacao_id,tipo,quantidade").eq("referencia_id", condicional.id),
+      ]);
+      if (registro.error || pecas.error || movimentos.error) throw new Error("Falha ao atualizar o condicional.");
+      const atual = registro.data as Condicional;
+      const [clienteRes, vendaItens] = await Promise.all([
+        supabase.from("clientes").select("id,nome,telefone").eq("id", atual.cliente_id).single(),
+        atual.venda_id ? supabase.from("venda_itens").select("produto_id,variacao_id,quantidade").eq("venda_id", atual.venda_id) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (clienteRes.error || vendaItens.error) throw new Error("Falha ao atualizar os detalhes.");
+      const cliente = clienteRes.data as Cliente;
+      const itensAtuais = pecas.data as CondicionalItem[];
+      const resumo = resumirFinalizacao(itensAtuais, movimentos.data as MovResumo[], vendaItens.data as VendaItemResumo[]);
+      const pendentes = atual.status === "aberto" ? itensAtuais.reduce((total, item) => total + Number(item.quantidade), 0) : resumo.itens.reduce((total, item) => total + Math.max(0, item.enviado - item.vendido - item.devolvido), 0);
+      const { pdf } = await import("@react-pdf/renderer");
+      const blob = await pdf(<CondicionalPdfDocument nomeLoja={nomeOperacao} clienteNome={cliente.nome} responsavel={atual.responsavel || "Não informado"} dataSaida={atual.data_saida} dataLimite={atual.data_limite} observacao={atual.observacao} codigo={atual.id.slice(0,8).toUpperCase()} status={atual.status}
+        itens={itensAtuais.map((item) => {
+          const conferido = resumo.itens.find((linha) => linha.produto_id === item.produto_id && linha.variacao_id === item.variacao_id);
+          return { nome: nomeComVariante(item.produto_id, item.variacao_id), quantidade: Number(item.quantidade), precoUnitario: Number(item.preco_unitario),
+            vendido: atual.status !== "aberto" && conferido?.estado !== "sem_movimento" ? conferido?.vendido : undefined,
+            devolvido: atual.status !== "aberto" && conferido?.estado !== "sem_movimento" ? conferido?.devolvido : undefined };
+        })} />).toBlob();
+      const nomeArquivo = nomeArquivoCliente("condicional", cliente.nome, atual.id);
+      if (compartilhar) setDocumentoCliente({ blob, nomeArquivo, titulo: "Condicional atualizado", telefone: cliente.telefone,
+        mensagem: mensagemCondicional({ cliente: cliente.nome, loja: nomeOperacao, status: atual.status, prazo: atual.data_limite, pendentes }) });
+      else baixarPdf(blob, nomeArquivo);
+    } catch { setErro("Não foi possível preparar o condicional atualizado. Tente novamente."); }
+    finally { setPreparandoPdf(null); }
+  }
+
   return (
     <section className="space-y-6">
       <PageHeader
@@ -650,6 +683,7 @@ export default function CondicionalPage() {
         title="Condicional"
         description="Controle peças deixadas com o cliente, prazo de retorno e converta em venda o que o cliente ficou — devolvendo o restante ao estoque."
       />
+      {documentoCliente && <DocumentoClienteDialog documento={documentoCliente} onFechar={() => setDocumentoCliente(null)} />}
 
       {erro && (
         <div className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
@@ -1141,33 +1175,8 @@ export default function CondicionalPage() {
                         </div>
 
                         <div className="flex flex-col gap-2 md:min-w-[190px]">
-                          <PDFDownloadLink
-                            document={
-                             <CondicionalPdfDocument
-  nomeLoja={nomeOperacao}
-  clienteNome={getClienteNome(condicional.cliente_id)}
-  responsavel={condicional.responsavel || "Não informado"}
-  dataSaida={condicional.data_saida}
-  dataLimite={condicional.data_limite}
-  observacao={condicional.observacao}
-  codigo={`S/O-COND-${String(
-    condicionais.findIndex((c) => c.id === condicional.id) + 1
-  ).padStart(4, "0")}`}
-  itens={itens.map((item) => ({
-    nome: getProdutoNome(item.produto_id),
-    quantidade: item.quantidade,
-  }))}
-/>
-                            }
-                            fileName={`condicional-${getClienteNome(condicional.cliente_id)
-                              .toLowerCase()
-                              .replaceAll(" ", "-")}.pdf`}
-                            className="rounded-2xl border border-[#2563eb]/20 bg-[#2563eb]/10 px-4 py-2 text-center text-sm font-bold text-[#2563eb] transition hover:bg-[#2563eb]/20"
-                          >
-                            {({ loading: pdfLoading }) =>
-                              pdfLoading ? "Gerando PDF..." : "Baixar PDF"
-                            }
-                          </PDFDownloadLink>
+                          <button type="button" onClick={() => prepararDocumento(condicional, false)} disabled={preparandoPdf === condicional.id} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 disabled:opacity-50">{preparandoPdf === condicional.id ? "Preparando…" : "Baixar PDF"}</button>
+                          <button type="button" onClick={() => prepararDocumento(condicional, true)} disabled={preparandoPdf === condicional.id} className="rounded-xl border bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50">Mensagem e PDF</button>
 
                           {condicional.status === "aberto" && (
                             <>

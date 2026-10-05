@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, MessageCircle, Pencil, Search, Trash2, X } from "lucide-react";
+import { Download, MessageCircle, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
@@ -13,7 +13,9 @@ import {
   validarRegrasPromissoria,
 } from "@/lib/promissorias-utils";
 import { carregarConfigEmpresa } from "@/lib/empresa-config";
-import { compartilharPdfWhatsApp } from "@/lib/whatsapp-utils";
+import { baixarPdf } from "@/lib/whatsapp-utils";
+import { mensagemAcordo, nomeArquivoCliente, resumirAcordo } from "@/lib/comunicacao-cliente";
+import { DocumentoClienteDialog, type DocumentoCliente } from "@/components/dashboard/documento-cliente-dialog";
 import { PromissoriaAcordoPdf } from "@/components/pdf/promissoria-acordo-pdf";
 import {
   calcularItemPromissoria,
@@ -58,7 +60,6 @@ function formatarData(data: string | null) {
   const [a, m, d] = data.slice(0, 10).split("-");
   return `${d}/${m}/${a}`;
 }
-function slug(v: string) { return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
 function normalizarBusca(v: string) { return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function rotuloFormaPagamento(forma: string | null) {
   if (!forma) return "Não informada";
@@ -75,6 +76,7 @@ export default function PromissoriasPage() {
   const [itensProm, setItensProm] = useState<ItemProm[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [baixandoPdf, setBaixandoPdf] = useState<string | null>(null);
@@ -82,6 +84,8 @@ export default function PromissoriasPage() {
   const [prazoMaxMeses, setPrazoMaxMeses] = useState(4);
   const [parcelaMinima, setParcelaMinima] = useState(0);
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [buscaCliente, setBuscaCliente] = useState("");
+  const [documentoCliente, setDocumentoCliente] = useState<DocumentoCliente | null>(null);
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [clienteId, setClienteId] = useState("");
@@ -229,7 +233,14 @@ export default function PromissoriasPage() {
   const totalAberto = promissorias.filter((p) => !["pago","cancelado"].includes(p.status)).reduce((s,p) => s + saldoDe(p),0);
   const totalPago = pagamentos.reduce((s,p) => s + Number(p.valor || 0),0);
   const totalFinanciado = promissorias.filter((p) => p.status !== "cancelado").reduce((s,p) => s + Number(p.valor_total || 0),0);
-  const promissoriasFiltradas = filtroStatus === "todos" ? promissorias : promissorias.filter((p) => p.status === filtroStatus);
+  const resumoDe = (p: Promissoria) => resumirAcordo({ status: p.status, valorTotal: Number(p.valor_total),
+    totalPago: pagoPorProm[p.id] || 0, entrada: Number(p.entrada_valor || 0), parcelas: Number(p.parcelas), primeiraParcela: p.data_primeira_parcela || p.data_vencimento });
+  const promissoriasFiltradas = promissorias.filter((p) => {
+    const resumo = resumoDe(p);
+    const correspondeStatus = filtroStatus === "todos" || (filtroStatus === "atrasado" ? resumo.situacao === "atrasado"
+      : filtroStatus === "em_aberto" ? !["quitado", "cancelado"].includes(resumo.situacao) : filtroStatus === "pago" ? resumo.situacao === "quitado" : p.status === filtroStatus);
+    return correspondeStatus && normalizarBusca(clientePorId.get(p.cliente_id)?.nome || "").includes(normalizarBusca(buscaCliente.trim()));
+  });
   const entradaEditando = editandoId
     ? (pagamentosPorPromissoria.get(editandoId) || []).find((pagamento) => pagamento.tipo === "entrada")
     : undefined;
@@ -378,14 +389,15 @@ export default function PromissoriasPage() {
     limparFormulario(); await carregarDados();
   }
 
-  async function registrarPagamento(prom: Promissoria) {
-    setErro(""); const saldo = saldoDe(prom); const bruto = valorPagamento[prom.id]; const valor = bruto ? Number(bruto) : saldo;
+  async function registrarPagamento(prom: Promissoria, quitar = false) {
+    setErro(""); setSucesso(""); const saldo = saldoDe(prom); const bruto = valorPagamento[prom.id]; const valor = quitar ? saldo : Number(bruto);
     if (!Number.isFinite(valor) || valor <= 0) return setErro("Informe um valor de pagamento válido.");
     if (valor > saldo + 0.001) return setErro(`Pagamento maior que o saldo de ${formatCurrency(saldo)}.`);
     setPagando(true);
     const { error } = await supabase.rpc("registrar_pagamento_promissoria", { p_promissoria_id: prom.id, p_valor: valor, p_forma: formaPagamento[prom.id] || "pix", p_obs: null, p_idempotency_key: crypto.randomUUID() });
     setPagando(false); if (error) return setErro(error.message);
     setValorPagamento((a) => ({ ...a, [prom.id]: "" })); await carregarDados();
+    setSucesso(valor >= saldo ? "Pagamento registrado. Acordo quitado: você já pode compartilhar o comprovante de quitação." : `Pagamento de ${formatCurrency(valor)} registrado. Restam ${formatCurrency(Math.round((saldo-valor)*100)/100)}. O PDF e a mensagem já usam o novo saldo.`);
   }
   async function marcarComoAtrasado(id: string) { const { error } = await supabase.from("promissorias").update({ status: "atrasado" }).eq("id", id); if (error) setErro(error.message); else await carregarDados(); }
   async function cancelarPromissoria(item: Promissoria) {
@@ -400,8 +412,28 @@ export default function PromissoriasPage() {
     await carregarDados();
   }
 
-  async function gerarArquivo(item: Promissoria, cliente: Cliente) {
-    const ips = itensPorPromissoria.get(item.id) || [];
+  async function gerarArquivo(item: Promissoria) {
+    // Reconsulta a posição atual antes de produzir um documento para o cliente.
+    const [promRes, pagRes, itensRes] = await Promise.all([
+      supabase.from("promissorias").select("*").eq("id", item.id).single(),
+      supabase.from("promissoria_pagamentos").select("id,promissoria_id,valor,data,forma_pagamento,tipo").eq("promissoria_id", item.id).order("data"),
+      supabase.from("promissoria_itens").select("*").eq("promissoria_id", item.id),
+    ]);
+    if (promRes.error || pagRes.error || itensRes.error) throw new Error("Não foi possível atualizar o documento.");
+    item = promRes.data as Promissoria;
+    const clienteRes = await supabase.from("clientes").select("id,nome,cpf,telefone").eq("id", item.cliente_id).single();
+    if (clienteRes.error) throw new Error("Não foi possível atualizar o cliente.");
+    const cliente = clienteRes.data as Cliente;
+    const pagamentosAtuais = pagRes.data as Pagamento[];
+    let ips = itensRes.data as ItemProm[];
+    // Acordos antigos podem ter os produtos somente na venda de origem.
+    if (ips.length === 0 && item.venda_id) {
+      const origem = await supabase.from("venda_itens")
+        .select("id,produto_id,variacao_id,quantidade,preco_unitario").eq("venda_id", item.venda_id);
+      if (origem.error) throw new Error("Não foi possível conferir os produtos da venda.");
+      ips = (origem.data || []).map((linha) => ({ ...linha, promissoria_id: item.id,
+        preco_original: Number(linha.preco_unitario), desconto_tipo: null, desconto_valor: 0, desconto_percentual: 0 }));
+    }
     const itensPdf = ips.map((ip) => {
       const p = produtoPorId.get(ip.produto_id);
       const v = ip.variacao_id ? variacaoPorId.get(ip.variacao_id) : undefined;
@@ -423,7 +455,7 @@ export default function PromissoriasPage() {
       (total, ip) => total + Number(ip.descontoValor || 0) * ip.quantidade,
       0
     );
-    const recebimentos = (pagamentosPorPromissoria.get(item.id) || [])
+    const recebimentos = pagamentosAtuais
       .map((pagamento) => ({
         data: pagamento.data,
         tipo: pagamento.tipo === "entrada" ? "entrada" as const : "parcela" as const,
@@ -433,23 +465,29 @@ export default function PromissoriasPage() {
     const primeira = item.data_primeira_parcela || item.data_vencimento || "";
     const saldoInicialParcelas = Math.max(0, Number(item.valor_total || 0) - Number(item.entrada_valor || 0));
     const cronograma = gerarCronogramaPromissoria(saldoInicialParcelas, Number(item.parcelas || 1), primeira);
-    const pago = pagoPorProm[item.id] || 0;
+    const pago = pagamentosAtuais.reduce((total, pagamento) => total + Number(pagamento.valor || 0), 0);
+    const dadosMensagem = { status: item.status, valorTotal: Number(item.valor_total), totalPago: pago,
+      entrada: Number(item.entrada_valor || 0), parcelas: Number(item.parcelas), primeiraParcela: primeira };
+    const resumo = resumirAcordo(dadosMensagem);
     const { pdf } = await import("@react-pdf/renderer");
-    const doc = <PromissoriaAcordoPdf loja={nomeLoja} cliente={cliente.nome} cpf={cliente.cpf} emissao={item.created_at.slice(0,10)} itens={itensPdf} subtotalProdutos={subtotalProdutos || undefined} descontoProdutos={descontoProdutos} valorProdutos={Number(item.valor_produtos || 0) || Math.max(0, Number(item.valor_total)-Number(item.acrescimo_valor || 0))} acrescimoValor={Number(item.acrescimo_valor || 0)} acrescimoPercentual={Number(item.acrescimo_percentual || 0)} entrada={Number(item.entrada_valor || 0)} valorTotal={Number(item.valor_total || 0)} totalPago={pago} saldoAtual={saldoDe(item)} parcelas={cronograma} recebimentos={recebimentos} observacao={item.observacao} />;
-    return { blob: await pdf(doc).toBlob(), nome: `promissoria-${slug(cliente.nome) || item.id}.pdf`, primeira };
+    const doc = <PromissoriaAcordoPdf loja={nomeLoja} cliente={cliente.nome} cpf={cliente.cpf} emissao={item.created_at.slice(0,10)} itens={itensPdf} subtotalProdutos={subtotalProdutos || undefined} descontoProdutos={descontoProdutos} valorProdutos={Number(item.valor_produtos || 0) || Math.max(0, Number(item.valor_total)-Number(item.acrescimo_valor || 0))} acrescimoValor={Number(item.acrescimo_valor || 0)} acrescimoPercentual={Number(item.acrescimo_percentual || 0)} entrada={Number(item.entrada_valor || 0)} valorTotal={Number(item.valor_total || 0)} totalPago={pago} saldoAtual={resumo.saldo} parcelas={cronograma} recebimentos={recebimentos} observacao={item.observacao} status={item.status} codigo={item.id.slice(0,8).toUpperCase()} />;
+    return { blob: await pdf(doc).toBlob(), nomeArquivo: nomeArquivoCliente(resumo.situacao === "quitado" ? "quitacao" : "acordo", cliente.nome, item.id),
+      mensagem: mensagemAcordo({ cliente: cliente.nome, loja: nomeLoja, ...dadosMensagem }), telefone: cliente.telefone, titulo: resumo.rotulo };
   }
   async function baixar(item: Promissoria, cliente?: Cliente) {
     if (!cliente) return setErro("Cliente não localizado."); setBaixandoPdf(item.id);
-    try { const a = await gerarArquivo(item, cliente); const url=URL.createObjectURL(a.blob); const l=document.createElement("a"); l.href=url; l.download=a.nome; document.body.appendChild(l); l.click(); l.remove(); URL.revokeObjectURL(url); } catch { setErro("Não foi possível gerar o PDF."); } finally { setBaixandoPdf(null); }
+    try { const a = await gerarArquivo(item); baixarPdf(a.blob, a.nomeArquivo); } catch { setErro("Não foi possível gerar o PDF atualizado. Tente novamente."); } finally { setBaixandoPdf(null); }
   }
   async function whatsapp(item: Promissoria, cliente?: Cliente) {
-    if (!cliente?.telefone) return setErro("Cadastre o telefone do cliente para abrir o WhatsApp."); setBaixandoPdf(item.id);
-    try { const a=await gerarArquivo(item,cliente); await compartilharPdfWhatsApp({ blob:a.blob,nomeArquivo:a.nome,telefone:cliente.telefone,mensagem:`Olá, ${cliente.nome}! Segue o acordo atualizado da ${nomeLoja || "loja"}. Saldo atual: ${formatCurrency(saldoDe(item))}. Próximo vencimento: ${formatarData(a.primeira)}.` }); } catch (e) { if (!(e instanceof DOMException && e.name === "AbortError")) setErro("Não foi possível compartilhar o PDF."); } finally { setBaixandoPdf(null); }
+    if (!cliente) return setErro("Cliente não localizado."); setBaixandoPdf(item.id);
+    try { setDocumentoCliente(await gerarArquivo(item)); } catch { setErro("Não foi possível preparar a mensagem e o PDF atualizados."); } finally { setBaixandoPdf(null); }
   }
 
   return <section className="space-y-6">
-    <PageHeader eyebrow="Financeiro e crédito" title="Promissórias" description="Vários produtos, desconto individual, entrada, parcelas, recebimentos e estoque em um único fluxo." />
+    <PageHeader eyebrow="Financeiro e crédito" title="Promissórias" description="Veja o que já foi pago, receba o saldo e compartilhe um documento atualizado com o cliente." />
+    {documentoCliente && <DocumentoClienteDialog documento={documentoCliente} onFechar={() => setDocumentoCliente(null)} />}
     {erro && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}</div>}
+    {sucesso && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{sucesso}</div>}
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[ ["Em aberto", String(promissorias.filter((p)=>!["pago","cancelado"].includes(p.status)).length)], ["Financiado", formatCurrency(totalFinanciado)], ["Total recebido", formatCurrency(totalPago)], ["Saldo em aberto", formatCurrency(totalAberto)] ].map(([l,v]) => <div key={l} className="rounded-[28px] border border-[#e8ecf4] bg-white p-5"><p className="text-sm font-bold text-[#64748b]">{l}</p><p className="mt-3 text-2xl font-black text-[#0f172a]">{v}</p></div>)}
@@ -563,15 +601,19 @@ export default function PromissoriasPage() {
       </div>
 
       <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-black">Promissórias registradas</h2><div className="flex gap-1">{[["todos","Todas"],["em_aberto","Abertas"],["pago","Pagas"],["atrasado","Atrasadas"]].map(([v,l])=><button key={v} onClick={()=>setFiltroStatus(v)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${filtroStatus===v?"bg-[#2563eb] text-white":"border"}`}>{l}</button>)}</div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Acordos registrados</h2><button type="button" onClick={() => { limparFormulario(); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white"><Plus size={16}/>Novo acordo</button></div>
+        <label className="mt-4 block text-sm font-semibold">Buscar cliente<input value={buscaCliente} onChange={(event) => setBuscaCliente(event.target.value)} placeholder="Digite o nome do cliente" className="mt-2 w-full rounded-xl border bg-[#f8fafc] px-3 py-3 font-normal"/></label>
+        <div className="mt-3 flex flex-wrap gap-2">{[["todos","Todas"],["em_aberto","Em aberto"],["pago","Quitadas"],["atrasado","Atrasadas"],["cancelado","Canceladas"]].map(([v,l])=><button type="button" key={v} aria-pressed={filtroStatus===v} onClick={()=>setFiltroStatus(v)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${filtroStatus===v?"bg-[#2563eb] text-white":"border"}`}>{l}</button>)}</div>
         {loading ? <p className="mt-5 text-[#64748b]">Carregando...</p> : (
           <div className="mt-5 space-y-4">
+            {promissoriasFiltradas.length === 0 && <p className="rounded-xl bg-[#f8fafc] p-5 text-sm text-[#64748b]">Nenhum acordo encontrado. Altere os filtros ou crie um novo acordo.</p>}
             {promissoriasFiltradas.map((item) => {
               const cliente = clientePorId.get(item.cliente_id);
               const ips = itensPorPromissoria.get(item.id) || [];
               const recebimentos = pagamentosPorPromissoria.get(item.id) || [];
               const pago = pagoPorProm[item.id] || 0;
               const saldo = saldoDe(item);
+              const resumo = resumoDe(item);
               const mensal = calcularParcelaSugerida(
                 Math.max(0, Number(item.valor_total) - Number(item.entrada_valor || 0)),
                 item.parcelas
@@ -582,7 +624,7 @@ export default function PromissoriasPage() {
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <b>{cliente?.nome || "Cliente"}</b>
-                        <span className={`rounded-full border px-3 py-1 text-xs font-bold ${obterCorStatus(item.status)}`}>{item.status}</span>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-bold ${obterCorStatus(resumo.situacao === "quitado" ? "pago" : resumo.situacao === "atrasado" ? "atrasado" : item.status)}`}>{resumo.rotulo}</span>
                       </div>
 
                       {ips.length > 0 ? (
@@ -609,6 +651,7 @@ export default function PromissoriasPage() {
                       <p className="text-sm text-[#64748b]">Produtos após descontos {formatCurrency(Number(item.valor_produtos || 0) || Math.max(0, Number(item.valor_total) - Number(item.acrescimo_valor || 0)))} · juros {formatCurrency(Number(item.acrescimo_valor || 0))} ({Number(item.acrescimo_percentual || 0).toFixed(2)}%) · total {formatCurrency(Number(item.valor_total || 0))}</p>
                       <p className="text-sm text-[#64748b]">Entrada {formatCurrency(Number(item.entrada_valor || 0))} · {item.parcelas}x de {formatCurrency(mensal)} · primeira {formatarData(item.data_primeira_parcela || item.data_vencimento)}</p>
                       <p className="text-sm"><span className="font-semibold text-green-700">Recebido {formatCurrency(pago)}</span> · <span className="font-semibold text-amber-700">Saldo {formatCurrency(saldo)}</span></p>
+                      {resumo.proxima && <p className="text-sm text-[#475569]">{resumo.proxima.vencimento < new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) ? "Parcela pendente" : "Próxima parcela"}: {resumo.proxima.numero}/{item.parcelas} · {formatCurrency(resumo.proxima.restante)} · {formatarData(resumo.proxima.vencimento)}</p>}
 
                       {recebimentos.length > 0 && (
                         <details className="rounded-xl border border-[#e2e8f0] bg-white px-3 py-2.5">
@@ -629,9 +672,9 @@ export default function PromissoriasPage() {
                     <div className="flex w-full flex-col gap-2 lg:w-[250px] lg:shrink-0">
                       <div className="flex gap-2">
                         {!['pago','cancelado'].includes(item.status) && <button type="button" onClick={()=>editar(item)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-semibold"><Pencil size={15}/>Editar</button>}
-                        <button type="button" onClick={()=>baixar(item,cliente)} disabled={baixandoPdf===item.id} aria-label="Baixar PDF" className="rounded-xl border bg-white p-2.5 disabled:opacity-50"><Download size={16}/></button>
-                        <button type="button" onClick={()=>whatsapp(item,cliente)} disabled={baixandoPdf===item.id} aria-label="Compartilhar no WhatsApp" className="rounded-xl border bg-white p-2.5 disabled:opacity-50"><MessageCircle size={16}/></button>
                       </div>
+                      <button type="button" onClick={()=>baixar(item,cliente)} disabled={baixandoPdf===item.id} className="flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50"><Download size={16}/>{baixandoPdf===item.id ? "Preparando…" : resumo.situacao === "quitado" ? "Baixar quitação" : "Baixar PDF"}</button>
+                      <button type="button" onClick={()=>whatsapp(item,cliente)} disabled={baixandoPdf===item.id} className="flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-semibold disabled:opacity-50"><MessageCircle size={16}/>Mensagem e PDF</button>
                       {!['pago','cancelado'].includes(item.status) && recebimentos.length === 0 && (
                         <button type="button" onClick={()=>cancelarPromissoria(item)} className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
                           <Trash2 size={15}/>Cancelar promissória
@@ -640,11 +683,12 @@ export default function PromissoriasPage() {
                       {saldo > 0 && (
                         <>
                           <div className="grid gap-2 sm:grid-cols-[1fr_120px] lg:grid-cols-1">
-                            <input type="number" min="0.01" max={saldo} step="0.01" value={valorPagamento[item.id] || ""} onChange={(e)=>setValorPagamento((atual)=>({...atual,[item.id]:e.target.value}))} placeholder={`Receber até ${formatCurrency(saldo)}`} className="min-w-0 rounded-xl border bg-white px-3 py-2 text-sm"/>
+                            <input aria-label="Valor do pagamento" type="number" min="0.01" max={saldo} step="0.01" value={valorPagamento[item.id] || ""} onChange={(e)=>setValorPagamento((atual)=>({...atual,[item.id]:e.target.value}))} placeholder={`Receber até ${formatCurrency(saldo)}`} className="min-w-0 rounded-xl border bg-white px-3 py-2 text-sm"/>
                             <select value={formaPagamento[item.id] || "pix"} onChange={(e)=>setFormaPagamento((atual)=>({...atual,[item.id]:e.target.value}))} aria-label="Forma do recebimento" className="rounded-xl border bg-white px-3 py-2 text-sm"><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option></select>
                           </div>
                           <p className="text-xs text-[#64748b]">O recebimento entra automaticamente no caixa de hoje e no mês correspondente.</p>
                           <button type="button" onClick={()=>registrarPagamento(item)} disabled={pagando} className="rounded-xl bg-green-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60">Registrar pagamento</button>
+                          <button type="button" onClick={()=>registrarPagamento(item, true)} disabled={pagando} className="rounded-xl border border-green-200 bg-white px-3 py-2 text-sm font-semibold text-green-700 disabled:opacity-60">Quitar saldo de {formatCurrency(saldo)}</button>
                           {item.status!=="atrasado" && <button type="button" onClick={()=>marcarComoAtrasado(item.id)} className="rounded-xl border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800">Marcar atrasado</button>}
                         </>
                       )}

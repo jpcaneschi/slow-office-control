@@ -24,7 +24,7 @@
 .nexo-dashboard[data-dashboard-home] main { padding-top: 16px; }
 .nexo-dashboard[data-dashboard-home] main > div { max-width: 1920px; }
 .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div { padding-top: 10px; padding-bottom: 10px; gap: 8px; }
-.nexo-dashboard[data-dashboard-home] .nexo-dashboard-header h1 { font-size: 22px; }
+.nexo-dashboard[data-dashboard-home] .nexo-dashboard-heading { font-size: 22px; }
 @media (min-width: 1280px) {
   .nexo-dashboard[data-dashboard-home] > div > div > aside.nexo-sidebar { width: 230px; }
   .nexo-dashboard[data-dashboard-home] main { padding-left: 20px; padding-right: 20px; }
@@ -34,7 +34,7 @@
 }
 @media (max-width: 767px) {
   .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div { padding-left: 12px; padding-right: 12px; }
-  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header h1 { font-size: 18px; }
+  .nexo-dashboard[data-dashboard-home] .nexo-dashboard-heading { font-size: 18px; }
   .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header > div > div:last-child { gap: 4px; }
   .nexo-dashboard[data-dashboard-home] .nexo-dashboard-header button { min-height: 40px; }
   .nexo-dashboard[data-dashboard-home] .nexo-preference-controls { gap: 0; padding: 0; }
@@ -83,6 +83,24 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Operação diária: alvos fáceis de tocar e leitura estável nas duas telas. */
+.nexo-dashboard main button, .nexo-dashboard [role="dialog"] button { min-height: 40px; }
+.nexo-dashboard button:disabled { cursor: not-allowed; }
+.nexo-dashboard main input, .nexo-dashboard main select, .nexo-dashboard main textarea { max-width: 100%; }
+.nexo-dashboard main :is(p, td, th) { overflow-wrap: anywhere; }
+.nexo-skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-160%); border-radius: 8px; background: #2563eb; color: white; padding: 12px 18px; font-size: 14px; }
+.nexo-skip-link:focus { transform: none; }
+@media (max-width: 767px) {
+  .nexo-dashboard main button, .nexo-dashboard [role="dialog"] button, .nexo-dashboard :is(button, summary) { min-height: 44px; }
+  .nexo-dashboard :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+  .nexo-mobile-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .nexo-dashboard main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .nexo-dashboard *, .nexo-dashboard *::before, .nexo-dashboard *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
 /* Scrollbar discreta para combinar com o tema claro */
