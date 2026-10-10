@@ -14,4 +14,10 @@ describe("links do WhatsApp", () => {
       "https://wa.me/5532999991234?text=Ol%C3%A1!%20%F0%9F%91%8B"
     );
   });
+
+  it("gera um link direto do WhatsApp com quebras de linha", () => {
+    expect(criarLinkWhatsApp("32999991234", "Olá!\nSegue o PDF.")).toBe(
+      "https://wa.me/5532999991234?text=Ol%C3%A1!%0ASegue%20o%20PDF."
+    );
+  });
 });

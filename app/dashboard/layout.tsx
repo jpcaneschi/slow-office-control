@@ -38,6 +38,7 @@ import { RouteGuard } from "@/components/dashboard/route-guard";
 import { podeAcessar } from "@/lib/permissoes";
 import { rotaBloqueadaPorModulo } from "@/lib/modulos";
 import { NexoLogo } from "@/components/brand/nexo-logo";
+import { shopifyApi } from "@/lib/shopify/client";
 import {
   DashboardPreferenceControls,
   DashboardPreferencesProvider,
@@ -209,6 +210,22 @@ function FerramentasGestao({ pathname }: { pathname: string }) {
   return <><GlobalSearch /><div className={pathname === "/dashboard" ? "hidden" : "hidden sm:block"}><PeriodFilter /></div><NotificationsBell /></>;
 }
 
+function ShopifySyncPulse() {
+  const { papel, carregando } = usePapel();
+  useEffect(() => {
+    if (carregando || (papel !== "owner" && papel !== "gerente" && papel !== "caixa")) return;
+    let active = true;
+    const sync = () => {
+      if (!active || document.visibilityState !== "visible") return;
+      void shopifyApi("/api/shopify/sync", { method: "POST" }).catch(() => undefined);
+    };
+    sync();
+    const timer = window.setInterval(sync, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [carregando, papel]);
+  return null;
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
@@ -239,6 +256,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <AccessGuard>
             <SubscriptionGuard>
               <RoleProvider>
+                <ShopifySyncPulse />
                 <PeriodProvider>
                   <div className="min-h-screen">
       <div className="flex min-h-screen">
