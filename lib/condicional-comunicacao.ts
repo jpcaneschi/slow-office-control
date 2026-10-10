@@ -1,7 +1,7 @@
 import { hojeISO, somarDiasISO } from "@/lib/datas";
 
 export type PecaCondicional = {
-  nome: string; quantidade: number; precoUnitario?: number | null;
+  nome: string; quantidade: number; precoUnitario?: number | null; precoOriginal?: number | null;
   vendido?: number; devolvido?: number;
 };
 export type EtapaCondicional = "avaliacao" | "amanha" | "hoje" | "vencido" | "devolvido" | "compra" | "finalizado" | "cancelado" | "conferencia";
@@ -23,6 +23,9 @@ export function resumirCondicional({ status, prazo, itens, hoje = hojeISO(), pen
   const restante = aberto ? enviado || pendentes || 0 : detalhado ? enviado - (comprado || 0) - (devolvido || 0) : pendentes ?? null;
   const referencia = pecas.length > 0 && pecas.every(item => item.precoUnitario != null && Number.isFinite(item.precoUnitario) && item.precoUnitario >= 0)
     ? pecas.reduce((total, item) => total + Math.round(Number(item.precoUnitario) * 100) * item.quantidade, 0) / 100 : null;
+  const original = pecas.length > 0 && pecas.every(item => item.precoOriginal != null && Number.isFinite(item.precoOriginal) && item.precoOriginal >= 0)
+    ? pecas.reduce((total, item) => total + Math.round(Number(item.precoOriginal) * 100) * item.quantidade, 0) / 100 : null;
+  const economia = original != null && referencia != null ? Math.max(0, Math.round((original - referencia) * 100) / 100) : null;
   const etapa: EtapaCondicional = status === "cancelado" ? "cancelado"
     : !aberto && ((itens != null && (!detalhado || (restante || 0) > 0)) || (pendentes || 0) > 0 || (status === "recolhido" && (comprado || 0) > 0)) ? "conferencia"
     : status === "recolhido" ? "devolvido"
@@ -40,5 +43,5 @@ export function resumirCondicional({ status, prazo, itens, hoje = hojeISO(), pen
     cancelado: "Este condicional foi cancelado. O documento preserva o registro original para sua conferência.",
     conferencia: "Há um encerramento registrado. O detalhamento das peças ainda precisa ser conferido pela loja.",
   };
-  return { aberto, etapa, rotulo: ROTULOS[etapa], orientacao: texto[etapa], enviado, comprado, devolvido, restante, referencia, detalhado };
+  return { aberto, etapa, rotulo: ROTULOS[etapa], orientacao: texto[etapa], enviado, comprado, devolvido, restante, referencia, original, economia, detalhado };
 }
