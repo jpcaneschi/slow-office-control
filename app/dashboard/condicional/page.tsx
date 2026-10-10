@@ -77,6 +77,7 @@ type CondicionalItem = {
   produto_id: string;
   variacao_id: string | null;
   quantidade: number;
+  preco_original: number;
   preco_unitario: number;
   status: string;
 };
@@ -86,6 +87,7 @@ type ItemRascunho = {
   variacao_id: string | null;
   nome: string;
   quantidade: number;
+  preco_original: number;
   preco_unitario: number;
 };
 
@@ -140,6 +142,7 @@ export default function CondicionalPage() {
   const [formaConversao, setFormaConversao] = useState("pix");
   const [convertendo, setConvertendo] = useState(false);
   const [pixDescontoCfg, setPixDescontoCfg] = useState(5);
+  const [maxParcelasCfg, setMaxParcelasCfg] = useState(6);
 
   async function carregarDados() {
     setLoading(true);
@@ -159,7 +162,7 @@ export default function CondicionalPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("condicional_itens")
-        .select("id, condicional_id, produto_id, variacao_id, quantidade, preco_unitario, status")
+      .select("id, condicional_id, produto_id, variacao_id, quantidade, preco_original, preco_unitario, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("configuracoes")
@@ -250,6 +253,7 @@ export default function CondicionalPage() {
     setNomeOperacao(cfg.nome_operacao || "Sua loja");
     setResponsaveisConfig(await carregarNomesResponsaveis());
     setPixDescontoCfg(cfg.pix_desconto);
+    setMaxParcelasCfg(cfg.max_parcelas);
     setPrazoDias(cfg.condicional_prazo_dias);
     setDataLimite(somarDias(dataSaida, cfg.condicional_prazo_dias));
     setLoading(false);
@@ -414,6 +418,7 @@ export default function CondicionalPage() {
           variacao_id: variacao ? variacao.id : null,
           nome: rotulo,
           quantidade: quantidadeNumero,
+          preco_original: precoUnit,
           preco_unitario: precoUnit,
         },
       ]);
@@ -480,6 +485,7 @@ export default function CondicionalPage() {
         produto_id: item.produto_id,
         variacao_id: item.variacao_id,
         quantidade: item.quantidade,
+        preco_original: item.preco_original,
         preco_unitario: item.preco_unitario,
         status: "em_aberto",
       }));
@@ -666,14 +672,14 @@ export default function CondicionalPage() {
           const comprado = (vendaItens.data || []).filter(linha => linha.produto_id === item.produto_id && linha.variacao_id === item.variacao_id)
             .reduce((total, linha) => total + Number(linha.quantidade), 0);
           const compraConferida = !!atual.venda_id || conferido?.devolvido === Number(item.quantidade);
-          return { nome: nomeComVariante(item.produto_id, item.variacao_id), quantidade: Number(item.quantidade), precoUnitario: item.preco_unitario != null ? Number(item.preco_unitario) : null,
+          return { nome: nomeComVariante(item.produto_id, item.variacao_id), quantidade: Number(item.quantidade), precoOriginal: item.preco_original != null ? Number(item.preco_original) : null, precoUnitario: item.preco_unitario != null ? Number(item.preco_unitario) : null,
             vendido: atual.status !== "aberto" && compraConferida ? comprado : undefined,
             devolvido: atual.status !== "aberto" && conferido?.estado !== "sem_movimento" ? conferido?.devolvido : undefined };
         });
       const codigo = atual.id.slice(0, 8).toUpperCase();
       const posicao = resumirCondicional({ status: atual.status, prazo: atual.data_limite, itens: itensDocumento });
       const { pdf } = await import("@react-pdf/renderer");
-      const blob = await pdf(<CondicionalPdfDocument nomeLoja={nomeOperacao} clienteNome={cliente.nome} responsavel={atual.responsavel || "Não informado"} dataSaida={atual.data_saida} dataLimite={atual.data_limite} observacao={atual.observacao} codigo={codigo} status={atual.status} itens={itensDocumento} />).toBlob();
+      const blob = await pdf(<CondicionalPdfDocument nomeLoja={nomeOperacao} clienteNome={cliente.nome} responsavel={atual.responsavel || "Não informado"} dataSaida={atual.data_saida} dataLimite={atual.data_limite} observacao={atual.observacao} codigo={codigo} status={atual.status} itens={itensDocumento} maxParcelas={maxParcelasCfg} />).toBlob();
       const nomeArquivo = nomeArquivoCliente(`condicional-${posicao.etapa}`, cliente.nome, atual.id);
       if (compartilhar) setDocumentoCliente({ blob, nomeArquivo, titulo: posicao.rotulo, telefone: cliente.telefone,
         mensagem: mensagemCondicional({ cliente: cliente.nome, loja: nomeOperacao, status: atual.status, prazo: atual.data_limite, pendentes, itens: itensDocumento, codigo }) });
@@ -894,9 +900,9 @@ export default function CondicionalPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-[#0f172a]">{item.nome}</p>
-                        <p className="mt-1 text-sm text-[#64748b]">
-                          Quantidade: {item.quantidade} · Valor unitário: {formatCurrency(item.preco_unitario)}
-                        </p>
+                        <p className="mt-1 text-sm text-[#64748b]">Quantidade: {item.quantidade} · Original: {formatCurrency(item.preco_original)}</p>
+                        <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-[#475569]">Preço combinado</label>
+                        <input type="number" min="0" step="0.01" value={item.preco_unitario} onChange={(e) => { const valor = Number(e.target.value); setItensRascunho((atual) => atual.map((linha) => (linha.variacao_id ?? linha.produto_id) === (item.variacao_id ?? item.produto_id) ? { ...linha, preco_unitario: Number.isFinite(valor) ? valor : 0 } : linha)); }} className="mt-1 w-40 rounded-xl border border-[#dbe3ef] bg-white px-3 py-2 text-sm font-bold text-[#0f172a] outline-none focus:border-[#2563eb]" />
                       </div>
 
                       <button

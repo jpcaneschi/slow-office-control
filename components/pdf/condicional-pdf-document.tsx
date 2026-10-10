@@ -10,6 +10,7 @@ Font.registerHyphenationCallback(word => [word]);
 type Props = {
   nomeLoja: string; clienteNome: string; responsavel: string; dataSaida: string; dataLimite: string;
   observacao?: string | null; itens: PecaCondicional[]; codigo?: string; status?: string; atualizadoEm?: string;
+  maxParcelas?: number;
 };
 const brl = (valor: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
 const styles = StyleSheet.create({
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
   footer: { position: "absolute", height: 26, bottom: 22, left: 38, right: 38, fontSize: 7.5, color: "#64748b", textAlign: "center" },
 });
 
-export function CondicionalPdfDocument({ nomeLoja, clienteNome, responsavel, dataSaida, dataLimite, observacao, itens, codigo, status = "aberto", atualizadoEm = hojeISO() }: Props) {
+export function CondicionalPdfDocument({ nomeLoja, clienteNome, responsavel, dataSaida, dataLimite, observacao, itens, codigo, status = "aberto", atualizadoEm = hojeISO(), maxParcelas = 6 }: Props) {
   const resumo = resumirCondicional({ status, prazo: dataLimite, itens, hoje: atualizadoEm });
   const titulo = resumo.aberto ? "Sua seleção de peças" : resumo.etapa === "devolvido" ? "Devolução confirmada"
     : resumo.etapa === "compra" ? "Sua escolha, registrada" : resumo.etapa === "cancelado" ? "Condicional cancelado" : "Conferência do condicional";
@@ -63,22 +64,22 @@ export function CondicionalPdfDocument({ nomeLoja, clienteNome, responsavel, dat
       </>}
       <Text style={styles.section}>{resumo.aberto ? "Peças para experimentar" : "Resultado por peça"}</Text>
       <View style={styles.head} wrap={false}>
-        <Text style={{ ...styles.product, width: "50%" }}>Produto · tamanho · cor</Text>
+        <Text style={{ ...styles.product, width: resumo.aberto ? "42%" : "50%" }}>Produto · tamanho · cor</Text>
         <Text style={{ ...styles.number, width: "10%" }}>Qtd.</Text>
-        {resumo.aberto ? <><Text style={{ ...styles.number, width: "20%" }}>Unitário</Text><Text style={{ ...styles.number, width: "20%" }}>Referência</Text></>
+        {resumo.aberto ? <><Text style={{ ...styles.number, width: "16%" }}>Original</Text><Text style={{ ...styles.number, width: "16%" }}>Combinado</Text><Text style={{ ...styles.number, width: "16%" }}>Desconto</Text></>
           : <><Text style={{ ...styles.number, width: "13%" }}>Compradas</Text><Text style={{ ...styles.number, width: "13%" }}>Devolvidas</Text><Text style={{ ...styles.number, width: "14%" }}>A conferir</Text></>}
       </View>
       {pecas.map((item, i) => {
         const conhecido = item.vendido != null && item.devolvido != null && item.vendido >= 0 && item.devolvido >= 0 && item.vendido + item.devolvido <= item.quantidade;
         return <View key={i} style={styles.row} wrap={false}>
-          <Text style={{ ...styles.product, width: "50%" }}>{item.nome}</Text><Text style={{ ...styles.number, width: "10%" }}>{item.quantidade}</Text>
-          {resumo.aberto ? <><Text style={{ ...styles.number, width: "20%" }}>{item.precoUnitario != null ? brl(item.precoUnitario) : "—"}</Text><Text style={{ ...styles.number, width: "20%" }}>{item.precoUnitario != null ? brl(Math.round(item.precoUnitario * 100) * item.quantidade / 100) : "—"}</Text></>
+          <Text style={{ ...styles.product, width: resumo.aberto ? "42%" : "50%" }}>{item.nome}</Text><Text style={{ ...styles.number, width: "10%" }}>{item.quantidade}</Text>
+          {resumo.aberto ? <><Text style={{ ...styles.number, width: "16%" }}>{item.precoOriginal != null ? brl(item.precoOriginal) : "—"}</Text><Text style={{ ...styles.number, width: "16%" }}>{item.precoUnitario != null ? brl(item.precoUnitario) : "—"}</Text><Text style={{ ...styles.number, width: "16%" }}>{item.precoOriginal != null && item.precoUnitario != null && item.precoOriginal > item.precoUnitario ? brl(item.precoOriginal - item.precoUnitario) : "—"}</Text></>
             : <><Text style={{ ...styles.number, width: "13%" }}>{conhecido ? item.vendido : "—"}</Text><Text style={{ ...styles.number, width: "13%" }}>{conhecido ? item.devolvido : "—"}</Text><Text style={{ ...styles.number, width: "14%" }}>{conhecido ? item.quantidade - (item.vendido || 0) - (item.devolvido || 0) : "—"}</Text></>}
         </View>;
       })}
       {itens.length === 0 && <Text style={{ ...styles.paragraph, marginTop: 10 }}>As peças deste registro ainda precisam ser conferidas com a loja.</Text>}
       {indice === paginas.length - 1 && <>
-        {resumo.aberto ? <View style={styles.grid} wrap={false}><View style={{ width: "60%" }}><Text style={styles.label}>Valor de referência da seleção</Text><Text style={styles.value}>{resumo.referencia != null ? brl(resumo.referencia) : "A conferir com a loja"}</Text></View><Text style={{ ...styles.muted, width: "40%", lineHeight: 1.4 }}>Valor informativo. A compra e o pagamento serão registrados após a confirmação da sua escolha.</Text></View>
+        {resumo.aberto ? <><View style={styles.grid} wrap={false}><View style={styles.card}><Text style={styles.label}>Total original</Text><Text style={styles.value}>{resumo.original != null ? brl(resumo.original) : "A conferir"}</Text></View><View style={styles.card}><Text style={styles.label}>Total combinado</Text><Text style={styles.value}>{resumo.referencia != null ? brl(resumo.referencia) : "A conferir"}</Text></View><View style={styles.card}><Text style={styles.label}>Economia</Text><Text style={styles.value}>{resumo.economia != null ? brl(resumo.economia) : "A conferir"}</Text></View></View><View style={styles.note} wrap={false}><Text style={styles.section}>Condições de pagamento</Text><Text style={styles.paragraph}>Compra em até {maxParcelas}x sem juros no cartão. Para pagamento à vista no Pix ou em dinheiro, a loja oferece condição especial; confirme o valor final no fechamento.</Text><Text style={{ ...styles.muted, marginTop: 6 }}>Os valores acima são informativos. A venda e o pagamento só serão registrados após a confirmação das peças escolhidas.</Text></View></>
           : resumo.detalhado && resumo.etapa !== "cancelado" && <View style={styles.grid} wrap={false}><View style={styles.card}><Text style={styles.label}>Peças compradas</Text><Text style={styles.value}>{resumo.comprado}</Text></View><View style={styles.card}><Text style={styles.label}>Peças devolvidas</Text><Text style={styles.value}>{resumo.devolvido}</Text></View><View style={styles.card}><Text style={styles.label}>A conferir</Text><Text style={styles.value}>{resumo.restante}</Text></View></View>}
         {observacao?.trim() && <View style={styles.note}><Text style={styles.section}>Observações da loja</Text><Text style={styles.paragraph}>{observacao}</Text></View>}
         <View style={styles.note} wrap={false}><Text style={styles.section}>{resumo.aberto ? "Como concluir sua escolha" : "Seu atendimento"}</Text><Text style={styles.paragraph}>{resumo.aberto ? "Avise a loja quais peças deseja comprar e combine o retorno das demais. Se precisar ajustar o prazo, entre em contato antes da devolução." : resumo.etapa === "compra" ? "Obrigado pela sua escolha! Guarde este resumo. Os valores efetivos, descontos e pagamentos estão no comprovante da venda." : resumo.etapa === "devolvido" ? "Obrigado por experimentar nossa seleção. Quando quiser conhecer outras peças, conte com a gente!" : resumo.orientacao}</Text></View>
