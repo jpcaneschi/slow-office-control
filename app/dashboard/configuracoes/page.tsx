@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CATEGORIAS_PADRAO } from "@/lib/empresa-config";
 import { EquipeSection } from "@/components/dashboard/equipe-section";
 import { TaxasCartaoSection } from "@/components/dashboard/taxas-cartao-section";
+import { ShopifySection } from "@/components/dashboard/shopify-section";
 import { usePapel } from "@/components/dashboard/role-context";
 import {
   MODULOS_OPCIONAIS,
@@ -385,6 +386,8 @@ export default function ConfiguracoesPage() {
       ) : (
         <div className="grid gap-6">
           <EquipeSection />
+
+          <ShopifySection />
 
           <div className="grid gap-6 xl:grid-cols-2">
             <div className="rounded-[30px] border border-[#e8ecf4] bg-white p-6">

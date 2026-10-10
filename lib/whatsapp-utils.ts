@@ -25,8 +25,9 @@ export function baixarPdf(blob: Blob, nomeArquivo: string) {
 }
 
 /**
- * Celular: compartilha o PDF como arquivo pelo menu nativo.
- * Desktop/fallback: baixa o arquivo e abre a conversa com a mensagem pronta.
+ * Baixa o PDF e abre a conversa pelo link oficial do WhatsApp.
+ * O wa.me não permite anexar arquivos automaticamente; o PDF baixado fica
+ * pronto para o usuário anexar, enquanto a mensagem já chega preenchida.
  */
 export async function compartilharPdfWhatsApp({
   blob,
@@ -39,22 +40,12 @@ export async function compartilharPdfWhatsApp({
   telefone: string;
   mensagem: string;
 }) {
-  const arquivo = new File([blob], nomeArquivo, { type: "application/pdf" });
-  const nav = navigator as Navigator & {
-    canShare?: (dados: ShareData) => boolean;
-  };
-
-  if (nav.share && nav.canShare?.({ files: [arquivo] })) {
-    await nav.share({
-      title: nomeArquivo,
-      text: mensagem,
-      files: [arquivo],
-    });
-    return "compartilhado" as const;
-  }
-
   baixarPdf(blob, nomeArquivo);
   const link = criarLinkWhatsApp(telefone, mensagem);
-  if (link) window.open(link, "_blank", "noopener,noreferrer");
-  return "baixado" as const;
+  if (!link) return "baixado" as const;
+
+  // A navegação direta não é bloqueada como pop-up quando o PDF demorou para
+  // ser gerado. O histórico permite voltar ao Nexo após anexar o documento.
+  window.location.assign(link);
+  return "whatsapp_aberto" as const;
 }
