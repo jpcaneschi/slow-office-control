@@ -105,13 +105,13 @@ type VendaItem = {
 
 type PagamentoVenda = {
   venda_id: string;
-  forma: "pix" | "dinheiro" | "cartao";
+  forma: "pix" | "dinheiro" | "cartao" | "debito";
   valor: number;
   taxa_valor: number | null;
 };
 
 type PagamentoRascunho = {
-  forma: "pix" | "dinheiro" | "cartao";
+  forma: "pix" | "dinheiro" | "cartao" | "debito";
   valor: string;
   parcelas: string;
   taxa: string;
@@ -389,7 +389,7 @@ export default function VendasPage() {
   const taxaNum = Number(taxaCartao || 0);
   const parcelasNum = Math.max(1, parseInt(parcelas) || 1);
   const valorLiquidoRascunho =
-    formaPagamento === "cartao"
+    formaPagamento === "cartao" || formaPagamento === "debito"
       ? totalRascunho * (1 - taxaNum / 100)
       : totalRascunho;
   const totalPagamentosMultiplos = pagamentosMultiplos.reduce(
@@ -402,10 +402,10 @@ export default function VendasPage() {
   // o PDV auto-preenche a taxa; só permite editar se a regra autorizar.
   const regraTaxaAplicavel = useMemo(
     () =>
-      formaPagamento === "cartao"
+      formaPagamento === "cartao" || formaPagamento === "debito"
         ? encontrarRegraTaxa(taxasRegras, {
-            tipo: "credito",
-            parcelas: parcelasNum,
+            tipo: formaPagamento === "debito" ? "debito" : "credito",
+            parcelas: formaPagamento === "debito" ? 1 : parcelasNum,
           })
         : null,
     [formaPagamento, parcelasNum, taxasRegras]
@@ -747,17 +747,28 @@ export default function VendasPage() {
               forma: pagamento.forma,
               valor: Number(pagamento.valor),
               parcelas: pagamento.forma === "cartao" ? Number(pagamento.parcelas || 1) : 1,
-              taxa_percentual: pagamento.forma === "cartao" ? Number(pagamento.taxa || 0) : 0,
+              taxa_percentual: pagamento.forma === "cartao" || pagamento.forma === "debito" ? Number(pagamento.taxa || 0) : 0,
             })),
             p_idempotency_key: idempKey,
           })
+        : formaPagamento === "debito"
+          ? supabase.rpc("criar_venda_debito", {
+              p_cliente_id: clienteId || null,
+              p_responsavel: responsavel.trim() || "Não informado",
+              p_funcionario_id: funcMatch ? funcMatch.id : null,
+              p_taxa: taxaNum,
+              p_desconto: descontoManualNumero,
+              p_observacao: observacao.trim() || null,
+              p_itens: itensPayload,
+              p_idempotency_key: idempKey,
+            })
         : supabase.rpc("criar_venda", {
         p_cliente_id: clienteId || null,
         p_responsavel: responsavel.trim() || "Não informado",
         p_funcionario_id: funcMatch ? funcMatch.id : null,
         p_forma_pagamento: formaPagamento,
         p_parcelas: formaPagamento === "cartao" ? parcelasNum : 1,
-        p_taxa: formaPagamento === "cartao" ? taxaNum : 0,
+        p_taxa: formaPagamento === "cartao" || formaPagamento === "debito" ? taxaNum : 0,
         p_valor_recebido:
           formaPagamento === "dinheiro"
             ? recebidoNum
@@ -895,7 +906,7 @@ export default function VendasPage() {
         </div>
       )}
 
-      {!modoCaixa && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {!modoCaixa && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <div className="rounded-[24px] border border-[#e8ecf4] bg-white p-4 sm:p-5">
           <p className="text-sm font-bold text-[#475569]">Vendas concluídas</p>
           <p className="mt-3 text-2xl font-black tracking-tight text-[#0f172a] sm:text-3xl">
@@ -910,7 +921,7 @@ export default function VendasPage() {
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-[#bfdbfe] bg-[#eff6ff] p-4 sm:col-span-2 sm:p-5 lg:col-span-1">
+        <div className="rounded-[24px] border border-[#bfdbfe] bg-[#eff6ff] p-4 sm:col-span-2 sm:p-5 xl:col-span-1">
           <p className="text-sm font-bold text-[#1d4ed8]">Recebido no período</p>
           <p className="mt-3 break-words text-xl font-black tracking-tight text-[#0f172a] sm:text-2xl">
             {formatCurrency(recebimentosPeriodo.totalRecebido)}
@@ -918,22 +929,36 @@ export default function VendasPage() {
         </div>
 
         <div className="rounded-[24px] border border-[#e8ecf4] bg-white p-4 sm:p-5">
-          <p className="text-xs font-bold text-[#64748b] sm:text-sm">Pix / Dinheiro</p>
+          <p className="text-xs font-bold text-[#1d4ed8] sm:text-sm">Pix</p>
           <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
             {formatCurrency(recebimentosPeriodo.pix)}
           </p>
-          <p className="mt-1 text-xs font-semibold text-[#64748b]">
-            Dinheiro: {formatCurrency(recebimentosPeriodo.dinheiro)}
+        </div>
+
+        <div className="rounded-[24px] border border-[#bbf7d0] bg-[#f0fdf4] p-4 sm:p-5">
+          <p className="text-xs font-bold text-[#15803d] sm:text-sm">Dinheiro</p>
+          <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
+            {formatCurrency(recebimentosPeriodo.dinheiro)}
           </p>
         </div>
 
         <div className="rounded-[24px] border border-[#e9d5ff] bg-[#faf5ff] p-4 sm:p-5">
-          <p className="text-xs font-bold text-[#7e22ce] sm:text-sm">Cartão líquido</p>
+          <p className="text-xs font-bold text-[#7e22ce] sm:text-sm">Crédito líquido</p>
           <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
-            {formatCurrency(recebimentosPeriodo.cartaoLiquido)}
+            {formatCurrency(recebimentosPeriodo.creditoLiquido)}
           </p>
           <p className="mt-1 text-xs font-semibold text-[#7e22ce]">
-            Bruto: {formatCurrency(recebimentosPeriodo.cartaoBruto)}
+            Bruto: {formatCurrency(recebimentosPeriodo.creditoBruto)}
+          </p>
+        </div>
+
+        <div className="rounded-[24px] border border-[#fed7aa] bg-[#fff7ed] p-4 sm:p-5">
+          <p className="text-xs font-bold text-[#c2410c] sm:text-sm">Débito líquido</p>
+          <p className="mt-2 break-words text-lg font-black tracking-tight text-[#0f172a] sm:text-xl">
+            {formatCurrency(recebimentosPeriodo.debitoLiquido)}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[#c2410c]">
+            Bruto: {formatCurrency(recebimentosPeriodo.debitoBruto)}
           </p>
         </div>
       </div>}
@@ -1019,7 +1044,8 @@ export default function VendasPage() {
                 >
                   <option value="pix">Pix</option>
                   <option value="dinheiro">Dinheiro</option>
-                  <option value="cartao">Cartão</option>
+                  <option value="cartao">Crédito</option>
+                  <option value="debito">Débito</option>
                   <option value="promissoria">Promissória</option>
                   <option value="misto">Misto</option>
                   <option value="multiplo">Pagamento dividido</option>
@@ -1065,7 +1091,8 @@ export default function VendasPage() {
                           >
                             <option value="pix">Pix</option>
                             <option value="dinheiro">Dinheiro</option>
-                            <option value="cartao">Cartão</option>
+                            <option value="cartao">Crédito</option>
+                            <option value="debito">Débito</option>
                           </select>
                           <input
                             type="number"
@@ -1114,7 +1141,7 @@ export default function VendasPage() {
                             Remover
                           </button>
                         </div>
-                        {pagamento.forma === "cartao" && (
+                        {(pagamento.forma === "cartao" || pagamento.forma === "debito") && (
                           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <input
                               type="number"
@@ -1129,7 +1156,8 @@ export default function VendasPage() {
                                 )
                               }
                               placeholder="Parcelas"
-                              className="rounded-xl border border-[#e8ecf4] px-3 py-2 text-sm outline-none"
+                              disabled={pagamento.forma === "debito"}
+                              className="rounded-xl border border-[#e8ecf4] px-3 py-2 text-sm outline-none disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
                             />
                             <input
                               type="number"
@@ -1183,9 +1211,9 @@ export default function VendasPage() {
                 </div>
               )}
 
-              {formaPagamento === "cartao" && (
+              {(formaPagamento === "cartao" || formaPagamento === "debito") && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
+                  {formaPagamento === "cartao" ? <div>
                     <label className="mb-2 block text-sm text-[#475569]">
                       Parcelas
                     </label>
@@ -1202,7 +1230,7 @@ export default function VendasPage() {
                         )
                       )}
                     </select>
-                  </div>
+                  </div> : <div className="rounded-2xl border border-[#fed7aa] bg-[#fff7ed] px-4 py-3 text-sm font-semibold text-[#9a3412]">Débito é registrado em uma parcela.</div>}
                   <div>
                     <label className="mb-2 block text-sm text-[#475569]">
                       Taxa (%)
@@ -1502,7 +1530,7 @@ export default function VendasPage() {
               </div>
 
               {!modoCaixa && <div className="rounded-2xl border border-[#e8ecf4] bg-[#f8fafc] p-3 sm:p-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.25fr]">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className="text-xs font-bold text-[#64748b]">
                     Data inicial
                     <input
@@ -1535,24 +1563,40 @@ export default function VendasPage() {
                       className="mt-1.5 w-full min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
                     />
                   </label>
-                  <label className="text-xs font-bold text-[#64748b]">
-                    Forma de pagamento
-                    <select
-                      value={filtroPagamento}
-                      onChange={(event) =>
-                        setFiltroPagamento(event.target.value as FiltroFormaVenda)
-                      }
-                      className="mt-1.5 w-full min-w-0 rounded-xl border border-[#dbe4f0] bg-white px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
-                    >
-                      <option value="todas">Todas as formas</option>
-                      <option value="pix">Pix (inclusive dividido)</option>
-                      <option value="dinheiro">Dinheiro (inclusive dividido)</option>
-                      <option value="cartao">Cartão (inclusive dividido)</option>
-                      <option value="promissoria">Promissória</option>
-                      <option value="misto">Entrada + promissória</option>
-                      <option value="multiplo">Pagamento dividido</option>
-                    </select>
-                  </label>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-[#64748b]">Forma de pagamento</p>
+                  <div className="mt-2 flex max-w-full gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filtrar vendas por forma de pagamento">
+                    {[
+                      ["Todas", "todas"],
+                      ["Pix", "pix"],
+                      ["Dinheiro", "dinheiro"],
+                      ["Crédito", "cartao"],
+                      ["Débito", "debito"],
+                      ["Promissória", "promissoria"],
+                      ["Entrada + promissória", "misto"],
+                      ["Pagamento dividido", "multiplo"],
+                    ].map(([label, valor]) => {
+                      const ativo = filtroPagamento === valor;
+                      return (
+                        <button
+                          key={valor}
+                          type="button"
+                          role="tab"
+                          aria-selected={ativo}
+                          onClick={() => setFiltroPagamento(valor as FiltroFormaVenda)}
+                          className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                            ativo
+                              ? "border-[#2563eb] bg-[#2563eb] text-white shadow-sm"
+                              : "border-[#dbe4f0] bg-white text-[#475569] hover:border-[#93b4f7] hover:text-[#2563eb]"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-[#64748b]">Pix, dinheiro, crédito e débito também encontram a parte correspondente de pagamentos divididos.</p>
                 </div>
                 <div className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1">
                   {[

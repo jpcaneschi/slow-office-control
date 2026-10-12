@@ -63,7 +63,7 @@ function formatarData(data: string | null) {
 function normalizarBusca(v: string) { return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function rotuloFormaPagamento(forma: string | null) {
   if (!forma) return "Não informada";
-  return forma === "pix" ? "Pix" : forma === "cartao" ? "Cartão" : forma === "dinheiro" ? "Dinheiro" : forma;
+  return forma === "pix" ? "Pix" : forma === "cartao" ? "Crédito" : forma === "debito" ? "Débito" : forma === "dinheiro" ? "Dinheiro" : forma;
 }
 
 export default function PromissoriasPage() {
