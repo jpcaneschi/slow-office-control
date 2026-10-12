@@ -68,7 +68,7 @@ describe("filtros e recebimentos de vendas", () => {
     expect(vendaCorrespondeFiltro(promissoria, [], "promissoria")).toBe(true);
   });
 
-  it("resume Pix, dinheiro e cartão líquido sem duplicar vendas simples", () => {
+  it("resume Pix, dinheiro, crédito e débito sem duplicar vendas simples", () => {
     const vendas = [
       venda({ id: "pix", forma_pagamento: "pix", total: 80 }),
       venda({ id: "cash", forma_pagamento: "dinheiro", total: 50 }),
@@ -78,14 +78,22 @@ describe("filtros e recebimentos de vendas", () => {
         total: 100,
         valor_liquido: 96,
       }),
+      venda({
+        id: "debit",
+        forma_pagamento: "debito",
+        total: 70,
+        valor_liquido: 69,
+      }),
     ];
 
     expect(resumirRecebimentos(vendas, [])).toEqual({
       pix: 80,
       dinheiro: 50,
-      cartaoBruto: 100,
-      cartaoLiquido: 96,
-      totalRecebido: 226,
+      creditoBruto: 100,
+      creditoLiquido: 96,
+      debitoBruto: 70,
+      debitoLiquido: 69,
+      totalRecebido: 295,
     });
   });
 });

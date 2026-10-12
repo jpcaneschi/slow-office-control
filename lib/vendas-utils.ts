@@ -38,6 +38,8 @@ export function obterCorFormaPagamento(forma: string) {
       return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
     case "cartao":
       return "bg-purple-500/10 text-purple-300 border-purple-500/20";
+    case "debito":
+      return "bg-orange-500/10 text-orange-700 border-orange-500/20";
     case "promissoria":
       return "bg-yellow-500/10 text-yellow-300 border-yellow-500/20";
     case "misto":
@@ -53,7 +55,8 @@ export function rotuloFormaPagamento(forma: string) {
   const rotulos: Record<string, string> = {
     pix: "PIX",
     dinheiro: "Dinheiro",
-    cartao: "Cartão",
+    cartao: "Crédito",
+    debito: "Débito",
     promissoria: "Promissória",
     misto: "Misto (entrada + promissória)",
     multiplo: "Pagamento dividido",

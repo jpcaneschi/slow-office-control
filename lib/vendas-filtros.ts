@@ -1,4 +1,4 @@
-export type FormaRecebimento = "pix" | "dinheiro" | "cartao";
+export type FormaRecebimento = "pix" | "dinheiro" | "cartao" | "debito";
 
 export type FiltroFormaVenda =
   | "todas"
@@ -33,8 +33,10 @@ export type PagamentoEfetivo = {
 export type ResumoRecebimentos = {
   pix: number;
   dinheiro: number;
-  cartaoBruto: number;
-  cartaoLiquido: number;
+  creditoBruto: number;
+  creditoLiquido: number;
+  debitoBruto: number;
+  debitoLiquido: number;
   totalRecebido: number;
 };
 
@@ -44,7 +46,7 @@ function numeroSeguro(valor: number | null | undefined) {
 }
 
 function ehFormaRecebimento(valor: string | null): valor is FormaRecebimento {
-  return valor === "pix" || valor === "dinheiro" || valor === "cartao";
+  return valor === "pix" || valor === "dinheiro" || valor === "cartao" || valor === "debito";
 }
 
 /**
@@ -66,7 +68,7 @@ export function obterPagamentosEfetivos(
         return {
           forma: pagamento.forma,
           bruto,
-          liquido: pagamento.forma === "cartao" ? bruto - taxa : bruto,
+          liquido: pagamento.forma === "cartao" || pagamento.forma === "debito" ? bruto - taxa : bruto,
         };
       });
   }
@@ -84,7 +86,7 @@ export function obterPagamentosEfetivos(
 
   const bruto = numeroSeguro(venda.total);
   const liquido =
-    venda.forma_pagamento === "cartao"
+    venda.forma_pagamento === "cartao" || venda.forma_pagamento === "debito"
       ? Math.min(bruto, numeroSeguro(venda.valor_liquido ?? venda.total))
       : bruto;
 
@@ -112,8 +114,10 @@ export function resumirRecebimentos(
   const resumo: ResumoRecebimentos = {
     pix: 0,
     dinheiro: 0,
-    cartaoBruto: 0,
-    cartaoLiquido: 0,
+    creditoBruto: 0,
+    creditoLiquido: 0,
+    debitoBruto: 0,
+    debitoLiquido: 0,
     totalRecebido: 0,
   };
 
@@ -122,8 +126,12 @@ export function resumirRecebimentos(
       if (pagamento.forma === "pix") resumo.pix += pagamento.liquido;
       if (pagamento.forma === "dinheiro") resumo.dinheiro += pagamento.liquido;
       if (pagamento.forma === "cartao") {
-        resumo.cartaoBruto += pagamento.bruto;
-        resumo.cartaoLiquido += pagamento.liquido;
+        resumo.creditoBruto += pagamento.bruto;
+        resumo.creditoLiquido += pagamento.liquido;
+      }
+      if (pagamento.forma === "debito") {
+        resumo.debitoBruto += pagamento.bruto;
+        resumo.debitoLiquido += pagamento.liquido;
       }
       resumo.totalRecebido += pagamento.liquido;
     }

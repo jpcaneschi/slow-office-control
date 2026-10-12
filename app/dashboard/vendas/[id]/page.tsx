@@ -42,6 +42,7 @@ type Venda = {
   observacao: string | null;
   status: string;
   created_at: string;
+  data_venda: string;
 };
 
 type Item = {
@@ -86,7 +87,8 @@ type TrocaItem = {
 const PAGAMENTO: Record<string, string> = {
   pix: "PIX",
   dinheiro: "Dinheiro",
-  cartao: "Cartão",
+  cartao: "Crédito",
+  debito: "Débito",
   promissoria: "Promissória",
   misto: "Misto",
   multiplo: "Pagamento dividido",
@@ -114,6 +116,9 @@ export default function VendaDetalhePage() {
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [preparandoDocumento, setPreparandoDocumento] = useState(false);
   const [documentoCliente, setDocumentoCliente] = useState<DocumentoCliente | null>(null);
+  const [dataEditada, setDataEditada] = useState("");
+  const [salvandoData, setSalvandoData] = useState(false);
+  const [confirmacao, setConfirmacao] = useState("");
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -123,7 +128,7 @@ export default function VendaDetalhePage() {
     const { data: v, error: vendaError } = await supabase
       .from("vendas")
       .select(
-        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, parcelas, taxa, taxa_valor, valor_bruto, custo_total, margem, valor_liquido, valor_recebido, troco, entrada_forma, motivo_cancelamento, observacao, status, created_at"
+        "id, cliente_id, responsavel, forma_pagamento, desconto_pix, subtotal, desconto, total, parcelas, taxa, taxa_valor, valor_bruto, custo_total, margem, valor_liquido, valor_recebido, troco, entrada_forma, motivo_cancelamento, observacao, status, created_at, data_venda"
       )
       .eq("id", id)
       .maybeSingle();
@@ -134,6 +139,7 @@ export default function VendaDetalhePage() {
       return;
     }
     setVenda(v as Venda);
+    setDataEditada(String(v.data_venda || v.created_at.slice(0, 10)));
 
     const [itensRes, cliRes, pagamentosRes, trocasRes, trocaItensRes] = await Promise.all([
       supabase
@@ -240,6 +246,24 @@ export default function VendaDetalhePage() {
     preco_unitario: Number(item.preco_unitario || 0),
   }));
 
+  async function salvarDataVenda() {
+    if (!venda || !dataEditada || dataEditada === venda.data_venda) return;
+    setErro("");
+    setConfirmacao("");
+    setSalvandoData(true);
+    const { error } = await supabase.rpc("definir_data_venda", {
+      p_venda_id: venda.id,
+      p_data_venda: dataEditada,
+    });
+    if (error) {
+      setErro(`Não foi possível alterar a data: ${error.message}`);
+    } else {
+      setConfirmacao("Data real da venda atualizada com sucesso.");
+      await carregar();
+    }
+    setSalvandoData(false);
+  }
+
   async function prepararComprovante() {
     if (!venda) return;
     setErro(""); setPreparandoDocumento(true);
@@ -323,6 +347,12 @@ export default function VendaDetalhePage() {
         </div>
       ) : null}
 
+      {confirmacao ? (
+        <div role="status" className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm font-semibold text-[#15803d]">
+          {confirmacao}
+        </div>
+      ) : null}
+
       {loading ? (
         <div className={`${cardClass} flex items-center justify-center py-16`}>
           <Loader2 className="h-6 w-6 animate-spin text-[#2563eb]" />
@@ -364,11 +394,33 @@ export default function VendaDetalhePage() {
                 </span>
               </div>
             </div>
+            {papel !== "caixa" ? (
+              <div className="mt-4 flex flex-col gap-3 border-t border-[#eef2f7] pt-4 sm:flex-row sm:items-end">
+                <label className="min-w-0 flex-1 text-xs font-semibold text-[#64748b]">
+                  Corrigir data real da venda
+                  <input
+                    type="date"
+                    value={dataEditada}
+                    max={new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })}
+                    onChange={(event) => setDataEditada(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-[#dbe4f0] bg-[#f8fafc] px-3 py-2.5 text-sm font-semibold text-[#334155] outline-none focus:border-[#2563eb]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={salvarDataVenda}
+                  disabled={salvandoData || !dataEditada || dataEditada === venda.data_venda}
+                  className="rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {salvandoData ? "Salvando…" : "Salvar data"}
+                </button>
+              </div>
+            ) : null}
             {/* Detalhes do pagamento (snapshot) */}
             <div className="mt-4 grid gap-4 border-t border-[#eef2f7] pt-4 sm:grid-cols-2 lg:grid-cols-3">
-              {venda.forma_pagamento === "cartao" && (
+              {(venda.forma_pagamento === "cartao" || venda.forma_pagamento === "debito") && (
                 <>
-                  <Campo rotulo="Parcelas" valor={`${venda.parcelas || 1}x`} />
+                  <Campo rotulo="Parcelas" valor={venda.forma_pagamento === "debito" ? "1x" : `${venda.parcelas || 1}x`} />
                   <Campo
                     rotulo="Taxa da maquininha"
                     valor={`${Number(venda.taxa || 0)}% · ${formatCurrency(
@@ -419,7 +471,7 @@ export default function VendaDetalhePage() {
                         <p className="text-sm font-bold text-[#0f172a]">
                           {rotuloFormaPagamento(pagamento.forma)} · {formatCurrency(Number(pagamento.valor))}
                         </p>
-                        {pagamento.forma === "cartao" && (
+                        {(pagamento.forma === "cartao" || pagamento.forma === "debito") && (
                           <p className="mt-0.5 text-xs text-[#64748b]">
                             {pagamento.parcelas || 1}x · taxa {Number(pagamento.taxa_percentual || 0)}% ({formatCurrency(Number(pagamento.taxa_valor || 0))})
                           </p>
@@ -587,7 +639,7 @@ export default function VendaDetalhePage() {
                 {formatCurrency(Number(venda.total || 0))}
               </span>
             </div>
-            {venda.forma_pagamento === "cartao" &&
+            {(venda.forma_pagamento === "cartao" || venda.forma_pagamento === "debito") &&
               Number(venda.taxa_valor || 0) > 0 && (
                 <div className="mt-3 space-y-1 border-t border-[#eef2f7] pt-3">
                   <Linha
