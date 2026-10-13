@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { criarLinkWhatsApp, normalizarTelefoneWhatsApp } from "@/lib/whatsapp-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { compartilharPdf, criarLinkWhatsApp, normalizarTelefoneWhatsApp } from "@/lib/whatsapp-utils";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("links do WhatsApp", () => {
   it("normaliza telefone brasileiro com DDD", () => {
@@ -19,5 +23,26 @@ describe("links do WhatsApp", () => {
     expect(criarLinkWhatsApp("32999991234", "Olá!\nSegue o PDF.")).toBe(
       "https://wa.me/5532999991234?text=Ol%C3%A1!%0ASegue%20o%20PDF."
     );
+  });
+
+  it("compartilha o PDF pelo menu nativo sem precisar de telefone", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      share,
+      canShare: vi.fn().mockReturnValue(true),
+    });
+
+    const resultado = await compartilharPdf({
+      blob: new Blob(["pdf"], { type: "application/pdf" }),
+      nomeArquivo: "comprovante.pdf",
+      mensagem: "Segue o comprovante.",
+    });
+
+    expect(resultado).toBe("compartilhado");
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({
+      title: "comprovante.pdf",
+      text: "Segue o comprovante.",
+      files: [expect.any(File)],
+    }));
   });
 });

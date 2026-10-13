@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Copy, Download, MessageCircle, X } from "lucide-react";
-import { baixarPdf, criarLinkWhatsApp } from "@/lib/whatsapp-utils";
+import { Copy, Download, Loader2, Share2, X } from "lucide-react";
+import { baixarPdf, compartilharPdf } from "@/lib/whatsapp-utils";
 
 export type DocumentoCliente = { blob: Blob; nomeArquivo: string; mensagem: string; telefone?: string | null; titulo: string };
 
@@ -10,6 +10,7 @@ export function DocumentoClienteDialog({ documento, onFechar }: { documento: Doc
   const [mensagem, setMensagem] = useState(documento.mensagem);
   const [feedback, setFeedback] = useState("");
   const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
   const [urlPdf, setUrlPdf] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -36,7 +37,29 @@ export function DocumentoClienteDialog({ documento, onFechar }: { documento: Doc
     return () => { document.removeEventListener("keydown", teclado); document.body.style.overflow = overflow; anterior?.focus(); };
   }, [onFechar]);
 
-  const linkWhatsApp = criarLinkWhatsApp(documento.telefone || "", mensagem);
+  async function compartilhar() {
+    setErro("");
+    setFeedback("");
+    setEnviando(true);
+    try {
+      const resultado = await compartilharPdf({
+        blob: documento.blob,
+        nomeArquivo: documento.nomeArquivo,
+        mensagem,
+      });
+      setFeedback(
+        resultado === "compartilhado"
+          ? "PDF pronto para compartilhar. Escolha o WhatsApp e a conversa desejada."
+          : "PDF baixado. Escolha a conversa e anexe o arquivo."
+      );
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setErro("Não foi possível compartilhar. Você ainda pode baixar o PDF e copiar a mensagem.");
+      }
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) onFechar(); }}>
     <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={`${id}-titulo`} className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-[var(--foreground)] shadow-xl sm:p-6">
@@ -53,13 +76,13 @@ export function DocumentoClienteDialog({ documento, onFechar }: { documento: Doc
       </div>
       {feedback && <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p>}
       {erro && <p role="alert" className="mt-3 text-sm text-red-600">{erro}</p>}
-      {!documento.telefone && <p className="mt-3 text-sm text-[var(--text-muted)]">Cliente sem telefone cadastrado. Use a mensagem copiada e o PDF baixado.</p>}
+      {!documento.telefone && <p className="mt-3 text-sm text-[var(--text-muted)]">Cliente sem telefone cadastrado. Você ainda pode compartilhar o PDF e escolher a conversa correta no seu aparelho.</p>}
       <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
         {urlPdf && <a href={urlPdf} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-[var(--border)] px-4 py-3 text-sm font-semibold">Visualizar PDF</a>}
         <button type="button" onClick={() => baixarPdf(documento.blob, documento.nomeArquivo)} className="flex items-center gap-2 rounded-xl border border-[var(--border)] px-4 py-3 text-sm font-semibold"><Download size={16}/>Baixar PDF</button>
-        {linkWhatsApp ? <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer" onClick={() => { baixarPdf(documento.blob, documento.nomeArquivo); setFeedback("PDF baixado. Anexe o arquivo na conversa aberta."); setErro(""); }} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1fb85a]"><MessageCircle size={17}/>Abrir WhatsApp</a> : <button type="button" disabled className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-300 px-4 py-3 text-sm font-semibold text-white"><MessageCircle size={17}/>WhatsApp indisponível</button>}
+        <button type="button" disabled={enviando || !mensagem.trim()} onClick={compartilhar} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">{enviando ? <Loader2 size={17} className="animate-spin"/> : <Share2 size={17}/>}Compartilhar PDF</button>
       </div>
-      <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">O botão baixa o PDF e abre a conversa pelo link oficial do WhatsApp com a mensagem pronta. Depois, basta anexar o arquivo baixado e confirmar o envio.</p>
+      <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">No celular, escolha o WhatsApp e a conversa no menu de compartilhamento. No computador, o PDF é baixado para você anexar onde quiser. O envio sempre é confirmado por você.</p>
     </div>
   </div>;
 }
